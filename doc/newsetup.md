@@ -29,13 +29,13 @@ You might run into some issues while deploying the containers. Here are some iss
 
 ### Build hangs while installing packages on pwnboard container
 
-> Check MTU of host using `ip link show \<networking interface\>` and note the number next to `mtu`. Then run the following command and note the MTU.
+> Find networking interface using `ip a`. Check MTU of interface using `ip link show <interface>` and note the number next to `mtu`. Then run the following command and note the container MTU.
 
 ```bash
 docker run --rm alpine sh -c "ip link show eth0"
 ```
 
-> If this MTU is greater than the host MTU, lower the default docker networking MTU by running the following commands:
+> If this MTU is greater than the host MTU, lower the default Docker networking MTU by running the following commands:
 
 ```bash
 cat <<EOF > /etc/docker/daemon.json
