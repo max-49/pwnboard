@@ -8,7 +8,7 @@ This modified version exists to modernize nullmonk's fork since some things have
 
 ## Running the pwnboard
 
-For RIT Redteam engagements, the pwnboard is deployed with RedTeamDeploy. For custom deployments, see [Pwnboard Setup](./doc/setup.md).
+For instructions on deploying Pwnboard from nothing, see [Pwnboard Setup](./doc/setup.md).
 
 ## Watching the pwnboard
 
