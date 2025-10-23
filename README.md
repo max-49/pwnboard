@@ -2,12 +2,13 @@
 The pwnboard is a tool used for RIT redteam engagements and competitions. It allows Redteam to
 easily see which machines they have access to and which machines they have lost beacons on.
 
-This is a modified version of ztgrace/pwnboard.
+This is a modified version of nullmonk/pwnboard, which is a modified version of ztgrace/pwnboard.
+
+This modified version exists to modernize nullmonk's fork since some things have changed. Documentation written by nullmonk/ztgrace.
 
 ## Running the pwnboard
 
-For RIT Redteam engagements, the pwnboard is deployed with [RedTeamDeploy](https://github.com/micahjmartin/RedTeamDeploy). For custom deployments, see [Pwnboard Setup](./doc/setup.md).
-
+For RIT Redteam engagements, the pwnboard is deployed with RedTeamDeploy. For custom deployments, see [Pwnboard Setup](./doc/setup.md).
 
 ## Watching the pwnboard
 

@@ -1,0 +1,79 @@
+{
+  "name": "UB Lockdown",
+  "date": "Fall 2019",
+  "teams": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+  "networks": [
+        {
+        "name": "client",
+        "ip": "10.x.1",
+        "hosts": [
+        {
+          "os": "Linux ElementaryOS",
+          "name": "Linux A",
+          "ip": "10"
+        },
+        {
+          "os": "Fedora 30",
+          "name": "Linux B",
+          "ip": "20"
+        },
+        {
+          "os": "CentOS",
+          "name": "Linux C",
+          "ip": "30"
+        },
+        {
+          "os": "Linux Mint",
+          "name": "Linux D",
+          "ip": "40"
+        },
+        {
+          "os": "Win7",
+          "name": "Windows A",
+          "ip": "50"
+        },
+        {
+          "os": "Win2019",
+          "name": "AD",
+          "ip": "60"
+        },
+         {
+          "os": "Win10",
+          "name": "Windows B",
+          "ip": "70"
+        }
+      ]
+    },
+    {
+      "name": "cloud",
+      "ip": "10.x.2",
+      "hosts": [
+        {
+          "os": "pfsense",
+          "name": "pfsense",
+          "ip": "1"
+        },
+        {
+          "os": "CentOS 7",
+          "name": "Web",
+          "ip": "2"
+        },
+        {
+          "os": "Ubuntu16",
+          "name": "DB",
+          "ip": "3"
+        },
+        {
+          "os": "Win Serv 16",
+          "name": "FTP",
+          "ip": "4"
+        },
+        {
+          "os": "CentOS 7",
+          "name": "Gitlab",
+          "ip": "5"
+        }
+      ]
+    }
+  ]
+}

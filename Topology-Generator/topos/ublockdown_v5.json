@@ -1,0 +1,101 @@
+
+{
+    "name": "UB Lockdown v6",
+    "date": "Fall 2018",
+    "teams": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+    ],
+    "networks": [
+        {
+            "name": "client",
+            "ip": "10.x.1",
+            "hosts": [
+                {
+                    "os": "ubuntu",
+                    "name": "Linux A",
+                    "ip": "10"
+                },
+                {
+                    "os": "CentOS 7",
+                    "name": "Linux B",
+                    "ip": "20"
+                },
+                {
+                    "os": "CentOS 7",
+                    "name": "Linux C",
+                    "ip": "30"
+                },
+                {
+                    "os": "Win10",
+                    "name": "Windows A",
+                    "ip": "40"
+                },
+                {
+                    "os": "Win10",
+                    "name": "Windows B",
+                    "ip": "50"
+                },
+                {
+                    "os": "Win2016",
+                    "name": "AD",
+                    "ip": "60"
+                }
+            ]
+        },
+        {
+            "name": "cloud",
+            "ip": "10.x.2",
+            "hosts": [
+                {
+                    "os": "pfsense",
+                    "name": "pfsense",
+                    "ip": "1"
+                },
+                {
+                    "os": "ubuntu16",
+                    "name": "Web",
+                    "ip": "2"
+                },
+                {
+                    "os": "ubuntu16",
+                    "name": "DB",
+                    "ip": "3"
+                },
+                {
+                    "os": "",
+                    "name": "DB",
+                    "ip": "3"
+                },
+                {
+                    "os": "",
+                    "name": "Mail",
+                    "ip": "4"
+                },
+                {
+                    "os": "",
+                    "name": "Gitlab",
+                    "ip": "5"
+                },
+                {
+                    "os": "",
+                    "name": "Greylog",
+                    "ip": "6"
+                }
+            ]
+        }
+    ]
+}

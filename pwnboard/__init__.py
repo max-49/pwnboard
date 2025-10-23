@@ -42,8 +42,7 @@ logger.setLevel(logging.DEBUG)
 # Create the redis object. Make sure that we decode our responses
 rserver = os.environ.get('REDIS_HOST', 'localhost')
 rport = os.environ.get('REDIS_PORT', 6379)
-r = redis.StrictRedis(host=rserver, port=rport,
-                      charset='utf-8', decode_responses=True)
+r = redis.StrictRedis(host=rserver, port=rport, decode_responses=True)
 
 # Ignore a few errors here as routes arn't "used" and "not at top of file"
 from . import routes  # noqa: E402, F401

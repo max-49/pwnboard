@@ -5,17 +5,17 @@ EXPOSE 5000
 # Install package dependencies
 RUN apk add --update python3 uwsgi py3-pip
 COPY requirements.txt /tmp/requirements.txt
-RUN pip3 install --upgrade pip
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 RUN pip3 install -r /tmp/requirements.txt
 
 # Install the code
-#RUN mkdir -p /opt/pwnboard/
 COPY . /opt/pwnboard/
 WORKDIR /opt/pwnboard
 
 # Build the board file if one isnt given
 RUN /bin/sh scripts/setup.sh
 
-CMD ["python3", "pwnboard.py"]
+CMD ["python", "pwnboard.py"]
 
 #CMD ["uwsgi", "--yaml", "/opt/pwnboard/config/wsgi.yml"]
