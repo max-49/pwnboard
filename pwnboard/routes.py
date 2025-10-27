@@ -94,7 +94,36 @@ def callback():
     BOARDCACHE_UPDATED = True
     return "valid"
 
+@app.route('/creds', methods=['POST'])
+def creds_callback():
+    """Handle when a server registers a credential update"""
+    data = request.get_json(force=True)
+    # data = {"ip": <ip>, "username": <username>, "password": <password>, "admin": 0/1} --> callback
+    data['last_seen'] = getEpoch()
+    # Make sure 'application' is in the data
+    if 'username' not in data and 'password' not in data:
+        return "Invalid: Missing 'username' or 'password' in the request"
+    
+    if 'admin' in data:
+        if data['admin'] not in [0,1]:
+            return "Invalid: admin must be set to either 0 (not admin) or 1 (admin)"
+    else:
+        # -1 = unknown
+        data['admin'] = -1
 
+    if 'ips' in data and isinstance(data['ips'], list):
+        for ip in data['ips']:
+            d = dict(data)
+            d['ip'] = ip
+            saveData(d)
+    elif 'ip' in data:
+        saveData(data)
+    else:
+        return 'invalid POST'
+    # Tell us that new data has come
+    global BOARDCACHE_UPDATED
+    BOARDCACHE_UPDATED = True
+    return "valid"
 
 @app.route('/install/<tool>/', methods=['GET'])
 @app.route('/install/<tool>', methods=['GET'])

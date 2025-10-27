@@ -140,4 +140,30 @@ def saveData(data):
         'last_seen': data['last_seen']
     })
 
+def saveCredData(data):
+    '''
+    Parse credential updates that come in via POST to the server.
+
+    'username' and 'password' are required in the data
+    '''
+    # Don't accept callback from no IP or loopback
+    if str(data.get('ip', '127.0.0.1')).lower() in ["127.0.0.1", "none", None, "null"]:
+        return
+
+    logger.debug("updated credentials for {}".format(data['ip']))
+    # Fill in default values. Fastest way according to https://stackoverflow.com/a/17501506
+    data['server'] = data['server'] if 'server' in data else "pwnboard"
+    data['message'] = data['message'] if 'message' in data else "Callback received to {}".format(data['server'])
+
+    send_syslog("CREDENTIALS {ip} {message}".format(**data))
+
+    #TODO: Make this work with credentials
+    # save this to the DB
+    r.hmset(data['ip'], {
+        'username': data['username'],
+        'password': data['password'],
+        'server': data['server'],
+        'last_seen': data['last_seen']
+    })
+
 
