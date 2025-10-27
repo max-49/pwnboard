@@ -69,9 +69,9 @@ def getHostData(ip):
 
     # Set the last seen time based on time calculations
     last = getTimeDelta(last)
-    if last > int(os.environ.get("HOST_TIMEOUT", 2)):
+    if last and last > int(os.environ.get("HOST_TIMEOUT", 2)):
         if online and online.lower().strip() == "true":
-            logger.warn("{} offline".format(ip))
+            logger.warning("{} offline".format(ip))
             # Try to send a slack message
             send_syslog("pwnboard GENERIC {} went offline".format(ip))
         status['online'] = ""
@@ -119,6 +119,9 @@ def saveData(data):
 
     'ip' and 'application' are required in the data
     '''
+    # data = {"ip": <ip>, "application": <type>, "last_seen": <time>}
+    # data = {"ip": <ip>, "application": <type>, "server": <server>, "message": <log msg>, "last_seen": <time>}
+    # Don't accept callback from no IP or loopback
     if str(data.get('ip', '127.0.0.1')).lower() in ["127.0.0.1", "none", None, "null"]:
         return
 

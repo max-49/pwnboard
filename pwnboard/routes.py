@@ -12,7 +12,10 @@ from . import app, logger, r, BOARD
 
 
 # The cache of the main board page
-BOARDCACHE_TIMEOUT = os.environ.get('CACHE_TIME', -1)  # -1 means disabled
+try:
+    BOARDCACHE_TIMEOUT = int(os.environ.get('CACHE_TIME', -1))  # -1 means disabled
+except (TypeError, ValueError):
+    BOARDCACHE_TIMEOUT = -1
 BOARDCACHE = ""
 BOARDCACHE_TIME = 0
 BOARDCACHE_UPDATED = True
@@ -60,14 +63,22 @@ def index():
 def callback():
     """Handle when a server registers an callback"""
     data = request.get_json(force=True)
+    # data = {"ip": <ip>, "type": <type>} --> callback
+    # data = {"ips": ['list', 'of', 'ips'], "type": type} --> callback
+    # data = {"ip": <ip>, "challenge": nonce} --> challenge
+    # data = {"challenge": nonce} --> challenge
     if 'challenge' in data:
         return data['challenge']
     data['last_seen'] = getEpoch()
+    # data = {"ip": <ip>, "type": <type>, "last_seen": <time>}
+    # data = {"ips": ['ip', 'ip'], "type": <type>, "last_seen": <time>}
     # Make sure 'application' is in the data
     if 'application' not in data and 'type' not in data:
         return "Invalid: Missing 'application' or 'type' in the request"
 
     if 'type' in data: data['application'] = data['type']
+    # data = {"ip": <ip>, "application": <type>, "last_seen": <time>}
+    # data = {"ips": ['ip', 'ip'], "application": <type>, "last_seen": <time>}
 
     if 'ips' in data and isinstance(data['ips'], list):
         for ip in data['ips']:
