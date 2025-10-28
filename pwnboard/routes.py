@@ -92,13 +92,13 @@ def callback():
     # Tell us that new data has come
     global BOARDCACHE_UPDATED
     BOARDCACHE_UPDATED = True
-    return "valid"
+    return "valid\n"
 
 @app.route('/creds', methods=['POST'])
 def creds_callback():
     """Handle when a server registers a credential update"""
     data = request.get_json(force=True)
-    # data = {"ip": <ip>, "application": <application>, "username": <username>, "password": <password>, "admin": 0/1} --> callback
+    # data = {"ip": <ip>, "username": <username>, "password": <password>, "admin": 0/1} --> callback
     data['last_seen'] = getEpoch()
     # Make sure username and password are in the data
     if 'username' not in data and 'password' not in data:
@@ -123,7 +123,7 @@ def creds_callback():
     # Tell us that new data has come
     global BOARDCACHE_UPDATED
     BOARDCACHE_UPDATED = True
-    return "valid"
+    return "valid\n"
 
 @app.route('/install/<tool>/', methods=['GET'])
 @app.route('/install/<tool>', methods=['GET'])
