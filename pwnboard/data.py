@@ -59,7 +59,7 @@ def getHostData(ip):
     # Request the data from the database
     server, app, last, message, online = r.hmget(ip, ('server', 'application',
                                       'last_seen', 'message', 'online'))
-    creds_last, creds = r.hmget(f"{ip}:creds", ('last_seen', 'creds'))
+    creds_last, creds, creds_online = r.hmget(f"{ip}:creds", ('last_seen', 'creds', 'creds_online'))
     # Add the data to a dictionary
     status = {}
     status['ip'] = ip
@@ -75,15 +75,20 @@ def getHostData(ip):
     # Set the last seen time based on time calculations
     last = getTimeDelta(last)
     if last and last > int(os.environ.get("HOST_TIMEOUT", 2)):
-        if online and online.lower().strip() == "true":
+        if creds_online and creds_online.lower().strip() == "true":
             logger.warning("{} offline".format(ip))
             # Try to send a slack message
             send_syslog("pwnboard GENERIC {} went offline".format(ip))
         status['online'] = ""
     else:
         status['online'] = "True"
+
+    if creds_last and creds_last > int(os.environ.get("CREDS_TIMEOUT", 30)):
+        status['creds_online'] = ""
+    else:
+        status['creds_online'] = "True"
     # Write the status to the database
-    r.hmset(ip, {'online': status['online']})
+    r.hmset(f"{ip}:creds", {'creds_online': status['creds_online']})
 
     status['Last Seen'] = "{}m".format(last)
     status['Type'] = app

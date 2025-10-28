@@ -33,10 +33,19 @@
                         <td><b>{{ row['name'] }}</b></td>
                         {% for host in row['hosts'] %}
                             {% if 'online' in host and host.pop('online') %}
+                                {% if 'creds_online' in host %}
+                                    <b>{{ host.pop('creds_online') }}</b>
+                                {% endif %}
                                 {% if theme == "blue" %}
                                     <td class="bg-danger">
                                 {% else %}
                                     <td class="bg-success">
+                                {% endif %}
+                            {% elif 'creds_online' in host and host.pop('creds_online') %}
+                                {% if theme == "blue" %}
+                                    <td class="bg-warning">
+                                {% else %}
+                                    <td class="bg-warning">
                                 {% endif %}
                             {% else %}
                                 {% if theme == "blue" %}
@@ -51,7 +60,7 @@
                             <span style="font-size: 0.8em; display: inline-block;">
                                 {# If we are on the last seen key, add 'm' #}
                                 {{k}}: {{v}}
-                            </span>
+                            </span><br>
                             {% endfor %}
                         </td>
                         {% endfor %}
