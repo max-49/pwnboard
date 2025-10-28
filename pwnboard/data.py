@@ -88,6 +88,7 @@ def getHostData(ip):
     else:
         status['creds_online'] = "True"
     # Write the status to the database
+    r.hmset(ip, {'online': status['online']})
     r.hmset(f"{ip}:creds", {'creds_online': status['creds_online']})
 
     status['Last Seen'] = "{}m".format(last)

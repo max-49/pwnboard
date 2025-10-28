@@ -32,7 +32,7 @@
                     <tr>
                         <td><b>{{ row['name'] }}</b></td>
                         {% for host in row['hosts'] %}
-                            {% if 'online' in host and host.pop('online') %}
+                            {% if 'online' in host and 'online' != '' and host.pop('online') %}
                                 {% if 'creds_online' in host %}
                                     <b>{{ host.pop('creds_online') }}</b>
                                 {% endif %}
@@ -41,7 +41,7 @@
                                 {% else %}
                                     <td class="bg-success">
                                 {% endif %}
-                            {% elif 'creds_online' in host and host.pop('creds_online') %}
+                            {% elif 'creds_online' in host 'creds_online' != '' and host.pop('creds_online') %}
                                 {% if theme == "blue" %}
                                     <td class="bg-warning">
                                 {% else %}
