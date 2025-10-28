@@ -141,7 +141,7 @@ def saveData(data):
 
     # save this to the DB
     r.hmset(data['ip'], {
-        'creds_app': data['application'],
+        'application': data['application'],
         'message': data['message'],
         'server': data['server'],
         'last_seen': data['last_seen']
