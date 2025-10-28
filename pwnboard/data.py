@@ -59,8 +59,8 @@ def getHostData(ip):
     # Request the data from the database
     server, app, last, message, online = r.hmget(ip, ('server', 'application',
                                       'last_seen', 'message', 'online'))
-    creds_last, creds_app, username, password, admin = r.hmget(f"{ip}:creds", ('last_seen', 'creds_app',
-                                      'username', 'password', 'admin'))
+    creds_last, creds_app, creds = r.hmget(f"{ip}:creds", ('last_seen', 'creds_app',
+                                      'creds'))
     # Add the data to a dictionary
     status = {}
     status['ip'] = ip
@@ -69,11 +69,12 @@ def getHostData(ip):
     if all([x is None for x in (server, app, last, message, online)]):
         return status
     
-    if all([x is None for x in (creds_last, creds_app, username, password)]):
+    if all([x is None for x in (creds_last, creds_app, creds)]):
         status['has_creds'] = False
 
     # Set the last seen time based on time calculations
     last = getTimeDelta(last)
+    creds_last = getTimeDelta(creds_last)
     if last and last > int(os.environ.get("HOST_TIMEOUT", 2)):
         if online and online.lower().strip() == "true":
             logger.warning("{} offline".format(ip))
@@ -88,13 +89,10 @@ def getHostData(ip):
     status['Last Seen'] = "{}m".format(last)
     status['Type'] = app
     
-    if (username is not None):
-        status['has_creds'] = True
-        status['Administrator'] = True if admin == 1 else False
-        status['Username'] = username
-        status['Password'] = password
+    if (creds is not None):
+        status['Creds'] = creds
         status['Creds App'] = creds_app
-        status['Creds Last Seen'] = creds_last
+        status['Creds Last Seen'] = "{}m".format(creds_last)
 
     return status
 
@@ -174,10 +172,9 @@ def saveCredData(data):
 
     #TODO: Make this work with credentials
     # save this to the DB
+    credstring = f"{'*' if data['admin'] else ''} {data['username']}:{data['password']}"
     r.hmset(f"{data['ip']}:creds", {
-        'username': data['username'],
-        'password': data['password'],
-        'admin': data['admin'],
+        'creds': credstring,
         'application': data['application'],
         'server': data['server'],
         'last_seen': data['last_seen']
