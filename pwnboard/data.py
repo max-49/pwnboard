@@ -72,9 +72,10 @@ def getHostData(ip):
             status['Creds Last Seen'] = "{}m".format(creds_last)
         if creds_last and creds_last > int(os.environ.get("CREDS_TIMEOUT", 30)):
             status['creds_online'] = ""
-        else:
+            r.hmset(f"{ip}:creds", {'creds_online': status['creds_online']})
+        elif creds_last:
             status['creds_online'] = "True"
-        r.hmset(f"{ip}:creds", {'creds_online': status['creds_online']})
+            r.hmset(f"{ip}:creds", {'creds_online': status['creds_online']})
         return status
 
     # Set the last seen time based on time calculations
