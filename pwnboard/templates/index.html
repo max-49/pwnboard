@@ -50,7 +50,7 @@
                             {% for k, v in host.items() %}
                             <span style="font-size: 0.8em; display: inline-block;">
                                 {# If we are on the last seen key, add 'm' #}
-                                {{k}}: {{v}}{% if k == 'Last seen' or k == 'Creds Last Seen' %}m{% endif %}
+                                {{k}}: {{v}}
                             </span>
                             {% endfor %}
                         </td>

@@ -65,12 +65,15 @@ def getHostData(ip):
     status['ip'] = ip
     # If all the data is None from the DB, just return the blank status
     # stop unneeded calcs. and prevent data from being written to db
+    creds_last = getTimeDelta(creds_last)
     if all([x is None for x in (server, app, last, message, online)]):
+        if (creds is not None):
+            status['Creds'] = creds
+            status['Creds Last Seen'] = "{}m".format(creds_last)
         return status
 
     # Set the last seen time based on time calculations
     last = getTimeDelta(last)
-    creds_last = getTimeDelta(creds_last)
     if last and last > int(os.environ.get("HOST_TIMEOUT", 2)):
         if online and online.lower().strip() == "true":
             logger.warning("{} offline".format(ip))
