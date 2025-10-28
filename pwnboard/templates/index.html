@@ -32,17 +32,13 @@
                     <tr>
                         <td><b>{{ row['name'] }}</b></td>
                         {% for host in row['hosts'] %}
-                            {% if 'online' in host and 'online' != '' and host.pop('online') %}
-                                {% if 'creds_online' in host %}
-                                    <h1>I AM ONLINE WITH CREDS</h1>
-                                    <b>{{ host.pop('creds_online') }}</b>
-                                {% endif %}
+                            {% if 'online' in host and host['online'] != '' and host['online'] %}
                                 {% if theme == "blue" %}
                                     <td class="bg-danger">
                                 {% else %}
                                     <td class="bg-success">
                                 {% endif %}
-                            {% elif 'creds_online' in host and 'creds_online' != '' and host.pop('creds_online') %}
+                            {% elif 'creds_online' in host and host['creds_online'] != '' and host['creds_online'] %}
                                 {% if theme == "blue" %}
                                     <td class="bg-warning">
                                 {% else %}
@@ -55,6 +51,8 @@
                                     <td class="bg-danger">
                                 {% endif %}
                             {% endif %}
+                            {% set _ = host.pop('online', None) %}
+                            {% set _ = host.pop('creds_online', None) %}
                             <b>{{ host.pop('ip') }}</b><br/>
                             
                             {% for k, v in host.items() %}
