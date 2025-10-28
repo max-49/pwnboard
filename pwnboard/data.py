@@ -83,7 +83,7 @@ def getHostData(ip):
     # Set the last seen time based on time calculations
     last = getTimeDelta(last)
     if last and last > int(os.environ.get("HOST_TIMEOUT", 2)):
-        if creds_online and creds_online.lower().strip() == "true":
+        if online and online.lower().strip() == "true":
             logger.warning("{} offline".format(ip))
             # Try to send a slack message
             send_syslog("pwnboard GENERIC {} went offline".format(ip))
@@ -93,7 +93,7 @@ def getHostData(ip):
 
     if creds_last and creds_last > int(os.environ.get("CREDS_TIMEOUT", 30)):
         status['creds_online'] = ""
-    else:
+    elif creds:
         status['creds_online'] = "True"
     # Write the status to the database
     r.hmset(ip, {'online': status['online']})
