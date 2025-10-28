@@ -98,9 +98,9 @@ def callback():
 def creds_callback():
     """Handle when a server registers a credential update"""
     data = request.get_json(force=True)
-    # data = {"ip": <ip>, "username": <username>, "password": <password>, "admin": 0/1} --> callback
+    # data = {"ip": <ip>, "application": <application>, "username": <username>, "password": <password>, "admin": 0/1} --> callback
     data['last_seen'] = getEpoch()
-    # Make sure 'application' is in the data
+    # Make sure username and password are in the data
     if 'username' not in data and 'password' not in data:
         return "Invalid: Missing 'username' or 'password' in the request"
     

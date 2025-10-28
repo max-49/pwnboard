@@ -59,6 +59,8 @@ def getHostData(ip):
     # Request the data from the database
     server, app, last, message, online = r.hmget(ip, ('server', 'application',
                                       'last_seen', 'message', 'online'))
+    creds_last, creds_app, username, password, admin = r.hmget(f"{ip}:creds", ('last_seen', 'application',
+                                      'username', 'password', 'admin'))
     # Add the data to a dictionary
     status = {}
     status['ip'] = ip
@@ -66,6 +68,9 @@ def getHostData(ip):
     # stop unneeded calcs. and prevent data from being written to db
     if all([x is None for x in (server, app, last, message, online)]):
         return status
+    
+    if all([x is None for x in (creds_last, creds_app, username, password)]):
+        status['has_creds'] = False
 
     # Set the last seen time based on time calculations
     last = getTimeDelta(last)
@@ -82,6 +87,15 @@ def getHostData(ip):
 
     status['Last Seen'] = "{}m".format(last)
     status['Type'] = app
+    
+    if ("has_creds" not in status):
+        status['has_creds'] = True
+        status['Administrator'] = True if admin == 1 else False
+        status['Username'] = username
+        status['Password'] = password
+        status['Creds App'] = creds_app
+        status['Creds Last Seen'] = creds_last
+
     return status
 
 
@@ -154,14 +168,17 @@ def saveCredData(data):
     # Fill in default values. Fastest way according to https://stackoverflow.com/a/17501506
     data['server'] = data['server'] if 'server' in data else "pwnboard"
     data['message'] = data['message'] if 'message' in data else "Callback received to {}".format(data['server'])
+    data['application'] = data['application'] if 'application' in data else "generic"
 
     send_syslog("CREDENTIALS {ip} {message}".format(**data))
 
     #TODO: Make this work with credentials
     # save this to the DB
-    r.hmset(data['ip'], {
+    r.hmset(f"{data['ip']}:creds", {
         'username': data['username'],
         'password': data['password'],
+        'admin': data['admin'],
+        'application': data['application'],
         'server': data['server'],
         'last_seen': data['last_seen']
     })
