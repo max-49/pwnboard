@@ -34,6 +34,7 @@
                         {% for host in row['hosts'] %}
                             {% if 'online' in host and 'online' != '' and host.pop('online') %}
                                 {% if 'creds_online' in host %}
+                                    <h1>I AM ONLINE WITH CREDS</h1>
                                     <b>{{ host.pop('creds_online') }}</b>
                                 {% endif %}
                                 {% if theme == "blue" %}
