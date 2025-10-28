@@ -87,16 +87,16 @@ def getHostData(ip):
             logger.warning("{} offline".format(ip))
             # Try to send a slack message
             send_syslog("pwnboard GENERIC {} went offline".format(ip))
-        status['online'] = ""
+        status['online'] = ''
     else:
         status['online'] = "True"
 
     if creds_last and creds_last > int(os.environ.get("CREDS_TIMEOUT", 30)):
-        status['creds_online'] = ""
+        status['creds_online'] = ''
     elif creds:
         status['creds_online'] = "True"
     else:
-        status['creds_online'] = None
+        status['creds_online'] = ''
     # Write the status to the database
     r.hmset(ip, {'online': status['online']})
     r.hmset(f"{ip}:creds", {'creds_online': status['creds_online']})
