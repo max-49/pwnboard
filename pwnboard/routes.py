@@ -7,7 +7,7 @@ from flask import (request, render_template, make_response, Response, url_for,
 #from .functions import saveData
 
 
-from .data import getBoardDict, getEpoch, getAlert, saveData, send_syslog
+from .data import getBoardDict, getEpoch, getAlert, saveData, saveCredData, send_syslog
 from . import app, logger, r, BOARD
 
 
@@ -115,9 +115,9 @@ def creds_callback():
         for ip in data['ips']:
             d = dict(data)
             d['ip'] = ip
-            saveData(d)
+            saveCredData(d)
     elif 'ip' in data:
-        saveData(data)
+        saveCredData(data)
     else:
         return 'invalid POST'
     # Tell us that new data has come
