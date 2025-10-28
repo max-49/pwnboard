@@ -95,6 +95,8 @@ def getHostData(ip):
         status['creds_online'] = ""
     elif creds:
         status['creds_online'] = "True"
+    else:
+        status['creds_online'] = None
     # Write the status to the database
     r.hmset(ip, {'online': status['online']})
     r.hmset(f"{ip}:creds", {'creds_online': status['creds_online']})
