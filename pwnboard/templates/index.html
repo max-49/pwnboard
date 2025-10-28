@@ -41,7 +41,7 @@
                                 {% else %}
                                     <td class="bg-success">
                                 {% endif %}
-                            {% elif 'creds_online' in host 'creds_online' != '' and host.pop('creds_online') %}
+                            {% elif 'creds_online' in host and 'creds_online' != '' and host.pop('creds_online') %}
                                 {% if theme == "blue" %}
                                     <td class="bg-warning">
                                 {% else %}
