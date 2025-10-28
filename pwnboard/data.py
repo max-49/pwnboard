@@ -59,7 +59,7 @@ def getHostData(ip):
     # Request the data from the database
     server, app, last, message, online = r.hmget(ip, ('server', 'application',
                                       'last_seen', 'message', 'online'))
-    creds_last, creds_app, username, password, admin = r.hmget(f"{ip}:creds", ('last_seen', 'application',
+    creds_last, creds_app, username, password, admin = r.hmget(f"{ip}:creds", ('last_seen', 'creds_app',
                                       'username', 'password', 'admin'))
     # Add the data to a dictionary
     status = {}
@@ -88,7 +88,7 @@ def getHostData(ip):
     status['Last Seen'] = "{}m".format(last)
     status['Type'] = app
     
-    if ("has_creds" not in status):
+    if (username is not None):
         status['has_creds'] = True
         status['Administrator'] = True if admin == 1 else False
         status['Username'] = username
@@ -148,7 +148,7 @@ def saveData(data):
 
     # save this to the DB
     r.hmset(data['ip'], {
-        'application': data['application'],
+        'creds_app': data['application'],
         'message': data['message'],
         'server': data['server'],
         'last_seen': data['last_seen']
