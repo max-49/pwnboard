@@ -66,10 +66,7 @@ def getHostData(ip):
     # If all the data is None from the DB, just return the blank status
     # stop unneeded calcs. and prevent data from being written to db
     creds_last = getTimeDelta(creds_last)
-    if all([x is None for x in (server, app, last, message, online)]):
-        if (creds is not None):
-            status['Creds'] = creds
-            status['Creds Last Seen'] = "{}m".format(creds_last)
+    if all([x is None for x in (server, app, last, message, online, creds, creds_last, creds_online)]):
         return status
 
     # Set the last seen time based on time calculations
