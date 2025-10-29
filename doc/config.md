@@ -27,3 +27,5 @@ environment variables and their default settings.
 
 - `SYSLOG_HOST` _No default_ - If HOST and PORT are set for SYSLOG, send syslog data to the server on every callback
 - `SYSLOG_PORT` _No default_
+
+this is an easter egg
