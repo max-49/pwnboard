@@ -1,0 +1,20 @@
+name: Sync to RITSEC GitLab
+on:
+  push:
+    branches:
+    - main
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      
+    - name: Checkout full repository
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Push to RITSEC GitLab
+      run: |
+        git remote add gitlab https://oauth2:${{ secrets.GITLABSYNC }}@gitlab.ritsec.cloud/redteam/pwnboard.git
+        git push gitlab
