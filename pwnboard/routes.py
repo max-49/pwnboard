@@ -60,6 +60,7 @@ def index():
 
 @app.route('/checkin', methods=['POST'])
 @app.route('/generic', methods=['POST'])
+@app.route('/pwn', methods=['POST'])
 def callback():
     """Handle when a server registers an callback"""
     data = request.get_json(force=True)

@@ -57,8 +57,8 @@ def getHostData(ip):
     type - The last service the host called back through
     '''
     # Request the data from the database
-    server, app, last, message, online = r.hmget(ip, ('server', 'application',
-                                      'last_seen', 'message', 'online'))
+    server, app, last, message, online, access_type = r.hmget(ip, ('server', 'application',
+                                      'last_seen', 'message', 'online', 'access_type'))
     creds_last, creds, creds_online = r.hmget(f"{ip}:creds", ('last_seen', 'creds', 'creds_online'))
     # Add the data to a dictionary
     status = {}
@@ -103,6 +103,7 @@ def getHostData(ip):
 
     status['Last Seen'] = "{}m".format(last)
     status['Type'] = app
+    status['Access Type'] = access_type
     
     if (creds is not None):
         status['Creds'] = creds
@@ -155,12 +156,14 @@ def saveData(data):
     # Fill in default values. Fastest way according to https://stackoverflow.com/a/17501506
     data['server'] = data['server'] if 'server' in data else "pwnboard"
     data['message'] = data['message'] if 'message' in data else "Callback received to {}".format(data['server'])
+    data['access_type'] = data['access_type'] if 'access_type' in data else "generic"
 
     send_syslog("{application} BOXACCESS {ip} {message}".format(**data))
 
     # save this to the DB
     r.hmset(data['ip'], {
         'application': data['application'],
+        'access_type': data['access_type'],
         'message': data['message'],
         'server': data['server'],
         'last_seen': data['last_seen']
