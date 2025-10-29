@@ -10,7 +10,6 @@ SYSLOGSOCK = None
 HOST=os.environ.get("SYSLOG_HOST", None)
 PORT=int(os.environ.get("SYSLOG_PORT", -1))
 
-
 def send_syslog(string):
     """Send a syslog to the server. Make sure the port is open though
     """

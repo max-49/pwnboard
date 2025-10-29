@@ -11,7 +11,6 @@ from os.path import isfile
 
 BOARD = []
 
-
 def loadBoard():
     global BOARD
     fil = os.environ.get("BOARD", "board.json")
