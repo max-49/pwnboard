@@ -178,6 +178,10 @@ def saveCredData(data):
     if str(data.get('ip', '127.0.0.1')).lower() in ["127.0.0.1", "none", None, "null"]:
         return
 
+    # if no password, don't accept
+    if (len(data['password']) <= 1):
+        return
+
     logger.debug("updated credentials for {}".format(data['ip']))
     # Fill in default values. Fastest way according to https://stackoverflow.com/a/17501506
     data['server'] = data['server'] if 'server' in data else "pwnboard"
