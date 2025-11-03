@@ -19,18 +19,3 @@ services:
   redis:
     image: redis:alpine
     restart: always
-
-  # superset:
-  #   image: apache/superset:latest
-  #   ports:
-  #     - 8088:8088
-  #   environment:
-  #     - SUPERSET_PASS=i_love_big_oil
-  #     - PWN_BOARD=/app/pythonpath/board.json
-  #     - PWNBOARD_URL=https://pwnboard.win
-  #     - REDIS_HOST=redis
-  #     - REDIS_PORT=6379
-  #     - MYSQL_HOST=mysql
-  #     - MYSQL_USER=pwnboard
-  #     - MYSQL_PASS=example
-  #     - MYSQL_DB=pwnboard

@@ -6,8 +6,8 @@ h1 {
     color: #fff;
 }
 
-.bg-red-1 { background-color: #fde8e8 !important; }  /* lightest */
-.bg-red-2 { background-color: #f8b4b4 !important; }
-.bg-red-3 { background-color: #f98080 !important; }
+.bg-red-1 { background-color: #f07b7b !important; }
+.bg-red-2 { background-color: #e65b5b !important; }
+.bg-red-3 { background-color: #e34646 !important; }
 .bg-red-4 { background-color: #e02424 !important; }
-.bg-red-5 { background-color: #b91c1c !important; }  /* deepest red */
+.bg-red-5 { background-color: #b91c1c !important; }

@@ -9,6 +9,10 @@ RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 RUN pip3 install -r /tmp/requirements.txt
 
+# PWNboard environment variables (timeouts in minutes)
+ENV HOST_TIMEOUT=5
+ENV CREDS_TIMEOUT=30
+
 # Install the code
 COPY . /opt/pwnboard/
 WORKDIR /opt/pwnboard
