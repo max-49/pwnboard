@@ -3,25 +3,38 @@ import random
 import requests
 import json
 import time
-import sys
 
-hosts = ["10.x.1.10",  "10.x.1.20", "10.x.1.30", "10.x.1.40", "10.x.1.50",
-         "10.x.2.2", "10.x.2.3", "10.3.x.3"]
-server = "http://localhost/generic"
+def random_callbacks(server, time_interval, hosts):
+    while True:
+        for i in range(random.randint(0,20)):
+            ip = random.choice(hosts)
+            data = json.dumps({'ip': ip, "application": f"c2_{random.randint(1,20)}"})
+            headers = {'Content-Type': 'application/json'}
+            r = requests.post(server,headers=headers,data=data)
+            print(r)
+            time.sleep(0.1)
+        time.sleep(time_interval)
 
-try:
-    loop = int(sys.argv[1])
-except Exception as E:
-    loop = 30
-while True:
-    ip = random.choice(hosts).replace("x", str(random.randint(1, 10)))
-    data = json.dumps({'ip': ip, "application": "empire"})
-    headers = {'Content-Type': 'application/json', 'Connection': 'Close'}
-    try:
-        r = requests.post(server, headers=headers, data=data,
-                          verify=False)
-        r = r.text
-    except Exception as E:
-        r = "Invalid"
-    print("{}: {}".format(data, r))
-    time.sleep(loop)
+def get_board():
+    start = int(input("Starting team number: "))
+    end = int(input("Ending team number: "))
+    teams = [i for i in range(start, end+1)]
+    networks = input("What are your networks? (separated by commas, ex: 192.168.x.0, 10.x.1.0): ").split(',')
+    networks = [network.strip() for network in networks]
+    board = []
+    for network in networks:
+        ip = ".".join(network.split(".")[:3]).lower()
+        boxes_in_net = input(f"List final octet of boxes in network {network} (ex: 1,2,3 for {ip}.1, {ip}.2, {ip}.3): ").split(',')
+        boxes = [ip+"."+box.strip() for box in boxes_in_net]
+        for i in teams:
+            for box in boxes:
+                board.append(box.replace("x", str(i)))
+    return board
+
+def main():
+    board = get_board()
+    server = input("Server Name?: ").strip()
+    random_callbacks(server, 1, board)
+
+if __name__ == '__main__':
+    main()
