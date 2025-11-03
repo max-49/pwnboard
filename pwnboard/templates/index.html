@@ -33,7 +33,7 @@
                         <td><b>{{ row['name'] }}</b></td>
                         {% for host in row['hosts'] %}
                             {% set cb = host.get('Callbacks', 0) %}
-                            {% if cb >= 1 and cb <= 2 %}
+                            {% if cb <= 2 %}
                                 {% set color_class = 'bg-red-1' %}
                             {% elif cb <= 4 %}
                                 {% set color_class = 'bg-red-2' %}
