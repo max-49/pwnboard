@@ -3,6 +3,7 @@ import datetime
 import time
 import os
 import copy
+import json
 import socket
 from . import r, logger, BOARD
 
@@ -59,6 +60,10 @@ def getHostData(ip):
     server, app, last, message, online, access_type = r.hmget(ip, ('server', 'application',
                                       'last_seen', 'message', 'online', 'access_type'))
     creds_last, creds, creds_online = r.hmget(f"{ip}:creds", ('last_seen', 'creds', 'creds_online'))
+
+    # callbacks_raw = r.hgetall(f"{ip}:callbacks")
+    # callbacks = {app.decode(): json.loads(data) for app, data in callbacks_raw.items()}
+
     # Add the data to a dictionary
     status = {}
     status['ip'] = ip
@@ -96,6 +101,14 @@ def getHostData(ip):
         status['creds_online'] = "True"
     else:
         status['creds_online'] = ''
+
+    # get num valid callbacks
+    try:
+        num_valid_callbacks = sum(getTimeDelta(json.loads(v)["last_seen"]) < int(os.environ.get("HOST_TIMEOUT", 2)) 
+                                for v in r.hgetall(f"{ip}:callbacks").values())
+    except Exception as e:
+        num_valid_callbacks = 0
+    
     # Write the status to the database
     r.hmset(ip, {'online': status['online']})
     r.hmset(f"{ip}:creds", {'creds_online': status['creds_online']})
@@ -103,6 +116,7 @@ def getHostData(ip):
     status['Last Seen'] = "{}m".format(last)
     status['Type'] = app
     status['Access Type'] = access_type
+    status['Callbacks'] = num_valid_callbacks
     
     if (creds is not None):
         status['Creds'] = creds
@@ -150,6 +164,36 @@ def saveData(data):
     # Don't accept callback from no IP or loopback
     if str(data.get('ip', '127.0.0.1')).lower() in ["127.0.0.1", "none", None, "null"]:
         return
+    
+    """
+    current (one callback per ip):
+    "192.168.1.1": {
+        'application': data['application'],
+        'access_type': data['access_type'],
+        'message': data['message'],
+        'server': data['server'],
+        'last_seen': data['last_seen']
+    }
+
+    proposed (multiple callbacks)
+    - on callback (or on check?), callbacks list iterated through and delete any 'last_seen' > threshold (5 mins)
+    - store in redis as f"{ip}:callbacks": json_string
+
+    "192.168.1.1:callbacks": "[
+        {'application': application, 'access_type': access_type, 'last_seen': last_seen},
+        {'application': application, 'access_type': access_type, 'last_seen': last_seen},
+        {'application': application, 'access_type': access_type, 'last_seen': last_seen}
+    ]"
+
+    Key: "192.168.1.10:callbacks"
+    Fields:
+        "application" → {"access_type": "", "last_seen": "2025-11-02T12:00:00Z"}
+        "application" → {"access_type": "", "last_seen": "2025-11-02T12:10:00Z"}
+
+    callbacks_json = json.dumps([{'application': application, 'access_type': access_type, 'last_seen': last_seen}, ...])
+    r.set(f"{ip}:callbacks", callbacks_json)
+    callbacks = json.loads(r.get(f"{ip}:callbacks"))
+    """
 
     logger.debug("updated beacon for {} from {}".format(data['ip'], data['application']))
     # Fill in default values. Fastest way according to https://stackoverflow.com/a/17501506
@@ -158,6 +202,13 @@ def saveData(data):
     data['access_type'] = data['access_type'] if 'access_type' in data else "generic"
 
     send_syslog("{application} BOXACCESS {ip} {message}".format(**data))
+
+    super_callback_data = {
+        "access_type": data['access_type'],
+        "last_seen": data['last_seen']
+    }
+
+    r.hset(f"{data['ip']}:callbacks", data['application'], json.dumps(super_callback_data))
 
     # save this to the DB
     r.hmset(data['ip'], {
@@ -189,7 +240,6 @@ def saveCredData(data):
 
     send_syslog("CREDENTIALS {ip} {message}".format(**data))
 
-    #TODO: Make this work with credentials
     # save this to the DB
     credstring = f"{'* ' if data['admin'] == 1 else ''}{data['username']}:{data['password']}"
     r.hmset(f"{data['ip']}:creds", {

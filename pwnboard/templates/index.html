@@ -32,12 +32,25 @@
                     <tr>
                         <td><b>{{ row['name'] }}</b></td>
                         {% for host in row['hosts'] %}
+                            {% set cb = host.get('Callbacks', 0) %}
+                            {% if cb >= 1 and cb <= 2 %}
+                                {% set color_class = 'bg-red-1' %}
+                            {% elif cb <= 4 %}
+                                {% set color_class = 'bg-red-2' %}
+                            {% elif cb <= 6 %}
+                                {% set color_class = 'bg-red-3' %}
+                            {% elif cb <= 8 %}
+                                {% set color_class = 'bg-red-4' %}
+                            {% else %}
+                                {% set color_class = 'bg-red-5' %}
+                            {% endif %}
                             {% if 'online' in host and host['online'] != '' and host['online'] %}
-                                {% if theme == "blue" %}
+                                <!-- {% if theme == "blue" %}
                                     <td class="bg-danger">
                                 {% else %}
                                     <td class="bg-success">
-                                {% endif %}
+                                {% endif %} -->
+                                <td class="{{ color_class }}">
                             {% elif 'creds_online' in host and host['creds_online'] != '' and host['creds_online'] %}
                                 {% if theme == "blue" %}
                                     <td class="bg-warning">
