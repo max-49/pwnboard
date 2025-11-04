@@ -6,8 +6,8 @@ h1 {
     color: #fff;
 }
 
-.bg-red-1 { background-color: #ec7474 !important; }
-.bg-red-2 { background-color: #eb5c5c !important; }
-.bg-red-3 { background-color: #ee4141 !important; }
-.bg-red-4 { background-color: #ec2727 !important; }
-.bg-red-5 { background-color: #eb0808 !important; }
+.bg-red-1 { background-color: rgb(236, 120, 120) !important; }
+.bg-red-2 { background-color: rgb(236, 80, 80) !important; }
+.bg-red-3 { background-color: rgb(236, 40, 40) !important; }
+.bg-red-4 { background-color: rgb(236, 20, 20) !important; }
+.bg-red-5 { background-color: rgb(236, 5, 5) !important; }

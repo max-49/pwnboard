@@ -5,11 +5,28 @@ import os
 import copy
 import json
 import socket
+import requests
 from . import r, logger, BOARD
 
 SYSLOGSOCK = None
 HOST=os.environ.get("SYSLOG_HOST", None)
 PORT=int(os.environ.get("SYSLOG_PORT", -1))
+DISCORD_WEBHOOK=os.environ.get("DISCORD_WEBHOOK", None)
+
+def send_discord(string):
+    if DISCORD_WEBHOOK is None:
+        return
+
+    hook_data = {
+        'content': string,
+        'username': 'PWNboard Bot',
+        'avatar_url': 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRGtJooqzY8OA0YNFuArgmbax3cOuSzXbdBnA&s',
+    }
+
+    try:
+        requests.post(DISCORD_WEBHOOK, json=hook_data, timeout=5)
+    except Exception as e:
+        print(f"Discord webhook error: {e}")
 
 def send_syslog(string):
     """Send a syslog to the server. Make sure the port is open though
@@ -104,8 +121,28 @@ def getHostData(ip):
 
     # get num valid callbacks
     try:
-        num_valid_callbacks = sum(getTimeDelta(json.loads(v)["last_seen"]) < int(os.environ.get("HOST_TIMEOUT", 2)) 
-                                for v in r.hgetall(f"{ip}:callbacks").values())
+        num_valid_callbacks = 0
+        callbacks_data = r.hgetall(f"{ip}:callbacks")
+        host_timeout = int(os.environ.get("HOST_TIMEOUT", 5))
+        
+        for app_name, callback_json in callbacks_data.items():
+            callback_data = json.loads(callback_json)
+            time_delta = getTimeDelta(callback_data["last_seen"])
+            
+            # Skip if time_delta is None (invalid timestamp)
+            if time_delta is None:
+                continue
+            
+            # Check if callback is valid (within timeout)
+            if time_delta < host_timeout:
+                num_valid_callbacks += 1
+
+            # Check if callback exceeded timeout but is still marked as online
+            elif time_delta >= host_timeout and callback_data.get("online") == "True":
+                callback_data["online"] = "False"
+                # Update the callback in Redis
+                r.hset(f"{ip}:callbacks", app_name, json.dumps(callback_data))
+                send_discord(f"LOST BEACON ON {ip}: {app_name}")
     except Exception as e:
         num_valid_callbacks = 0
     
@@ -177,22 +214,12 @@ def saveData(data):
 
     proposed (multiple callbacks)
     - on callback (or on check?), callbacks list iterated through and delete any 'last_seen' > threshold (5 mins)
-    - store in redis as f"{ip}:callbacks": json_string
-
-    "192.168.1.1:callbacks": "[
-        {'application': application, 'access_type': access_type, 'last_seen': last_seen},
-        {'application': application, 'access_type': access_type, 'last_seen': last_seen},
-        {'application': application, 'access_type': access_type, 'last_seen': last_seen}
-    ]"
+    - store in redis as f"{ip}:callbacks": fields
 
     Key: "192.168.1.10:callbacks"
     Fields:
         "application" → {"access_type": "", "last_seen": "2025-11-02T12:00:00Z"}
         "application" → {"access_type": "", "last_seen": "2025-11-02T12:10:00Z"}
-
-    callbacks_json = json.dumps([{'application': application, 'access_type': access_type, 'last_seen': last_seen}, ...])
-    r.set(f"{ip}:callbacks", callbacks_json)
-    callbacks = json.loads(r.get(f"{ip}:callbacks"))
     """
 
     logger.debug("updated beacon for {} from {}".format(data['ip'], data['application']))
@@ -205,7 +232,8 @@ def saveData(data):
 
     super_callback_data = {
         "access_type": data['access_type'],
-        "last_seen": data['last_seen']
+        "last_seen": data['last_seen'],
+        "online": "True"
     }
 
     r.hset(f"{data['ip']}:callbacks", data['application'], json.dumps(super_callback_data))
