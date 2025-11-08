@@ -84,7 +84,7 @@
                                             {% if creds_list and creds_list|length > 0 %}
                                                 <ul class="list-unstyled mb-3">
                                                 {% for cred in creds_list %}
-                                                    <li>{{ cred }}</li>
+                                                    <li><code>{{ cred }}</code></li>
                                                 {% endfor %}
                                                 </ul>
                                             {% else %}
@@ -95,7 +95,7 @@
                                             {% if callbacks_list and callbacks_list|length > 0 %}
                                                 <ul class="list-unstyled">
                                                 {% for cb in callbacks_list %}
-                                                    <li>{{ cb }}</li>
+                                                    <li><code>{{ cb }}</code></li>
                                                 {% endfor %}
                                                 </ul>
                                             {% else %}
