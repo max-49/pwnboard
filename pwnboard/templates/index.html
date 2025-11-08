@@ -46,14 +46,17 @@
                                 {% set color_class = 'bg-red-5' %}
                             {% endif %}
                             {% if 'online' in host and host['online'] != '' and host['online'] %}
+                                {% set text_color = 'text-white' %}
                                 <td class="{{ color_class }}">
                             {% elif 'creds_online' in host and host['creds_online'] != '' and host['creds_online'] %}
+                                {% set text_color = 'text-black' %}
                                 {% if theme == "blue" %}
                                     <td class="bg-warning">
                                 {% else %}
                                     <td class="bg-warning">
                                 {% endif %}
                             {% else %}
+                                {% set text_color = 'text-white' %}
                                 {% if theme == "blue" %}
                                     <td class="bg-primary">
                                 {% else %}
@@ -70,14 +73,14 @@
                                 <div class="modal-dialog modal-lg" role="document">
                                     <div class="modal-content text-dark">
                                         <div class="modal-header">
-                                            <h5 class="modal-title w-100 text-center" id="credsModalLabel_{{ ip|replace('.', '_')|replace(':', '_') }}">Credentials for {{ ip }}</h5>
+                                            <h5 class="modal-title w-100 text-center" id="credsModalLabel_{{ ip|replace('.', '_')|replace(':', '_') }}">{{ ip }}</h5>
                                             <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
                                         </div>
                                         <div class="modal-body text-left">
                                             {% set creds_list = host.pop('all_valid_creds', []) %}
                                             {% set callbacks_list = host.pop('all_valid_callbacks', []) %}
 
-                                            <h6>Credentials</h6>
+                                            <h5>Credentials</h5>
                                             {% if creds_list and creds_list|length > 0 %}
                                                 <ul class="list-unstyled mb-3">
                                                 {% for cred in creds_list %}
@@ -88,7 +91,7 @@
                                                 <p class="text-muted">No credentials for host</p>
                                             {% endif %}
 
-                                            <h6>Callbacks</h6>
+                                            <h5>Callbacks</h5>
                                             {% if callbacks_list and callbacks_list|length > 0 %}
                                                 <ul class="list-unstyled">
                                                 {% for cb in callbacks_list %}
@@ -107,7 +110,7 @@
                             </div>
 
                             {% for k, v in host.items() %}
-                            <span style="font-size: 0.8em; display: inline-block;">
+                            <span style="font-size: 0.8em; display: inline-block;" class="{{ text_color }}">
                                 {# If we are on the last seen key, add 'm' #}
                                 {{k}}: {{v}}
                             </span><br>
