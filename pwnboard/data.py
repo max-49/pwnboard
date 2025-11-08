@@ -88,6 +88,7 @@ def getHostData(ip):
             for _, val in creds_data.items():
                 loaded_val = json.loads(val)
                 if loaded_val['creds_online'] == "True":
+                    print(f"[*] DEBUG: Got valid creds for {ip}! - {loaded_val['creds']}")
                     creds = loaded_val['creds']
                     creds_last = loaded_val['creds_last']
                     creds_online = loaded_val['creds_online']
