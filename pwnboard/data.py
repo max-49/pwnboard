@@ -76,29 +76,7 @@ def getHostData(ip):
     # Request the data from the database
     server, app, last, message, online, access_type = r.hmget(ip, ('server', 'application',
                                       'last_seen', 'message', 'online', 'access_type'))
-
-    # New creds storage: each field in the hash f"{ip}:creds" is a username -> json({"creds": "...", "last_seen": "..."})
-    # We need to find the most recent creds entry across all fields.
-    creds = None
-    creds_last = None
-    creds_online = None
-    try:
-        creds_data = r.hgetall(f"{ip}:creds")
-        if creds_data:
-            for _, val in creds_data.items():
-                loaded_val = json.loads(val)
-                print(f"[*] DEBUG: loaded_val = {loaded_val}")
-                if loaded_val['creds_online'] == "True":
-                    print(f"[*] DEBUG: Got valid creds for {ip}! - {loaded_val['creds']}")
-                    creds = loaded_val['creds']
-                    creds_last = loaded_val['creds_last']
-                    creds_online = loaded_val['creds_online']
-    except Exception as e:
-        print(f"[*] EXCEPTION IN GETTING CREDS: {e}")
-        creds = creds_last = creds_online = None
-
-    # callbacks_raw = r.hgetall(f"{ip}:callbacks")
-    # callbacks = {app.decode(): json.loads(data) for app, data in callbacks_raw.items()}
+    creds_last, creds, creds_online = r.hmget(f"{ip}:creds", ('last_seen', 'creds', 'creds_online'))
 
     # Add the data to a dictionary
     status = {}
@@ -116,10 +94,8 @@ def getHostData(ip):
             status['creds_online'] = ""
         else:
             status['creds_online'] = "True"
-
-        # store the creds_online flag as a single field in the creds hash
-        # r.hset(f"{ip}:creds", 'creds_online', status['creds_online'])
-
+        r.hmset(f"{ip}:creds", {'creds_online': status['creds_online']})
+        
         return status
 
     # Set the last seen time based on time calculations
@@ -169,11 +145,11 @@ def getHostData(ip):
     
     # Write the status to the database
     r.hmset(ip, {'online': status['online']})
-    # store the creds_online flag as a single field in the creds hash
+    r.hmset(f"{ip}:creds", {'creds_online': status['creds_online']})
 
     try:
         all_valid_creds = []
-        creds_data = r.hgetall(f"{ip}:creds")
+        creds_data = r.hgetall(f"{ip}:allcreds")
         creds_timeout = int(os.environ.get("CREDS_TIMEOUT", 30))
 
         for username, cred_json in creds_data.items():
@@ -187,7 +163,7 @@ def getHostData(ip):
                 all_valid_creds.append(cred_data['creds'])
             elif time_delta >= creds_timeout and cred_data.get("creds_online") == "True":
                 cred_data["creds_online"] = "False"
-                r.hset(f"{ip}:creds", username, json.dumps(cred_data))
+                r.hset(f"{ip}:allcreds", username, json.dumps(cred_data))
 
     except Exception as e:
         all_valid_creds = []
@@ -313,11 +289,12 @@ def saveCredData(data):
 
     # save this to the DB
     credstring = f"{'* ' if data['admin'] == 1 else ''}{data['username']}:{data['password']}"
-    # r.hmset(f"{data['ip']}:creds", {
-    #     'creds': credstring,
-    #     'server': data['server'],
-    #     'last_seen': data['last_seen']
-    # })
+    r.hmset(f"{data['ip']}:creds", {
+        'creds': credstring,
+        'server': data['server'],
+        'last_seen': data['last_seen']
+    })
+
     cred_data = {
         "creds": credstring,
         'server': data['server'],
@@ -325,6 +302,6 @@ def saveCredData(data):
         'creds_online': "True"
     }
 
-    r.hset(f"{data['ip']}:creds", data['username'], json.dumps(cred_data))
+    r.hset(f"{data['ip']}:allcreds", data['username'], json.dumps(cred_data))
 
 
