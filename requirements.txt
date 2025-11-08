@@ -1,4 +1,5 @@
 Flask
 PyYAML
 redis
+requests
 python-dotenv

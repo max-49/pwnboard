@@ -87,12 +87,14 @@ def getHostData(ip):
         if creds_data:
             for _, val in creds_data.items():
                 loaded_val = json.loads(val)
+                print(f"[*] DEBUG: loaded_val = {loaded_val}")
                 if loaded_val['creds_online'] == "True":
                     print(f"[*] DEBUG: Got valid creds for {ip}! - {loaded_val['creds']}")
                     creds = loaded_val['creds']
                     creds_last = loaded_val['creds_last']
                     creds_online = loaded_val['creds_online']
-    except Exception:
+    except Exception as e:
+        print(f"[*] EXCEPTION IN GETTING CREDS: {e}")
         creds = creds_last = creds_online = None
 
     # callbacks_raw = r.hgetall(f"{ip}:callbacks")
