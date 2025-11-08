@@ -67,22 +67,36 @@
 
                             <!-- Credentials modal for this host -->
                             <div class="modal fade" id="credsModal_{{ ip|replace('.', '_')|replace(':', '_') }}" tabindex="-1" role="dialog" aria-labelledby="credsModalLabel_{{ ip|replace('.', '_')|replace(':', '_') }}">
-                                <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+                                <div class="modal-dialog modal-lg" role="document">
                                     <div class="modal-content text-dark">
                                         <div class="modal-header">
-                                            <h5 class="modal-title w-100" id="credsModalLabel_{{ ip|replace('.', '_')|replace(':', '_') }}">Credentials for {{ ip }}</h5>
+                                            <h5 class="modal-title w-100 text-center" id="credsModalLabel_{{ ip|replace('.', '_')|replace(':', '_') }}">Credentials for {{ ip }}</h5>
                                             <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
                                         </div>
                                         <div class="modal-body text-left">
                                             {% set creds_list = host.pop('all_valid_creds', []) %}
+                                            {% set callbacks_list = host.pop('all_valid_callbacks', []) %}
+
+                                            <h6>Credentials</h6>
                                             {% if creds_list and creds_list|length > 0 %}
-                                                <ul class="list-unstyled">
+                                                <ul class="list-unstyled mb-3">
                                                 {% for cred in creds_list %}
-                                                    <li>{{ cred }}</li>
+                                                    <li><code>{{ cred }}</code></li>
                                                 {% endfor %}
                                                 </ul>
                                             {% else %}
-                                                <p>No credentials for host</p>
+                                                <p class="text-muted">No credentials for host</p>
+                                            {% endif %}
+
+                                            <h6>Callbacks</h6>
+                                            {% if callbacks_list and callbacks_list|length > 0 %}
+                                                <ul class="list-unstyled">
+                                                {% for cb in callbacks_list %}
+                                                    <li><code>{{ cb }}</code></li>
+                                                {% endfor %}
+                                                </ul>
+                                            {% else %}
+                                                <p class="text-muted">No callbacks for host</p>
                                             {% endif %}
                                         </div>
                                         <div class="modal-footer">

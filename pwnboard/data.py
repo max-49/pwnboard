@@ -65,6 +65,64 @@ def getBoardDict():
             _host.update(getHostData(_host['ip']))
     return board
 
+def getActiveCreds(ip):
+    try:
+        total_creds = 0
+        all_valid_creds = []
+        creds_data = r.hgetall(f"{ip}:allcreds")
+        creds_timeout = int(os.environ.get("CREDS_TIMEOUT", 30))
+
+        for username, cred_json in creds_data.items():
+            cred_data = json.loads(cred_json)
+            time_delta = getTimeDelta(cred_data["last_seen"])
+
+            if time_delta is None:
+                continue
+
+            if time_delta < creds_timeout:
+                all_valid_creds.append(cred_data['creds'])
+                total_creds += 1
+            elif time_delta >= creds_timeout and cred_data.get("creds_online") == "True":
+                cred_data["creds_online"] = "False"
+                r.hset(f"{ip}:allcreds", username, json.dumps(cred_data))
+
+    except Exception as e:
+        total_creds = 0
+        all_valid_creds = []
+
+    return total_creds, all_valid_creds
+
+def getActiveCallbacks(ip):
+    try:
+        num_valid_callbacks = 0
+        active_callbacks = []
+        callbacks_data = r.hgetall(f"{ip}:callbacks")
+        host_timeout = int(os.environ.get("HOST_TIMEOUT", 5))
+        
+        for app_name, callback_json in callbacks_data.items():
+            callback_data = json.loads(callback_json)
+            time_delta = getTimeDelta(callback_data["last_seen"])
+            
+            # Skip if time_delta is None (invalid timestamp)
+            if time_delta is None:
+                continue
+            
+            # Check if callback is valid (within timeout)
+            if time_delta < host_timeout:
+                num_valid_callbacks += 1
+                active_callbacks.append(app_name)
+
+            # Check if callback exceeded timeout but is still marked as online
+            elif time_delta >= host_timeout and callback_data.get("online") == "True":
+                callback_data["online"] = "False"
+                # Update the callback in Redis
+                r.hset(f"{ip}:callbacks", app_name, json.dumps(callback_data))
+                # send_discord(f"LOST BEACON ON {ip}: {app_name}")
+    except Exception as e:
+        num_valid_callbacks = 0
+        active_callbacks = []
+
+    return num_valid_callbacks, active_callbacks
 
 def getHostData(ip):
     '''
@@ -88,14 +146,20 @@ def getHostData(ip):
         if all([x is None for x in (creds_last, creds, creds_online)]):
             return status
 
-        status['Creds'] = creds
-        status['Creds Last Seen'] = "{}m".format(creds_last)
+        # Handle creds but no callbacks
+        status['Last Creds'] = creds
+        status['Last Creds Received'] = "{}m".format(creds_last)
         if creds_last and creds_last > int(os.environ.get("CREDS_TIMEOUT", 30)):
             status['creds_online'] = ""
         else:
             status['creds_online'] = "True"
-        r.hmset(f"{ip}:creds", {'creds_online': status['creds_online']})
         
+        r.hmset(f"{ip}:creds", {'creds_online': status['creds_online']})
+
+        total_creds, all_valid_creds = getActiveCreds(ip)
+        status['Active Creds'] = total_creds
+        status['all_valid_creds'] = all_valid_creds
+
         return status
 
     # Set the last seen time based on time calculations
@@ -117,66 +181,25 @@ def getHostData(ip):
         status['creds_online'] = ''
 
     # get num valid callbacks
-    try:
-        num_valid_callbacks = 0
-        callbacks_data = r.hgetall(f"{ip}:callbacks")
-        host_timeout = int(os.environ.get("HOST_TIMEOUT", 5))
-        
-        for app_name, callback_json in callbacks_data.items():
-            callback_data = json.loads(callback_json)
-            time_delta = getTimeDelta(callback_data["last_seen"])
-            
-            # Skip if time_delta is None (invalid timestamp)
-            if time_delta is None:
-                continue
-            
-            # Check if callback is valid (within timeout)
-            if time_delta < host_timeout:
-                num_valid_callbacks += 1
-
-            # Check if callback exceeded timeout but is still marked as online
-            elif time_delta >= host_timeout and callback_data.get("online") == "True":
-                callback_data["online"] = "False"
-                # Update the callback in Redis
-                r.hset(f"{ip}:callbacks", app_name, json.dumps(callback_data))
-                # send_discord(f"LOST BEACON ON {ip}: {app_name}")
-    except Exception as e:
-        num_valid_callbacks = 0
+    num_valid_callbacks, active_callbacks = getActiveCallbacks(ip)
+    total_creds, all_valid_creds = getActiveCreds(ip)
     
     # Write the status to the database
     r.hmset(ip, {'online': status['online']})
     r.hmset(f"{ip}:creds", {'creds_online': status['creds_online']})
 
-    try:
-        all_valid_creds = []
-        creds_data = r.hgetall(f"{ip}:allcreds")
-        creds_timeout = int(os.environ.get("CREDS_TIMEOUT", 30))
-
-        for username, cred_json in creds_data.items():
-            cred_data = json.loads(cred_json)
-            time_delta = getTimeDelta(cred_data["last_seen"])
-
-            if time_delta is None:
-                continue
-
-            if time_delta < creds_timeout:
-                all_valid_creds.append(cred_data['creds'])
-            elif time_delta >= creds_timeout and cred_data.get("creds_online") == "True":
-                cred_data["creds_online"] = "False"
-                r.hset(f"{ip}:allcreds", username, json.dumps(cred_data))
-
-    except Exception as e:
-        all_valid_creds = []
-
     status['Last Seen'] = "{}m".format(last)
     status['Type'] = app
     status['Access Type'] = access_type
-    status['Callbacks'] = num_valid_callbacks
+    status['Active Callbacks'] = num_valid_callbacks
+
     status['all_valid_creds'] = all_valid_creds
+    status['all_valid_callbacks'] = active_callbacks
     
     if (creds is not None):
-        status['Creds'] = creds
-        status['Creds Last Seen'] = "{}m".format(creds_last)
+        status['Last Creds'] = creds
+        status['Last Creds Received'] = "{}m".format(creds_last)
+        status['Active Creds'] = total_creds
 
     return status
 
