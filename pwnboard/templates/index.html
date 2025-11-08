@@ -8,18 +8,20 @@
         <link href='https://fonts.googleapis.com/css?family=Titillium+Web:600,400' rel='stylesheet' type='text/css' />
         <link href='https://fonts.googleapis.com/css?family=Jura:400,600' rel='stylesheet' type='text/css' />
         <link rel='stylesheet' href='/static/pwnboard.css' type='text/css' />
-        <!-- Auto-refresh is handled via JS to avoid reloading while a modal is open -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <!-- Auto-refresh is handled via JS to avoid reloading while a modal is open -->
     </head>
     <body>
         <div class="container text-center">
-{% if error %}
-        <p id="error" class="alert alert-danger">{{ error }}</p>
-{% endif %}
-{% block content %}
-{% endblock %}
-            <h1 class="title" style="font-family: 'Jura';">PWNboard</h1>
+        {% if error %}
+            <p id="error" class="alert alert-danger">{{ error }}</p>
+        {% endif %}
+        {% block content %}
+        {% endblock %}
+        <h1 class="title" style="font-family: 'Jura';">PWNboard</h1>
         </div>
             <div class="" style="width:100%">
+                <div class="table-responsive">
                 <table class="table table-dark table-bordered">
                     <tr>
                         <thead>
@@ -49,7 +51,7 @@
                                 {% set text_color = 'text-white' %}
                                 <td class="{{ color_class }}">
                             {% elif 'creds_online' in host and host['creds_online'] != '' and host['creds_online'] %}
-                                {% set text_color = 'text-black' %}
+                                {% set text_color = 'text-dark' %}
                                 {% if theme == "blue" %}
                                     <td class="bg-warning">
                                 {% else %}
@@ -66,40 +68,40 @@
                             {% set _ = host.pop('online', None) %}
                             {% set _ = host.pop('creds_online', None) %}
                             {% set ip = host.pop('ip') %}
-                            <a href="#" class="text-white" style="color:inherit; text-decoration:none;" data-toggle="modal" data-target="#credsModal_{{ ip|replace('.', '_')|replace(':', '_') }}"><b>{{ ip }}</b></a><br/>
+                            <a href="#" class="{{ text_color }}" style="color:inherit; text-decoration:none;" data-toggle="modal" data-target="#credsModal_{{ ip|replace('.', '_')|replace(':', '_') }}"><b>{{ ip }}</b></a><br/>
 
                             <!-- Credentials modal for this host -->
                             <div class="modal fade" id="credsModal_{{ ip|replace('.', '_')|replace(':', '_') }}" tabindex="-1" role="dialog" aria-labelledby="credsModalLabel_{{ ip|replace('.', '_')|replace(':', '_') }}">
                                 <div class="modal-dialog modal-lg" role="document">
                                     <div class="modal-content text-dark">
                                         <div class="modal-header">
-                                            <h5 class="modal-title w-100 text-center" id="credsModalLabel_{{ ip|replace('.', '_')|replace(':', '_') }}">{{ ip }}</h5>
+                                            <h3 class="modal-title w-100 text-center" id="credsModalLabel_{{ ip|replace('.', '_')|replace(':', '_') }}">{{ ip }}</h3>
                                             <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
                                         </div>
                                         <div class="modal-body text-left">
                                             {% set creds_list = host.pop('all_valid_creds', []) %}
                                             {% set callbacks_list = host.pop('all_valid_callbacks', []) %}
 
-                                            <h5>Credentials</h5>
+                                            <h4>Credentials</h4>
                                             {% if creds_list and creds_list|length > 0 %}
                                                 <ul class="list-unstyled mb-3">
                                                 {% for cred in creds_list %}
-                                                    <li><code>{{ cred }}</code></li>
+                                                    <li>{{ cred }}</li>
                                                 {% endfor %}
                                                 </ul>
                                             {% else %}
-                                                <p class="text-muted">No credentials for host</p>
+                                                <p class="text-muted">No active credentials for this host!</p>
                                             {% endif %}
 
-                                            <h5>Callbacks</h5>
+                                            <h4>Callbacks</h4>
                                             {% if callbacks_list and callbacks_list|length > 0 %}
                                                 <ul class="list-unstyled">
                                                 {% for cb in callbacks_list %}
-                                                    <li><code>{{ cb }}</code></li>
+                                                    <li>{{ cb }}</li>
                                                 {% endfor %}
                                                 </ul>
                                             {% else %}
-                                                <p class="text-muted">No callbacks for host</p>
+                                                <p class="text-muted">No active callbacks for host!</p>
                                             {% endif %}
                                         </div>
                                         <div class="modal-footer">
@@ -120,6 +122,7 @@
                     </tr>
                     {% endfor %}
                 </table>
+                </div>
             </div>
             <!-- Auto-refresh & modal persistence script -->
             <script>

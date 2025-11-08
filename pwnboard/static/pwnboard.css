@@ -11,3 +11,34 @@ h1 {
 .bg-red-3 { background-color: rgb(236, 40, 40) !important; }
 .bg-red-4 { background-color: rgb(236, 20, 20) !important; }
 .bg-red-5 { background-color: rgb(236, 5, 5) !important; }
+
+/* Mobile & modal improvements */
+.modal-content.text-dark { 
+    color: #212529; 
+}
+
+/* Make large modal a bit bigger on desktop, but full-width-ish on mobile */
+.modal-lg { 
+    max-width: 900px; 
+}
+
+@media (max-width: 576px) {
+    .modal-lg { max-width: calc(100% - 30px); margin: 0 15px; }
+    .table { font-size: 0.85rem; }
+    .table td { white-space: normal; word-break: break-word; }
+    .container.text-center { padding-left: 8px; padding-right: 8px; }
+}
+
+/* Make modal headings stand out */
+.modal-body h6 { 
+    margin-top: 0.25rem; margin-bottom: 0.5rem; font-weight: 600; 
+}
+
+/* Ensure links inside table inherit color and appear tappable */
+td a { 
+    color: inherit; text-decoration: none; 
+}
+
+td a:active, td a:focus { 
+    text-decoration: underline; 
+}
