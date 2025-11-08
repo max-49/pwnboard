@@ -121,7 +121,7 @@
                 </table>
                 </div>
             </div>
-            
+
             <!-- Auto-refresh & modal persistence script -->
             <script>
             (function(){
@@ -137,8 +137,13 @@
                 }, reloadMs);
 
                 // Track which modal is open using sessionStorage so we can re-open after a refresh
+                // Also move the modal element to the document body when shown to avoid stacking/overflow issues
                 $(document).on('show.bs.modal', '.modal', function(){
-                    try { sessionStorage.setItem('open_modal', this.id); } catch(e){}
+                    try {
+                        // move modal node to body so position:fixed works correctly on mobile
+                        $(this).appendTo(document.body);
+                        sessionStorage.setItem('open_modal', this.id);
+                    } catch(e){}
                 });
 
                 $(document).on('hide.bs.modal', '.modal', function(){
