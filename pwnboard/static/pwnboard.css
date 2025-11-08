@@ -24,9 +24,9 @@ h1 {
 
 @media (max-width: 576px) {
     .modal-lg { max-width: calc(100% - 30px); margin: 0 15px; }
-    .table { font-size: 0.85rem; }
+    /* .table { font-size: 0.85rem; }
     .table td { white-space: normal; word-break: break-word; }
-    .container.text-center { padding-left: 8px; padding-right: 8px; }
+    .container.text-center { padding-left: 8px; padding-right: 8px; } */
 }
 
 /* Make modal headings stand out */
