@@ -8,7 +8,7 @@
         <link href='https://fonts.googleapis.com/css?family=Titillium+Web:600,400' rel='stylesheet' type='text/css' />
         <link href='https://fonts.googleapis.com/css?family=Jura:400,600' rel='stylesheet' type='text/css' />
         <link rel='stylesheet' href='/static/pwnboard.css' type='text/css' />
-        <meta http-equiv="refresh" content="10">
+        <!-- Auto-refresh is handled via JS to avoid reloading while a modal is open -->
     </head>
     <body>
         <div class="container text-center">
@@ -68,10 +68,10 @@
                             <!-- Credentials modal for this host -->
                             <div class="modal fade" id="credsModal_{{ ip|replace('.', '_')|replace(':', '_') }}" tabindex="-1" role="dialog" aria-labelledby="credsModalLabel_{{ ip|replace('.', '_')|replace(':', '_') }}">
                                 <div class="modal-dialog" role="document">
-                                    <div class="modal-content">
+                                    <div class="modal-content text-dark">
                                         <div class="modal-header">
+                                            <h5 class="modal-title w-100 text-center" id="credsModalLabel_{{ ip|replace('.', '_')|replace(':', '_') }}">Credentials for {{ ip }}</h5>
                                             <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-                                            <h4 class="modal-title" id="credsModalLabel_{{ ip|replace('.', '_')|replace(':', '_') }}">Credentials for {{ ip }}</h4>
                                         </div>
                                         <div class="modal-body text-left">
                                             {% set creds_list = host.pop('all_valid_creds', []) %}
@@ -86,7 +86,7 @@
                                             {% endif %}
                                         </div>
                                         <div class="modal-footer">
-                                            <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
                                         </div>
                                     </div>
                                 </div>
@@ -104,5 +104,44 @@
                     {% endfor %}
                 </table>
             </div>
+            <!-- Auto-refresh & modal persistence script -->
+            <script>
+            (function(){
+                var reloadMs = 10000; // 10s
+
+                // Periodically reload only if no modal is currently shown
+                setInterval(function(){
+                    try{
+                        if (document.querySelectorAll('.modal.show').length === 0) {
+                            window.location.reload();
+                        }
+                    } catch(e) { /* ignore */ }
+                }, reloadMs);
+
+                // Track which modal is open using sessionStorage so we can re-open after a refresh
+                $(document).on('show.bs.modal', '.modal', function(){
+                    try { sessionStorage.setItem('open_modal', this.id); } catch(e){}
+                });
+
+                $(document).on('hide.bs.modal', '.modal', function(){
+                    try { sessionStorage.removeItem('open_modal'); } catch(e){}
+                });
+
+                // On load, reopen any modal that was open before refresh
+                $(document).ready(function(){
+                    try{
+                        var id = sessionStorage.getItem('open_modal');
+                        if (id) {
+                            var el = document.getElementById(id);
+                            if (el) {
+                                $('#' + id).modal('show');
+                            } else {
+                                sessionStorage.removeItem('open_modal');
+                            }
+                        }
+                    } catch(e) { /* ignore */ }
+                });
+            })();
+            </script>
     </body>
 </html>
