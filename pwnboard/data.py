@@ -76,7 +76,23 @@ def getHostData(ip):
     # Request the data from the database
     server, app, last, message, online, access_type = r.hmget(ip, ('server', 'application',
                                       'last_seen', 'message', 'online', 'access_type'))
-    creds_last, creds, creds_online = r.hmget(f"{ip}:creds", ('last_seen', 'creds', 'creds_online'))
+
+    # New creds storage: each field in the hash f"{ip}:creds" is a username -> json({"creds": "...", "last_seen": "..."})
+    # We need to find the most recent creds entry across all fields.
+    creds = None
+    creds_last = None
+    creds_online = None
+    try:
+        creds_data = r.hgetall(f"{ip}:creds")
+        if creds_data:
+            for _, val in creds_data.items():
+                loaded_val = json.loads(val)
+                if loaded_val['creds_online'] == "True":
+                    creds = loaded_val['creds']
+                    creds_last = loaded_val['creds_last']
+                    creds_online = loaded_val['creds_online']
+    except Exception:
+        creds = creds_last = creds_online = None
 
     # callbacks_raw = r.hgetall(f"{ip}:callbacks")
     # callbacks = {app.decode(): json.loads(data) for app, data in callbacks_raw.items()}
@@ -90,15 +106,17 @@ def getHostData(ip):
     if all([x is None for x in (server, app, last, message, online)]):
         if all([x is None for x in (creds_last, creds, creds_online)]):
             return status
-        
+
         status['Creds'] = creds
         status['Creds Last Seen'] = "{}m".format(creds_last)
         if creds_last and creds_last > int(os.environ.get("CREDS_TIMEOUT", 30)):
             status['creds_online'] = ""
         else:
             status['creds_online'] = "True"
-        r.hmset(f"{ip}:creds", {'creds_online': status['creds_online']})
-        
+
+        # store the creds_online flag as a single field in the creds hash
+        # r.hset(f"{ip}:creds", 'creds_online', status['creds_online'])
+
         return status
 
     # Set the last seen time based on time calculations
@@ -142,18 +160,40 @@ def getHostData(ip):
                 callback_data["online"] = "False"
                 # Update the callback in Redis
                 r.hset(f"{ip}:callbacks", app_name, json.dumps(callback_data))
-                send_discord(f"LOST BEACON ON {ip}: {app_name}")
+                # send_discord(f"LOST BEACON ON {ip}: {app_name}")
     except Exception as e:
         num_valid_callbacks = 0
     
     # Write the status to the database
     r.hmset(ip, {'online': status['online']})
-    r.hmset(f"{ip}:creds", {'creds_online': status['creds_online']})
+    # store the creds_online flag as a single field in the creds hash
+
+    try:
+        all_valid_creds = []
+        creds_data = r.hgetall(f"{ip}:creds")
+        creds_timeout = int(os.environ.get("CREDS_TIMEOUT", 30))
+
+        for username, cred_json in creds_data.items():
+            cred_data = json.loads(cred_json)
+            time_delta = getTimeDelta(cred_data["last_seen"])
+
+            if time_delta is None:
+                continue
+
+            if time_delta < creds_timeout:
+                all_valid_creds.append(cred_data['creds'])
+            elif time_delta >= creds_timeout and cred_data.get("creds_online") == "True":
+                cred_data["creds_online"] = "False"
+                r.hset(f"{ip}:creds", username, json.dumps(cred_data))
+
+    except Exception as e:
+        all_valid_creds = []
 
     status['Last Seen'] = "{}m".format(last)
     status['Type'] = app
     status['Access Type'] = access_type
     status['Callbacks'] = num_valid_callbacks
+    status['all_valid_creds'] = all_valid_creds
     
     if (creds is not None):
         status['Creds'] = creds
@@ -270,10 +310,18 @@ def saveCredData(data):
 
     # save this to the DB
     credstring = f"{'* ' if data['admin'] == 1 else ''}{data['username']}:{data['password']}"
-    r.hmset(f"{data['ip']}:creds", {
-        'creds': credstring,
+    # r.hmset(f"{data['ip']}:creds", {
+    #     'creds': credstring,
+    #     'server': data['server'],
+    #     'last_seen': data['last_seen']
+    # })
+    cred_data = {
+        "creds": credstring,
         'server': data['server'],
-        'last_seen': data['last_seen']
-    })
+        'last_seen': data['last_seen'],
+        'creds_online': "True"
+    }
+
+    r.hset(f"{data['ip']}:creds", data['username'], json.dumps(cred_data))
 
 

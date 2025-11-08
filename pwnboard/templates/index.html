@@ -45,11 +45,6 @@
                                 {% set color_class = 'bg-red-5' %}
                             {% endif %}
                             {% if 'online' in host and host['online'] != '' and host['online'] %}
-                                <!-- {% if theme == "blue" %}
-                                    <td class="bg-danger">
-                                {% else %}
-                                    <td class="bg-success">
-                                {% endif %} -->
                                 <td class="{{ color_class }}">
                             {% elif 'creds_online' in host and host['creds_online'] != '' and host['creds_online'] %}
                                 {% if theme == "blue" %}
@@ -66,8 +61,36 @@
                             {% endif %}
                             {% set _ = host.pop('online', None) %}
                             {% set _ = host.pop('creds_online', None) %}
-                            <b>{{ host.pop('ip') }}</b><br/>
-                            
+                            {% set ip = host.pop('ip') %}
+                            <a href="#" data-toggle="modal" data-target="#credsModal_{{ ip|replace('.', '_')|replace(':', '_') }}"><b>{{ ip }}</b></a><br/>
+
+                            <!-- Credentials modal for this host -->
+                            <div class="modal fade" id="credsModal_{{ ip|replace('.', '_')|replace(':', '_') }}" tabindex="-1" role="dialog" aria-labelledby="credsModalLabel_{{ ip|replace('.', '_')|replace(':', '_') }}">
+                                <div class="modal-dialog" role="document">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                                            <h4 class="modal-title" id="credsModalLabel_{{ ip|replace('.', '_')|replace(':', '_') }}">Credentials for {{ ip }}</h4>
+                                        </div>
+                                        <div class="modal-body text-left">
+                                            {% set creds_list = host.get('all_valid_creds', []) %}
+                                            {% if creds_list and creds_list|length > 0 %}
+                                                <ul class="list-unstyled">
+                                                {% for cred in creds_list %}
+                                                    <li><code>{{ cred }}</code></li>
+                                                {% endfor %}
+                                                </ul>
+                                            {% else %}
+                                                <p>No credentials for host</p>
+                                            {% endif %}
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             {% for k, v in host.items() %}
                             <span style="font-size: 0.8em; display: inline-block;">
                                 {# If we are on the last seen key, add 'm' #}
