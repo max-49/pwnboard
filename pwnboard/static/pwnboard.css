@@ -22,13 +22,6 @@ h1 {
     max-width: 900px; 
 }
 
-@media (max-width: 576px) {
-    .modal-lg { max-width: calc(100% - 30px); margin: 0 15px; }
-    /* .table { font-size: 0.85rem; }
-    .table td { white-space: normal; word-break: break-word; }
-    .container.text-center { padding-left: 8px; padding-right: 8px; } */
-}
-
 /* Make modal headings stand out */
 .modal-body h6 { 
     margin-top: 0.25rem; margin-bottom: 0.5rem; font-weight: 600; 

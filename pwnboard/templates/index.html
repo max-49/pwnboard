@@ -8,8 +8,6 @@
         <link href='https://fonts.googleapis.com/css?family=Titillium+Web:600,400' rel='stylesheet' type='text/css' />
         <link href='https://fonts.googleapis.com/css?family=Jura:400,600' rel='stylesheet' type='text/css' />
         <link rel='stylesheet' href='/static/pwnboard.css' type='text/css' />
-    <!-- <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"> -->
-    <!-- Auto-refresh is handled via JS to avoid reloading while a modal is open -->
     </head>
     <body>
         <div class="container text-center">
@@ -113,7 +111,6 @@
 
                             {% for k, v in host.items() %}
                             <span style="font-size: 0.8em; display: inline-block;" class="{{ text_color }}">
-                                {# If we are on the last seen key, add 'm' #}
                                 {{k}}: {{v}}
                             </span><br>
                             {% endfor %}
@@ -124,6 +121,7 @@
                 </table>
                 </div>
             </div>
+            
             <!-- Auto-refresh & modal persistence script -->
             <script>
             (function(){
