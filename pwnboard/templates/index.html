@@ -96,7 +96,7 @@
                                             {% if callbacks_list and callbacks_list|length > 0 %}
                                                 <ul class="list-unstyled">
                                                 {% for cb in callbacks_list %}
-                                                    <li><code>{{ cb[0] }}</code> - Last Seen: {{ cb[1] }}</li>
+                                                    <li><code>{{ cb[0] }}</code> - Last Seen: {{ cb[1] }} {% if cb[2] != "" %}- {{ cb[2] }}{% endif %}</li>
                                                 {% endfor %}
                                                 </ul>
                                             {% else %}

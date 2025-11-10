@@ -110,7 +110,7 @@ def getActiveCallbacks(ip):
             # Check if callback is valid (within timeout)
             if time_delta < host_timeout:
                 num_valid_callbacks += 1
-                active_callbacks.append((app_name, "{}m".format(time_delta)))
+                active_callbacks.append((app_name, "{}m".format(time_delta), callback_data['access_info']))
 
             # Check if callback exceeded timeout but is still marked as online
             elif time_delta >= host_timeout and callback_data.get("online") == "True":
@@ -238,42 +238,23 @@ def saveData(data):
 
     'ip' and 'application' are required in the data
     '''
-    # data = {"ip": <ip>, "application": <type>, "last_seen": <time>}
-    # data = {"ip": <ip>, "application": <type>, "server": <server>, "message": <log msg>, "last_seen": <time>}
+
     # Don't accept callback from no IP or loopback
     if str(data.get('ip', '127.0.0.1')).lower() in ["127.0.0.1", "none", None, "null"]:
         return
-    
-    """
-    current (one callback per ip):
-    "192.168.1.1": {
-        'application': data['application'],
-        'access_type': data['access_type'],
-        'message': data['message'],
-        'server': data['server'],
-        'last_seen': data['last_seen']
-    }
-
-    proposed (multiple callbacks)
-    - on callback (or on check?), callbacks list iterated through and delete any 'last_seen' > threshold (5 mins)
-    - store in redis as f"{ip}:callbacks": fields
-
-    Key: "192.168.1.10:callbacks"
-    Fields:
-        "application" → {"access_type": "", "last_seen": "2025-11-02T12:00:00Z"}
-        "application" → {"access_type": "", "last_seen": "2025-11-02T12:10:00Z"}
-    """
 
     logger.debug("updated beacon for {} from {}".format(data['ip'], data['application']))
-    # Fill in default values. Fastest way according to https://stackoverflow.com/a/17501506
+
     data['server'] = data['server'] if 'server' in data else "pwnboard"
     data['message'] = data['message'] if 'message' in data else "Callback received to {}".format(data['server'])
     data['access_type'] = data['access_type'] if 'access_type' in data else "generic"
+    data['access_info'] = data['access_info'] if 'access_info' in data else ""
 
     send_syslog("{application} BOXACCESS {ip} {message}".format(**data))
 
     super_callback_data = {
         "access_type": data['access_type'],
+        "access_info": data['access_info'],
         "last_seen": data['last_seen'],
         "online": "True"
     }
@@ -304,7 +285,7 @@ def saveCredData(data):
         return
 
     logger.debug("updated credentials for {}".format(data['ip']))
-    # Fill in default values. Fastest way according to https://stackoverflow.com/a/17501506
+
     data['server'] = data['server'] if 'server' in data else "pwnboard"
     data['message'] = data['message'] if 'message' in data else "Credentials received to {}".format(data['server'])
 
