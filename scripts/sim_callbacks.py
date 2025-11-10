@@ -5,10 +5,11 @@ import json
 import time
 
 def random_callbacks(server, time_interval, hosts):
+    callback_infos = ["https://thisisac2.xyz/<hostinfo>/<shell> - red:letredin", "https://discord.com/channel/<id>", "https://c2domain.com - goop:bob"]
     while True:
         for i in range(random.randint(0,20)):
             ip = random.choice(hosts)
-            data = json.dumps({'ip': ip, "application": f"c2_{random.randint(1,20)}"})
+            data = json.dumps({'ip': ip, "application": f"c2_{random.randint(1,20)}", "access_type": "c2", "access_info": random.choice(callback_infos)})
             headers = {'Content-Type': 'application/json'}
             r = requests.post(server,headers=headers,data=data)
             print(r)

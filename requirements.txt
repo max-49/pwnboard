@@ -4,3 +4,4 @@ redis
 requests
 python-dotenv
 pandas
+markupsafe

@@ -9,6 +9,8 @@ import json
 import logging
 from os.path import isfile
 from .logging_handler import DBHandler
+import re
+from markupsafe import Markup, escape
 
 BOARD = []
 IP_SET = set()
@@ -52,6 +54,27 @@ logger.addHandler(DBHandler())
 rserver = os.environ.get('REDIS_HOST', 'localhost')
 rport = os.environ.get('REDIS_PORT', 6379)
 r = redis.StrictRedis(host=rserver, port=rport, decode_responses=True)
+
+# Simple linkify filter: convert http(s) URLs inside a string into clickable links
+# Returns Markup so it's safe to render in templates
+URL_RE = re.compile(r'(https?://[^\s]+)')
+
+def linkify(text):
+    if not text:
+        return ''
+    # escape the full text first to avoid injecting html
+    esc = escape(text)
+
+    def _repl(m):
+        url = m.group(0)
+        # url is escaped when inserted into the anchor text/href
+        return '<a href="{0}" target="_blank" rel="noopener noreferrer">{0}</a>'.format(escape(url))
+
+    result = URL_RE.sub(_repl, esc)
+    return Markup(result)
+
+# Register the filter with Jinja environment
+app.jinja_env.filters['linkify'] = linkify
 
 # Ignore a few errors here as routes arn't "used" and "not at top of file"
 from . import routes  # noqa: E402, F401
