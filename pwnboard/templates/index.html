@@ -32,8 +32,9 @@
                     {% for row in board %}
                     <tr>
                         <td><b>{{ row['name'] }}</b></td>
-                        {% for host in row['hosts'] %}
-                            {% set cb = host.get('Active Callbacks', 0) %}
+                {% for host in row['hosts'] %}
+                    {% set ip = host.get('ip') %}
+                    {% set cb = host.get('Active Callbacks', 0) %}
                             {% if cb <= 2 %}
                                 {% set color_class = 'bg-red-1' %}
                             {% elif cb <= 4 %}
@@ -47,26 +48,26 @@
                             {% endif %}
                             {% if 'online' in host and host['online'] != '' and host['online'] %}
                                 {% set text_color = 'text-white' %}
-                                <td class="{{ color_class }}">
+                                <td class="{{ color_class }}" style="cursor:pointer" role="button" tabindex="0" data-toggle="modal" data-target="#credsModal_{{ ip|replace('.', '_')|replace(':', '_') }}">
                             {% elif 'creds_online' in host and host['creds_online'] != '' and host['creds_online'] %}
                                 {% set text_color = 'text-dark' %}
                                 {% if theme == "blue" %}
-                                    <td class="bg-warning">
+                                    <td class="bg-warning" style="cursor:pointer" role="button" tabindex="0" data-toggle="modal" data-target="#credsModal_{{ ip|replace('.', '_')|replace(':', '_') }}">
                                 {% else %}
-                                    <td class="bg-warning">
+                                    <td class="bg-warning" style="cursor:pointer" role="button" tabindex="0" data-toggle="modal" data-target="#credsModal_{{ ip|replace('.', '_')|replace(':', '_') }}">
                                 {% endif %}
                             {% else %}
                                 {% set text_color = 'text-white' %}
                                 {% if theme == "blue" %}
-                                    <td class="bg-primary">
+                                    <td class="bg-primary" style="cursor:pointer" role="button" tabindex="0" data-toggle="modal" data-target="#credsModal_{{ ip|replace('.', '_')|replace(':', '_') }}">
                                 {% else %}
-                                    <td class="bg-danger">
+                                    <td class="bg-danger" style="cursor:pointer" role="button" tabindex="0" data-toggle="modal" data-target="#credsModal_{{ ip|replace('.', '_')|replace(':', '_') }}">
                                 {% endif %}
                             {% endif %}
                             {% set _ = host.pop('online', None) %}
                             {% set _ = host.pop('creds_online', None) %}
-                            {% set ip = host.pop('ip') %}
-                            <a href="#" class="{{ text_color }}" style="color:inherit; text-decoration:none;" data-toggle="modal" data-target="#credsModal_{{ ip|replace('.', '_')|replace(':', '_') }}"><b>{{ ip }}</b></a><br/>
+                            {% set _ = host.pop('ip') %}
+                            <span class="{{ text_color }}" style="color:inherit; text-decoration:none;"><b>{{ ip }}</b></span><br/>
 
                             <!-- Credentials modal for this host -->
                             <div class="modal fade" id="credsModal_{{ ip|replace('.', '_')|replace(':', '_') }}" tabindex="-1" role="dialog" aria-labelledby="credsModalLabel_{{ ip|replace('.', '_')|replace(':', '_') }}">
