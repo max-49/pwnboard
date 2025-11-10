@@ -8,7 +8,7 @@ import redis
 import json
 import logging
 from os.path import isfile
-from logging_handler import DBHandler
+from .logging_handler import DBHandler
 
 BOARD = []
 
