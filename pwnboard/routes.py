@@ -63,7 +63,7 @@ def index():
 @app.route('/pwn', methods=['POST'])
 def callback():
     """Handle when a server registers an callback"""
-    data = request.get_json(force=True)
+    data = request.get_json(force=True) or {}
     # data = {"ip": <ip>, "type": <type>} --> callback
     # data = {"ips": ['list', 'of', 'ips'], "type": type} --> callback
     # data = {"ip": <ip>, "challenge": nonce} --> challenge
@@ -98,7 +98,7 @@ def callback():
 @app.route('/creds', methods=['POST'])
 def creds_callback():
     """Handle when a server registers a credential update"""
-    data = request.get_json(force=True)
+    data = request.get_json(force=True) or {}
     # data = {"ip": <ip>, "username": <username>, "password": <password>, "admin": 0/1} --> callback
     data['last_seen'] = getEpoch()
     # Make sure username and password are in the data
@@ -187,7 +187,7 @@ def setmessage():
     # if its an API call then return valid
     return "Valid"
 
-@app.route("/callbacks")
+@app.route("/graphs")
 def callbacks():
     conn = sqlite3.connect("logs.db")
     df = pd.read_sql_query("SELECT * FROM logs", conn, parse_dates=["timestamp"])
@@ -205,4 +205,4 @@ def callbacks():
         ],
     }
 
-    return render_template("callbacks.html", graph_data=graph_data)
+    return render_template("graphs.html", graph_data=graph_data)

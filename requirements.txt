@@ -3,3 +3,4 @@ PyYAML
 redis
 requests
 python-dotenv
+pandas
