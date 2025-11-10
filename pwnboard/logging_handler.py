@@ -29,11 +29,9 @@ class DBHandler(logging.Handler):
                 app = parts[5]
             except IndexError:
                 ip = app = "unknown"
-        else:
-            ip = app = "unknown"
-
-        self.conn.execute(
-            "INSERT INTO logs (timestamp, level, ip, app, message) VALUES (?, ?, ?, ?, ?)",
-            (datetime.fromtimestamp(record.created).isoformat(), record.levelname, ip, app, msg)
-        )
-        self.conn.commit()
+                
+            self.conn.execute(
+                "INSERT INTO logs (timestamp, level, ip, app, message) VALUES (?, ?, ?, ?, ?)",
+                (datetime.fromtimestamp(record.created).isoformat(), record.levelname, ip, app, msg)
+            )
+            self.conn.commit()

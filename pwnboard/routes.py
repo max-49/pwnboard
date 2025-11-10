@@ -8,7 +8,7 @@ import pandas as pd
 
 
 from .data import getBoardDict, getEpoch, getAlert, saveData, saveCredData, send_syslog
-from . import app, logger, r, BOARD
+from . import app, logger, r, BOARD, IP_SET
 
 
 # The cache of the main board page
@@ -85,11 +85,17 @@ def callback():
         for ip in data['ips']:
             d = dict(data)
             d['ip'] = ip
-            saveData(d)
+            if ip in IP_SET:
+                saveData(d)
+            else:
+                return 'invalid IP\n'
     elif 'ip' in data:
-        saveData(data)
+        if data['ip'] in IP_SET:
+            saveData(data)
+        else:
+            return 'invalid IP\n'
     else:
-        return 'invalid POST'
+        return 'invalid POST\n'
     # Tell us that new data has come
     global BOARDCACHE_UPDATED
     BOARDCACHE_UPDATED = True
@@ -116,11 +122,17 @@ def creds_callback():
         for ip in data['ips']:
             d = dict(data)
             d['ip'] = ip
-            saveCredData(d)
+            if ip in IP_SET:
+                saveCredData(d)
+            else:
+                return 'invalid IP\n'
     elif 'ip' in data:
-        saveCredData(data)
+        if data['ip'] in IP_SET:
+            saveCredData(data)
+        else:
+            return 'invalid IP\n'
     else:
-        return 'invalid POST'
+        return 'invalid POST\n'
     # Tell us that new data has come
     global BOARDCACHE_UPDATED
     BOARDCACHE_UPDATED = True

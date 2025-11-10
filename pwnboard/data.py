@@ -6,7 +6,7 @@ import copy
 import json
 import socket
 import requests
-from . import r, logger, BOARD
+from . import r, logger, BOARD, IP_SET
 
 SYSLOGSOCK = None
 HOST=os.environ.get("SYSLOG_HOST", None)

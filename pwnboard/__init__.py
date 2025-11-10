@@ -11,12 +11,20 @@ from os.path import isfile
 from .logging_handler import DBHandler
 
 BOARD = []
+IP_SET = set()
 
 def loadBoard():
     global BOARD
+    global IP_SET
     fil = os.environ.get("BOARD", "board.json")
     with open(fil) as fil:
         BOARD = json.load(fil)
+    
+    for row in BOARD.get("board", []):
+        for host in row.get("hosts", []):
+            ip = host.get("ip")
+            if ip:
+                IP_SET.add(ip)
 
 # Create the Flask app
 app = Flask(__name__)

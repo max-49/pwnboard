@@ -19,9 +19,42 @@
             }));
 
             const layout = {
-                title: 'Log Entries Per Application',
-                xaxis: { title: 'Time' },
-                yaxis: { title: 'Count' },
+                template: 'plotly_dark',
+                title: {
+                    text: 'Application Callbacks Over Time',
+                    font: { size: 24, family: 'Arial Black' }
+                },
+                xaxis: {
+                    title: 'Timestamp',
+                    showgrid: false,
+                    tickangle: -45,
+                    rangeselector: {
+                        buttons: [
+                            { count: 15, label: '15m', step: 'minute', stepmode: 'backward' },
+                            { count: 1, label: '1h', step: 'hour', stepmode: 'backward' },
+                            { count: 6, label: '6h', step: 'hour', stepmode: 'backward' },
+                            { count: 1, label: '1d', step: 'day', stepmode: 'backward' },
+                            { step: 'all', label: 'All' }
+                        ]
+                    },
+                    rangeslider: { visible: true },
+                    type: 'date',
+                    tickfont: { size: 12 }
+                },
+                yaxis: {
+                    title: 'Callback Count',
+                    showgrid: true,
+                    gridcolor: 'rgba(200,200,200,0.2)'
+                },
+                legend: {
+                    orientation: 'h',
+                    y: -0.2,
+                    xanchor: 'center',
+                    x: 0.5,
+                    bgcolor: 'rgba(255,255,255,0.5)',
+                    bordercolor: 'rgba(0,0,0,0.1)',
+                    borderwidth: 1
+                },
                 hovermode: 'x unified'
             };
 
