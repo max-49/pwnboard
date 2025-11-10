@@ -3,8 +3,8 @@ import os
 import logging
 from flask import (request, render_template, make_response, Response, url_for,
                    redirect, abort, jsonify)
-
-#from .functions import saveData
+import sqlite3
+import pandas as pd
 
 
 from .data import getBoardDict, getEpoch, getAlert, saveData, saveCredData, send_syslog
@@ -186,3 +186,23 @@ def setmessage():
 
     # if its an API call then return valid
     return "Valid"
+
+@app.route("/callbacks")
+def callbacks():
+    conn = sqlite3.connect("logs.db")
+    df = pd.read_sql_query("SELECT * FROM logs", conn, parse_dates=["timestamp"])
+    conn.close()
+
+    # Optional: aggregate by minute and application
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
+    counts = df.groupby(["app", pd.Grouper(key="timestamp", freq="1min")]).size().unstack(0).fillna(0)
+
+    # Convert to JSON for the frontend (so JS can plot it)
+    graph_data = {
+        "timestamps": counts.index.strftime("%Y-%m-%d %H:%M:%S").tolist(),
+        "series": [
+            {"name": app, "values": counts[app].tolist()} for app in counts.columns
+        ],
+    }
+
+    return render_template("callbacks.html", graph_data=graph_data)

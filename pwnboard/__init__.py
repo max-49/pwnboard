@@ -8,6 +8,7 @@ import redis
 import json
 import logging
 from os.path import isfile
+from logging_handler import DBHandler
 
 BOARD = []
 
@@ -22,7 +23,7 @@ app = Flask(__name__)
 app.config['STATIC_FOLDER'] = "lib/static"
 logger = logging.getLogger('pwnboard')
 loadBoard()
-#logfil = getConfig("server/logfile", "")
+
 logfil = ""
 # Get the pwnboard logger
 # Create a log formatter
@@ -38,6 +39,7 @@ SH = logging.StreamHandler()
 SH.setFormatter(FMT)
 logger.addHandler(SH)
 logger.setLevel(logging.DEBUG)
+logger.addHandler(DBHandler())
 # Create the redis object. Make sure that we decode our responses
 rserver = os.environ.get('REDIS_HOST', 'localhost')
 rport = os.environ.get('REDIS_PORT', 6379)
