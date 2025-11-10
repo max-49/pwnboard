@@ -80,7 +80,7 @@ def getActiveCreds(ip):
                 continue
 
             if time_delta < creds_timeout:
-                all_valid_creds.append(cred_data['creds'])
+                all_valid_creds.append((cred_data['creds'], "{}m".format(time_delta)))
                 total_creds += 1
             elif time_delta >= creds_timeout and cred_data.get("creds_online") == "True":
                 cred_data["creds_online"] = "False"
@@ -110,7 +110,7 @@ def getActiveCallbacks(ip):
             # Check if callback is valid (within timeout)
             if time_delta < host_timeout:
                 num_valid_callbacks += 1
-                active_callbacks.append(app_name)
+                active_callbacks.append((app_name, "{}m".format(time_delta)))
 
             # Check if callback exceeded timeout but is still marked as online
             elif time_delta >= host_timeout and callback_data.get("online") == "True":

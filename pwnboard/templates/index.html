@@ -85,7 +85,7 @@
                                             {% if creds_list and creds_list|length > 0 %}
                                                 <ul class="list-unstyled mb-3">
                                                 {% for cred in creds_list %}
-                                                    <li><code>{{ cred }}</code></li>
+                                                    <li><code>{{ cred[0] }}</code> - Last Seen: {{ cred[1] }}</li>
                                                 {% endfor %}
                                                 </ul>
                                             {% else %}
@@ -96,7 +96,7 @@
                                             {% if callbacks_list and callbacks_list|length > 0 %}
                                                 <ul class="list-unstyled">
                                                 {% for cb in callbacks_list %}
-                                                    <li><code>{{ cb }}</code></li>
+                                                    <li><code>{{ cb[0] }}</code> - Last Seen: {{ cb[1] }}</li>
                                                 {% endfor %}
                                                 </ul>
                                             {% else %}
@@ -164,6 +164,20 @@
                             }
                         }
                     } catch(e) { /* ignore */ }
+                });
+
+                // Ensure keyboard activation (Enter / Space) on focused clickable table cells
+                // so users can open modals using keyboard reliably across browsers.
+                // Uses jQuery to capture keydown on any td[role="button"] and trigger click.
+                $(document).on('keydown', 'td[role="button"]', function(e){
+                    try {
+                        // 13 = Enter, 32 = Space
+                        if (e.which === 13 || e.which === 32) {
+                            e.preventDefault();
+                            // trigger click so Bootstrap's data-toggle/data-target handles the modal
+                            $(this).trigger('click');
+                        }
+                    } catch (err) { /* ignore */ }
                 });
             })();
             </script>
