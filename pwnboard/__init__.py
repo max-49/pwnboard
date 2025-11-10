@@ -62,16 +62,22 @@ URL_RE = re.compile(r'(https?://[^\s]+)')
 def linkify(text):
     if not text:
         return ''
-    # escape the full text first to avoid injecting html
-    esc = escape(text)
-
-    def _repl(m):
+    # Build the output by escaping non-URL parts and replacing URLs with anchors
+    parts = []
+    last_end = 0
+    for m in URL_RE.finditer(text):
+        start, end = m.start(), m.end()
+        # escape text between matches
+        parts.append(escape(text[last_end:start]))
         url = m.group(0)
-        # url is escaped when inserted into the anchor text/href
-        return '<a href="{0}" target="_blank" rel="noopener noreferrer">{0}</a>'.format(escape(url))
+        # escape url for safe insertion into href/text
+        esc_url = escape(url)
+        parts.append('<a href="{0}" target="_blank" rel="noopener noreferrer">{1}</a>'.format(esc_url, esc_url))
+        last_end = end
 
-    result = URL_RE.sub(_repl, esc)
-    return Markup(result)
+    # append the remainder
+    parts.append(escape(text[last_end:]))
+    return Markup(''.join(parts))
 
 # Register the filter with Jinja environment
 app.jinja_env.filters['linkify'] = linkify
