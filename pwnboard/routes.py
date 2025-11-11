@@ -3,13 +3,12 @@ import os
 import logging
 from flask import (request, render_template, make_response, Response, url_for,
                    redirect, abort, jsonify)
+from flask import session
 import sqlite3
 import pandas as pd
-
-
+from functools import wraps
 from .data import getBoardDict, getEpoch, getAlert, saveData, saveCredData, send_syslog
-from . import app, logger, r, BOARD, IP_SET
-
+from . import app, logger, r, BOARD, IP_SET, ph, get_db
 
 # The cache of the main board page
 try:
@@ -20,8 +19,48 @@ BOARDCACHE = ""
 BOARDCACHE_TIME = 0
 BOARDCACHE_UPDATED = True
 
+# Decorator to check to see if session args are set
+def login_required(f):
+    """Simple decorator that requires session['user'] to be set."""
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if not session.get('user'):
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return wrapper
 
-@app.route('/', methods=['GET'])
+@app.route("/", methods=['GET'])
+def login():
+    return render_template("login.html")
+
+@app.route("/", methods=['POST'])
+def login_post():
+    username = request.form.get('username', '').strip()
+    password = request.form.get('password', '')
+    if not username or not password:
+        return render_template('login.html', error='Username and password required')
+
+    db = get_db()
+    cur = db.execute('SELECT password, role FROM users WHERE username = ?;', (username,))
+    row = cur.fetchone()
+    if row is None:
+        return render_template('login.html', error='Invalid username or password')
+
+    stored = row['password']
+    try:
+        if ph.verify(stored, password):
+            # Successful login: set session and redirect to index
+            session['user'] = username
+            session['role'] = row['role']
+            return redirect(url_for('index'))
+    except Exception:
+        # verification failed (bad password or invalid hash)
+        pass
+
+    return render_template('login.html', error='Invalid username or password')
+
+@app.route('/pwnboard', methods=['GET'])
+@login_required
 def index():
     '''
     Return the board with the most recent data (cached for 10 seconds)
@@ -212,11 +251,3 @@ def callbacks():
     }
 
     return render_template("graphs.html", graph_data=graph_data)
-
-@app.route("/login", methods=['GET'])
-def login():
-    return render_template("login.html")
-
-@app.route("/login", methods=['POST'])
-def login_post():
-    return render_template("login.html")

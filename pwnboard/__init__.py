@@ -2,19 +2,22 @@
 '''
 Initialize all the data and the config info
 '''
-from flask import Flask
+from flask import Flask, g
+import re
 import os
-import redis
 import json
+import redis
+import sqlite3
 import logging
 from os.path import isfile
-from .logging_handler import DBHandler
-import re
+from argon2 import PasswordHasher
 from markupsafe import Markup, escape
+from .logging_handler import DBHandler
 
 BOARD = []
 IP_SET = set()
 
+# Load the board.json file
 def loadBoard():
     global BOARD
     global IP_SET
@@ -31,29 +34,37 @@ def loadBoard():
 # Create the Flask app
 app = Flask(__name__)
 app.config['STATIC_FOLDER'] = "lib/static"
+# Basic secret key for session support (override in production)
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret')
 logger = logging.getLogger('pwnboard')
 loadBoard()
 
+ph = PasswordHasher()
+
 logfil = ""
+
 # Get the pwnboard logger
 # Create a log formatter
 FMT = logging.Formatter(fmt="[%(asctime)s] %(levelname)s: %(message)s",
                         datefmt="%x %I:%M:%S")
+
 # Create a file handler
 if logfil != "":
     FH = logging.FileHandler(logfil)
     FH.setFormatter(FMT)
     logger.addHandler(FH)
+
 # Create a console logging handler
 SH = logging.StreamHandler()
 SH.setFormatter(FMT)
 logger.addHandler(SH)
 logger.setLevel(logging.DEBUG)
 logger.addHandler(DBHandler())
+
 # Create the redis object. Make sure that we decode our responses
 rserver = os.environ.get('REDIS_HOST', 'localhost')
 rport = os.environ.get('REDIS_PORT', 6379)
-r = redis.StrictRedis(host=rserver, port=rport, decode_responses=True)
+r = redis.StrictRedis(host=rserver, port=int(rport), decode_responses=True)
 
 # Simple linkify filter: convert http(s) URLs inside a string into clickable links
 # Returns Markup so it's safe to render in templates
@@ -82,5 +93,52 @@ def linkify(text):
 # Register the filter with Jinja environment
 app.jinja_env.filters['linkify'] = linkify
 
-# Ignore a few errors here as routes arn't "used" and "not at top of file"
-from . import routes  # noqa: E402, F401
+# Initialize user database (use a short-lived connection for init)
+USERS_DB = os.environ.get('USERS_DB', 'users.db')
+with sqlite3.connect(USERS_DB) as _init_conn:
+    _init_conn.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY,
+        username TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        role TEXT
+    )
+    """)
+    _init_conn.commit()
+
+    default_user = os.environ.get("DEFAULT_USER", "admin")
+    default_password = os.environ.get("DEFAULT_USER_PASSWORD", "password")
+
+    cur = _init_conn.execute('SELECT username FROM users WHERE username = ?;', (default_user,))
+    if cur.fetchone() is None:
+        _init_conn.execute(
+            'INSERT INTO users(username, password, role) VALUES (?, ?, "admin");',
+            (default_user, ph.hash(default_password))
+        )
+        _init_conn.commit()
+
+
+def get_db():
+    """Return a per-request sqlite3 connection stored on flask.g."""
+    if getattr(g, 'db', None) is None:
+        g.db = sqlite3.connect(USERS_DB, detect_types=sqlite3.PARSE_DECLTYPES)
+        g.db.row_factory = sqlite3.Row
+        try:
+            g.db.execute("PRAGMA foreign_keys = ON")
+            g.db.execute("PRAGMA busy_timeout = 5000")
+        except Exception:
+            pass
+    return g.db
+
+
+def close_db(e=None):
+    db = getattr(g, 'db', None)
+    if db is not None:
+        db.close()
+        delattr(g, 'db')
+
+# Close DB when app is ended
+app.teardown_appcontext(close_db)
+
+# Import routes from routes file
+from . import routes
