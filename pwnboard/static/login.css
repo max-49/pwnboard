@@ -1,0 +1,28 @@
+/* Styles moved from login.html inline <style> block */
+/* Small enhancements to complement existing /static/login.css */
+body {
+  background: linear-gradient(135deg, #0f172a 0%, #0b1220 50%, #021124 100%);
+  color: #eef2ff;
+  font-family: 'Titillium Web', Helvetica, Arial, sans-serif;
+}
+.login-card {
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(2,6,23,0.6);
+  background: rgba(255,255,255,0.04);
+  backdrop-filter: blur(6px);
+}
+.brand {
+  font-family: 'Jura', Helvetica, Arial, sans-serif;
+  letter-spacing: 1px;
+}
+.form-control::placeholder { color: #cbd5e1; }
+.btn-primary {
+  background: linear-gradient(90deg,#2563eb,#7c3aed);
+  border: none;
+}
+.small-muted { color: #9aa4bf; }
+
+/* Responsive tweaks */
+@media (max-width: 576px) {
+  .login-card { padding: 1rem; }
+}
