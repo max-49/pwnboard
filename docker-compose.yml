@@ -10,10 +10,10 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - "PWNBOARD_URL=${PWNBOARD_URL}:${PWNBOARD_PORT}"
-      - "SYSLOG_HOST=${SAWMILL_HOST}"
-      - "SYSLOG_PORT=${SAWMILL_PORT}"
       - CACHE_TIME=-1    # Seconds to cache for. set to -1 to disable
       - DISCORD_WEBHOOK=${DISCORD_WEBHOOK}
+      - HOST_TIMEOUT=5
+      - CREDS_TIMEOUT=30
     volumes:
       - ./board.json:/opt/pwnboard/board.json:ro
 

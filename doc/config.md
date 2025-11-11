@@ -21,11 +21,8 @@ environment variables and their default settings.
 - `CACHE_TIME` _Default: "-1"_ - How many seconds to cache the web page for. Default is do not cache at all. This may be needed if you have many people watching the board at once.
 
 - `HOST_TIMEOUT` _Default: 2_ - Number of minutes of inactivity before a host expires
+- `CREDS_TIMEOUT` _Default: 30_ - Number of minutes of inactivity before credentials expire
 
-- `ALERT_TIMEOUT` _Default: 2_ - Number of minutes to show an alert for. _Note: This feature might actually be broken..._
-
-
-- `SYSLOG_HOST` _No default_ - If HOST and PORT are set for SYSLOG, send syslog data to the server on every callback
-- `SYSLOG_PORT` _No default_
+- `DISCORD_WEBHOOK` _No default_ - Link to Discord webhook used for notifying of lost hosts
 
 this is an easter egg

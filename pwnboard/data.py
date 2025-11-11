@@ -6,11 +6,8 @@ import copy
 import json
 import socket
 import requests
-from . import r, logger, BOARD, IP_SET
+from . import r, logger, BOARD
 
-SYSLOGSOCK = None
-HOST=os.environ.get("SYSLOG_HOST", None)
-PORT=int(os.environ.get("SYSLOG_PORT", -1))
 DISCORD_WEBHOOK=os.environ.get("DISCORD_WEBHOOK", None)
 
 def send_discord(string):
@@ -28,23 +25,6 @@ def send_discord(string):
     except Exception as e:
         print(f"Discord webhook error: {e}")
 
-def send_syslog(string):
-    """Send a syslog to the server. Make sure the port is open though
-    """
-    # TODO: If someone wants to thread this then pwnbaord wont fail if logstash is down
-    if not HOST or PORT == -1:
-        return
-    global SYSLOGSOCK
-    string = string.rstrip() +"\n"
-    try:
-        if not SYSLOGSOCK:
-            print("Creating socket to", HOST, PORT)
-            SYSLOGSOCK = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            SYSLOGSOCK.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            SYSLOGSOCK.connect((HOST, PORT))
-        SYSLOGSOCK.sendall(string.encode())
-    except:
-        SYSLOGSOCK = None
 
 def getEpoch():
     '''
@@ -167,8 +147,6 @@ def getHostData(ip):
     if last and last > int(os.environ.get("HOST_TIMEOUT", 2)):
         if online and online.lower().strip() == "true":
             logger.warning("{} offline".format(ip))
-            # Try to send a slack message
-            send_syslog("pwnboard GENERIC {} went offline".format(ip))
         status['online'] = ''
     else:
         status['online'] = "True"
@@ -250,8 +228,6 @@ def saveData(data):
     data['access_type'] = data['access_type'] if 'access_type' in data else "generic"
     data['access_info'] = data['access_info'] if 'access_info' in data else ""
 
-    send_syslog("{application} BOXACCESS {ip} {message}".format(**data))
-
     super_callback_data = {
         "access_type": data['access_type'],
         "access_info": data['access_info'],
@@ -288,8 +264,6 @@ def saveCredData(data):
 
     data['server'] = data['server'] if 'server' in data else "pwnboard"
     data['message'] = data['message'] if 'message' in data else "Credentials received to {}".format(data['server'])
-
-    send_syslog("CREDENTIALS {ip} {message}".format(**data))
 
     # save this to the DB
     credstring = f"{'* ' if data['admin'] == 1 else ''}{data['username']}:{data['password']}"
