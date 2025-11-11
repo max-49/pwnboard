@@ -1,44 +1,126 @@
-# pwnboard
-The pwnboard is a tool used for RIT redteam engagements and competitions. It allows Redteam to
-easily see which machines they have access to and which machines they have lost beacons on.
+# PWNBoard
 
-This is a modified version of nullmonk/pwnboard, which is a modified version of ztgrace/pwnboard.
+**PWNBoard** is a real-time web dashboard for tracking and visualizing beacons from offensive security tools and Command & Control (C2) frameworks during red team engagements and competitions.
 
-This modified version exists to modernize nullmonk's fork since some things have changed. Documentation written by nullmonk/ztgrace.
+![GitHub](https://img.shields.io/github/license/max-49/pwnboard)
+![Python](https://img.shields.io/badge/python-3.8+-blue.svg)
+![Flask](https://img.shields.io/badge/flask-latest-green.svg)
 
-## Running the pwnboard
+## 📋 Table of Contents
 
-For instructions on deploying Pwnboard from nothing, see [Pwnboard Setup](./doc/setup.md).
+- [Overview](#overview)
+- [Features](#features)
+- [Quick Start](#quick-start)
+- [Configuration](#configuration)
+- [Documentation](#documentation)
+- [Acknowledgements](#acknowledgements)
 
-## Watching the pwnboard
+## Overview
 
-To watch all of your lovely beacons flowing in, simply navigate to the pwnboard in a webbrowser.
+PWNBoard provides a centralized dashboard for tracking compromised hosts, active beacons, and harvested credentials across multiple teams during red team operations. This fork enhances the original [ztgrace/pwnboard](https://github.com/ztgrace/pwnboard) and [nullmonk/pwnboard](https://github.com/nullmonk/pwnboard) projects with a lot of really cool features (trust)
 
-## Updating the pwnboard
-If you would like your C2s and tools to update the pwnboard, you may use some of the plugins provided. Currently, the following public C2s are supported:
-  - CobaltStrike - `http://PWNBOARD/install/cobaltstrike`
-  - Empire - `http://PWNBOARD/install/empire`
-  - Metasploit - `http://PWNBOARD/install/metasploit`
+## Features
 
-If you would like to get another C2 framework supported, please make an issue or you can start integrating directly. Code examples for updating the pwnboard are provided in the following languages:
-  - Bash - `http://PWNBOARD/install/bash`
-  - Python - `http://PWNBOARD/install/python`
-  - Golang - `http://PWNBOARD/install/go`
+- There are a lot of features (They will be listed here soon)
 
+## Quick Start
 
-> Make sure `PWNBOARD_URL` is updated in the environment so the install scripts render correctly
+### Prerequisites
 
+- Ensure Docker is installed (see Docker documentation for installation instructions)
+- A `board.json` configuration file (see [Board Setup](#board-setup))
 
-## Set Alert Message
-Too push an alert message to the page you can navigate to `/setmessage` or push
-and update with a post request
-```
-curl -X POST 127.0.0.1/setmessage -d 'message=PWNboard'
-```
+### Board Setup
 
-> Note this feature may be broken...
+PWNBoard requires a topology configuration to define teams and target hosts. Generate your board configuration using the included Topology Generator:
 
-# Future Features
-* Click on a host to track the beacons
+1. **Create a topology** using `Topology-Generator/generator.py`:
+   ```bash
+   cd Topology-Generator
+   python3 generator.py
+   ```
+   Follow the prompts to define your teams and hosts. This creates `topology.json`.
 
-![pwnboard](https://raw.githubusercontent.com/micahjmartin/pwnboard/master/doc/img/PWNboard.png)
+2. **Convert topology to board format**:
+   ```bash
+   # From project root
+   python3 scripts/gen_config.py Topology-Generator/topology.json board.json
+   ```
+
+This generates `board.json` in the project root, which defines which IP addresses can submit beacons.
+
+### Deployment (Docker Compose)
+
+**Docker Compose is the recommended deployment method.**
+
+1. **Configure environment** (edit `docker-compose.yml` or create `.env`):
+   ```bash
+   export PWNBOARD_URL="http://your-domain.com:8080"
+   export PWNBOARD_PORT=8080
+   export SECRET_KEY="your-secret-key-here"
+   export DEFAULT_USER_PASSWORD="strong-password"
+   ```
+
+2. **Deploy**:
+   ```bash
+   docker compose up -d
+   ```
+
+3. **Access the dashboard**:
+   - Navigate to `http://your-domain.com:8080`
+   - Login with default credentials (multiple users/roles/access tokens to be added soon)
+
+For detailed setup instructions and troubleshooting, see [doc/setup.md](doc/setup.md).
+
+## Configuration
+
+PWNBoard is configured via environment variables, set in `docker-compose.yml`.
+
+### Key Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SECRET_KEY` | `dev-secret` | Flask secret key for sessions (**change in production!**) |
+| `DEFAULT_USER` | `admin` | Default admin username |
+| `DEFAULT_USER_PASSWORD` | `password` | Default admin password (**change immediately!**) |
+| `PWNBOARD_URL` | — | Base URL for your deployment (e.g., `http://pwnboard.example.com:8080`) |
+| `HOST_TIMEOUT` | `2` | Minutes before host marked offline |
+| `CREDS_TIMEOUT` | `30` | Minutes before credentials marked stale |
+| `PWN_THEME` | `blue` | Color theme: `blue` (red=active) or `green` (green=active) |
+| `CACHE_TIME` | `-1` | Board cache seconds (-1 = disabled) |
+| `DISCORD_WEBHOOK` | — | Discord webhook URL for notifications (optional) |
+
+For a complete list of configuration options, see [doc/config.md](doc/config.md).
+
+## Documentation
+
+- **[Setup Guide](doc/setup.md)** — Detailed deployment instructions and troubleshooting
+- **[Configuration Reference](doc/config.md)** — Complete environment variable reference
+- **[Development Guide](doc/DEVELOPMENT.md)** — Architecture, file structure, and contribution guidelines
+
+## Acknowledgements
+
+This project builds upon the work of:
+- **[ztgrace/pwnboard](https://github.com/ztgrace/pwnboard)** — Original pwnboard implementation
+- **[nullmonk/pwnboard](https://github.com/nullmonk/pwnboard)** — Improvements for RIT Red Team
+- **[RITRedteam/Topology-Generator](https://github.com/RITRedteam/Topology-Generator)** — Topology generation tool
+
+## Contributing
+
+Contributions are welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes with clear commit messages
+4. Test thoroughly
+5. Submit a Pull Request
+
+See [doc/DEVELOPMENT.md](doc/DEVELOPMENT.md) for detailed contribution guidelines.
+
+## License
+
+This project inherits the licensing from its upstream repositories. See original projects for specific license terms.
+
+---
+
+**Questions or Issues?** Open an issue on GitHub.
