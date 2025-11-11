@@ -209,3 +209,27 @@ def callbacks():
     }
 
     return render_template("graphs.html", graph_data=graph_data)
+
+
+@app.route('/manage_apps')
+@login_required
+def manage_apps():
+    """Placeholder Manage Apps view."""
+    return render_template('manage_apps.html')
+
+
+@app.route('/account_settings')
+@login_required
+def account_settings():
+    """Placeholder Account Settings view."""
+    return render_template('account_settings.html')
+
+
+@app.route('/manage_user_accounts')
+@login_required
+def manage_user_accounts():
+    """Admin-only Manage User Accounts page."""
+    # Only allow users with admin role
+    if session.get('role') != 'admin':
+        abort(403)
+    return render_template('manage_user_accounts.html')

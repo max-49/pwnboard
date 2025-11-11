@@ -22,8 +22,12 @@ def loadBoard():
     global BOARD
     global IP_SET
     fil = os.environ.get("BOARD", "board.json")
-    with open(fil) as fil:
-        BOARD = json.load(fil)
+    try:
+        with open(fil) as fil:
+            BOARD = json.load(fil)
+    except FileNotFoundError:
+        print("Please generate a board.json file first! See doc/config.md")
+        exit(1)
     
     for row in BOARD.get("board", []):
         for host in row.get("hosts", []):
