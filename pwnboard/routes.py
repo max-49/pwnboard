@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
-import os
-import logging
 from flask import (request, render_template, make_response, Response, url_for,
                    redirect, abort, jsonify)
 from flask import session
+
+import os
+import logging
 import sqlite3
 import pandas as pd
 from functools import wraps
+
 from .data import getBoardDict, getEpoch, getAlert, saveData, saveCredData
+from .authentication import *
+import re
 from . import app, logger, r, BOARD, IP_SET, ph, get_db
 
 # The cache of the main board page
@@ -31,6 +35,9 @@ def login_required(f):
 
 @app.route("/", methods=['GET'])
 def login():
+    # If already authenticated, redirect to dashboard
+    if session.get('user'):
+        return redirect(url_for('index'))
     return render_template("login.html")
 
 @app.route("/", methods=['POST'])
@@ -39,25 +46,14 @@ def login_post():
     password = request.form.get('password', '')
     if not username or not password:
         return render_template('login.html', error='Username and password required')
-
-    db = get_db()
-    cur = db.execute('SELECT password, role FROM users WHERE username = ?;', (username,))
-    row = cur.fetchone()
-    if row is None:
+    
+    login_res = verifyUser(username, password)
+    if login_res:
+        session['user'] = login_res[0]
+        session['role'] = login_res[1]
+        return redirect(url_for('index'))
+    else:
         return render_template('login.html', error='Invalid username or password')
-
-    stored = row['password']
-    try:
-        if ph.verify(stored, password):
-            # Successful login: set session and redirect to index
-            session['user'] = username
-            session['role'] = row['role']
-            return redirect(url_for('index'))
-    except Exception:
-        # verification failed (bad password or invalid hash)
-        pass
-
-    return render_template('login.html', error='Invalid username or password')
 
 @app.route('/pwnboard', methods=['GET'])
 @login_required
@@ -233,3 +229,86 @@ def manage_user_accounts():
     if session.get('role') != 'admin':
         abort(403)
     return render_template('manage_user_accounts.html')
+
+@app.route('/tokens/create', methods=['POST'])
+@login_required
+def create_token():
+    token_name = request.form.get('token_name', '').strip()
+    username = session.get('user')
+    application = request.form.get('application', '').strip()
+    description = request.form.get('description', '')
+    expiry = request.form.get('expiry', '7d')
+    # parse expiry like '30m', '5d', '1h', '6mo' into seconds; default 7 days
+    seconds_map = {'m': 60, 'h': 3600, 'd': 86400, 'w': 604800, 'mo': 2592000, 'y': 31536000}
+    expire_after = None
+    try:
+        m = re.match(r'^(\d+)\s*([a-zA-Z]+)?$', (expiry or '').strip())
+        if m:
+            num = int(m.group(1))
+            unit = (m.group(2) or '').lower()
+            if unit == '':
+                expire_after = num
+            elif unit in seconds_map:
+                expire_after = num * seconds_map[unit]
+            else:
+                # fallback default
+                expire_after = 7 * 86400
+        else:
+            expire_after = 7 * 86400
+    except Exception:
+        expire_after = 7 * 86400
+
+    token = createAccessToken(token_name, username, application, description, expires_after=expire_after)
+    if token:
+        return jsonify({'token': token})
+    else:
+        return ("", 500)
+
+
+@app.route('/tokens', methods=['GET'])
+@login_required
+def list_tokens():
+    username = session.get('user')
+    tokens = list_user_tokens(username)
+    return jsonify(tokens)
+
+
+@app.route('/tokens/<token_hash>', methods=['DELETE'])
+@login_required
+def delete_token_route(token_hash):
+    # owner or admin may delete
+    username = session.get('user')
+    data = r.get(f"token:{token_hash}")
+    if not data:
+        return ("Not found", 404)
+    try:
+        meta = json.loads(str(data))
+    except Exception:
+        return ("Invalid token", 500)
+    owner = meta.get('username')
+    if owner != username and session.get('role') != 'admin':
+        return ("Forbidden", 403)
+    ok = removeAccessToken(token_hash)
+    if ok:
+        return ("", 204)
+    return ("Error", 500)
+
+
+@app.route('/account/change_password', methods=['POST'])
+@login_required
+def account_change_password():
+    username = session.get('user')
+    old_pass = request.form.get('old_pass', '')
+    new_pass = request.form.get('new_pass', '')
+    if not old_pass or not new_pass:
+        return ("Missing fields", 400)
+    ok = changeUserPassword(username, old_pass, new_pass)
+    if ok:
+        return ("Password changed", 200)
+    return ("Password change failed", 400)
+
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))

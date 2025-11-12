@@ -1,13 +1,85 @@
+<!doctype html>
 <html>
 <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Account Settings - PWNboard</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css">
 </head>
 <body class="p-4">
     <div class="container">
-        <h1>Account Settings</h1>
-        <p class="text-muted">Placeholder for user account settings. Add profile, password change, and preferences here.</p>
-        <a class="btn btn-primary" href="{{ url_for('index') }}">Back to Dashboard</a>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h1>Account Settings</h1>
+            <a class="btn btn-secondary" href="{{ url_for('index') }}">Back to Dashboard</a>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card mb-3">
+                    <div class="card-header">Profile</div>
+                    <div class="card-body">
+                        <p><strong>Username:</strong> <span id="profile-username">{{ session.get('user') }}</span></p>
+                        <p><strong>Role:</strong> <span id="profile-role">{{ session.get('role') }}</span></p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Change Password</div>
+                    <div class="card-body">
+                        <form id="change-pass-form">
+                            <div class="form-group">
+                                <label for="old_pass">Current password</label>
+                                <input id="old_pass" name="old_pass" type="password" class="form-control" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="new_pass">New password</label>
+                                <input id="new_pass" name="new_pass" type="password" class="form-control" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="new_pass_confirm">Confirm new password</label>
+                                <input id="new_pass_confirm" name="new_pass_confirm" type="password" class="form-control" required>
+                            </div>
+                            <button class="btn btn-primary" type="submit">Change Password</button>
+                            <div id="change-pass-feedback" class="mt-2"></div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">Account Actions</div>
+                    <div class="card-body">
+                        <p class="text-muted">Manage your account. For token management visit the <a href="{{ url_for('manage_apps') }}">Manage Apps</a> page.</p>
+                        <p>
+                            <a class="btn btn-outline-secondary" href="{{ url_for('logout') }}">Logout</a>
+                        </p>
+                        <!-- Additional account actions can be added here -->
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
+
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" crossorigin="anonymous"></script>
+    <script>
+        (function(){
+            document.getElementById('change-pass-form').addEventListener('submit', async function(ev){
+                ev.preventDefault();
+                const old_pass = document.getElementById('old_pass').value;
+                const new_pass = document.getElementById('new_pass').value;
+                const confirm = document.getElementById('new_pass_confirm').value;
+                const feedback = document.getElementById('change-pass-feedback');
+                feedback.textContent = '';
+                if (new_pass !== confirm){ feedback.innerHTML = '<span class="text-danger">Passwords do not match</span>'; return; }
+                try{
+                    const res = await fetch('/account/change_password', { method: 'POST', body: new URLSearchParams({ old_pass, new_pass }) });
+                    const txt = await res.text();
+                    if (res.ok) feedback.innerHTML = '<span class="text-success">Password changed</span>';
+                    else feedback.innerHTML = '<span class="text-danger">'+(txt||'Error')+'</span>';
+                }catch(e){ feedback.innerHTML = '<span class="text-danger">Request failed</span>'; }
+            });
+        })();
+    </script>
 </body>
 </html>
