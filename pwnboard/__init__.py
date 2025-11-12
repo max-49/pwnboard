@@ -2,14 +2,14 @@
 '''
 Initialize all the data and the config info
 '''
-from flask import Flask, g
+from flask import Flask, g, session, redirect, url_for
 import re
 import os
 import json
 import redis
 import sqlite3
 import logging
-from os.path import isfile
+from functools import wraps
 from argon2 import PasswordHasher
 from markupsafe import Markup, escape
 from .logging_handler import DBHandler
@@ -135,14 +135,57 @@ def get_db():
     return g.db
 
 
+# Logs DB handling (per-request connection similar to get_db)
+LOGS_DB = os.environ.get('LOGS_DB', 'logs.db')
+def get_logs_db():
+    """Return a per-request sqlite3 connection for logs.db stored on flask.g."""
+    if getattr(g, 'logs_db', None) is None:
+        g.logs_db = sqlite3.connect(LOGS_DB, detect_types=sqlite3.PARSE_DECLTYPES)
+        g.logs_db.row_factory = sqlite3.Row
+        try:
+            g.logs_db.execute("PRAGMA busy_timeout = 5000")
+        except Exception:
+            pass
+    return g.logs_db
+
+
 def close_db(e=None):
     db = getattr(g, 'db', None)
     if db is not None:
         db.close()
         delattr(g, 'db')
+    logs_db = getattr(g, 'logs_db', None)
+    if logs_db is not None:
+        try:
+            logs_db.close()
+        except Exception:
+            pass
+        delattr(g, 'logs_db')
 
 # Close DB when app is ended
 app.teardown_appcontext(close_db)
 
+# Decorator to check to see if session args are set
+def login_required(f):
+    """Simple decorator that requires session['user'] to be set."""
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if not session.get('user'):
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return wrapper
+
+def admin_required(f):
+    """Decorator to require an admin role for API endpoints."""
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if not session.get('user'):
+            return redirect(url_for('login'))
+        if session.get('role') != 'admin':
+            return ("Forbidden", 403)
+        return f(*args, **kwargs)
+    return wrapper
+
 # Import routes from routes file
 from . import routes
+from . import endpoints

@@ -1,21 +1,38 @@
 <!DOCTYPE HTML>
 <html>
     <head>
-        <meta charset="utf-8">
-        <title>Application Callbacks Over Time</title>
-        <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width,initial-scale=1">
+            <title>Application Callbacks Over Time</title>
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+            <link href='https://fonts.googleapis.com/css?family=Titillium+Web:600,400' rel='stylesheet' type='text/css' />
+            <link href='https://fonts.googleapis.com/css?family=Jura:400,600' rel='stylesheet' type='text/css' />
+            <link rel='stylesheet' href="{{ url_for('static', filename='pwnboard.css') }}" type='text/css' />
+            <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     </head>
-    <body style="font-family: sans-serif; margin: 40px;">
-        <h2>Application Callbacks Over Time</h2>
-        <div id="plot" style="width:100%;height:600px;"></div>
+    <body>
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2>Application Callbacks Over Time</h2>
+                <a class="btn btn-secondary" href="{{ url_for('index') }}">Back to Dashboard</a>
+            </div>
+            <div id="plot" style="width:100%;height:600px;"></div>
+        </div>
 
-        <script>
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.14.7/dist/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+
+    <script>
             const data = {{ graph_data|tojson }};
-            const traces = data.series.map(s => ({
+            // Build stacked area traces so the plot shows volume by application
+            const traces = data.series.map((s, i) => ({
                 x: data.timestamps,
                 y: s.values,
-                mode: 'lines+markers',
-                name: s.name
+                mode: 'lines',
+                name: s.name,
+                stackgroup: 'one',
+                hoverinfo: 'x+y'
             }));
 
             const layout = {
@@ -28,6 +45,9 @@
                     title: 'Timestamp',
                     showgrid: false,
                     tickangle: -45,
+                    tickfont: { size: 11 },
+                    tickmode: 'auto',
+                    nticks: 10,
                     rangeselector: {
                         buttons: [
                             { count: 15, label: '15m', step: 'minute', stepmode: 'backward' },
@@ -37,9 +57,10 @@
                             { step: 'all', label: 'All' }
                         ]
                     },
-                    rangeslider: { visible: true },
+                    // remove the rangeslider (the sliding view at the bottom)
+                    rangeslider: { visible: false },
                     type: 'date',
-                    tickfont: { size: 12 }
+                    automargin: true
                 },
                 yaxis: {
                     title: 'Callback Count',
@@ -48,13 +69,18 @@
                 },
                 legend: {
                     orientation: 'h',
-                    y: -0.2,
+                    y: -0.25,
                     xanchor: 'center',
                     x: 0.5,
-                    bgcolor: 'rgba(255,255,255,0.5)',
-                    bordercolor: 'rgba(0,0,0,0.1)',
-                    borderwidth: 1
+                    yanchor: 'top',
+                    traceorder: 'normal',
+                    bgcolor: 'rgba(255,255,255,0.95)',
+                    bordercolor: 'rgba(0,0,0,0.08)',
+                    borderwidth: 1,
+                    itemclick: 'toggleothers',
+                    itemdoubleclick: 'toggle'
                 },
+                margin: { t: 110, b: 160, l: 60, r: 30 },
                 hovermode: 'x unified'
             };
 
