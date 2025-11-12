@@ -9,8 +9,8 @@ def random_callbacks(server, time_interval, hosts):
     while True:
         for i in range(random.randint(0,20)):
             ip = random.choice(hosts)
-            data = json.dumps({'ip': ip, "application": f"c2_{random.randint(1,20)}", "access_type": "c2", "access_info": random.choice(callback_infos)})
-            headers = {'Content-Type': 'application/json'}
+            data = json.dumps({'ip': ip, "application": f"c2_{random.randint(1,12)}", "access_type": "c2", "access_info": random.choice(callback_infos)})
+            headers = {'Content-Type': 'application/json', 'Authorization': 'Bearer BwjQsumIwiKfkK1EFssjGkzuY20WS9_hTVB-Z-4CU8Q'}
             r = requests.post(server,headers=headers,data=data)
             print(r)
             time.sleep(0.1)
@@ -35,7 +35,7 @@ def get_board():
 def main():
     board = get_board()
     server = input("Server Name?: ").strip()
-    random_callbacks(server, 1, board)
+    random_callbacks(server, 5, board)
 
 if __name__ == '__main__':
     main()

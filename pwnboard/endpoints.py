@@ -255,6 +255,11 @@ def account_change_password():
         return ("Missing fields", 400)
     ok = changeUserPassword(username, old_pass, new_pass)
     if ok:
+        # invalidate the session so the user must re-authenticate after password change
+        try:
+            session.clear()
+        except Exception:
+            pass
         return ("Password changed", 200)
     return ("Password change failed", 400)
 

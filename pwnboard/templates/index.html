@@ -17,13 +17,15 @@
                     {% if session.get('user') %}{{ session.get('user') }}{% else %}Menu{% endif %}
                 </button>
                 <div class="dropdown-menu dropdown-menu-right" aria-labelledby="userMenuButton">
-                    {% if session.get('role') != 'guest' %}
+                    {% if session.get('role') != 'guest' or session.get('role') != 'restricted' %}
                     <a class="dropdown-item" href="{{ url_for('manage_apps') }}">Manage Apps</a>
                     {% endif %}
                     {% if session.get('role') == 'admin' %}
                     <a class="dropdown-item" href="{{ url_for('manage_user_accounts') }}">Manage User Accounts</a>
                     {% endif %}
+                    {% if session.get('role') != 'restricted' %}
                     <a class="dropdown-item" href="{{ url_for('account_settings') }}">Account Settings</a>
+                    {% endif %}
                     <a class="dropdown-item" href="{{ url_for('callbacks') }}">Graphs</a>
                     <div class="dropdown-divider"></div>
                     <a class="dropdown-item text-danger" href="{{ url_for('logout') }}">Logout</a>

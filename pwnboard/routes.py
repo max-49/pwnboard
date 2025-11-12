@@ -163,7 +163,7 @@ def callbacks():
 @login_required
 def manage_apps():
     # Guests are not allowed to manage apps or create tokens
-    if session.get('role') == 'guest':
+    if session.get('role') == 'guest' or session.get('role') == 'restricted':
         abort(403)
     return render_template('manage_apps.html')
 
@@ -171,11 +171,14 @@ def manage_apps():
 @app.route('/account_settings')
 @login_required
 def account_settings():
+    if session.get('role') == 'restricted':
+        abort(403)
     return render_template('account_settings.html')
 
 
 @app.route('/manage_user_accounts')
 @login_required
+@admin_required
 def manage_user_accounts():
     """Admin-only Manage User Accounts page."""
     # Only allow users with admin role

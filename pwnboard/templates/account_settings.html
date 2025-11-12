@@ -80,7 +80,7 @@
                 try{
                     const res = await fetch('/account/change_password', { method: 'POST', body: new URLSearchParams({ old_pass, new_pass }) });
                     const txt = await res.text();
-                    if (res.ok) feedback.innerHTML = '<span class="text-success">Password changed</span>';
+                    if (res.ok) feedback.innerHTML = '<span class="text-success">Password successfully changed! You will be asked to reauthenticate once you leave this page.</span>';
                     else feedback.innerHTML = '<span class="text-danger">'+(txt||'Error')+'</span>';
                 }catch(e){ feedback.innerHTML = '<span class="text-danger">Request failed</span>'; }
             });
