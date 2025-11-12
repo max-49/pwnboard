@@ -1,13 +1,229 @@
+<!doctype html>
 <html>
 <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Manage User Accounts - PWNboard</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css">
+    <style>
+    /* small helpers consistent with other templates */
+    .mono{font-family:Menlo,monospace}
+    </style>
 </head>
 <body class="p-4">
     <div class="container">
-        <h1>Manage User Accounts</h1>
-        <p class="text-muted">Placeholder for user account management. Only visible to users with the admin role.</p>
-        <a class="btn btn-primary" href="{{ url_for('index') }}">Back to Dashboard</a>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h1>Manage User Accounts</h1>
+            <a class="btn btn-secondary" href="{{ url_for('index') }}">Back to Dashboard</a>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">Users</div>
+            <div class="card-body">
+                <div class="d-flex mb-3">
+                    <button id="btn-add-user" class="btn btn-success mr-3">+ Add User</button>
+                    <div class="form-inline text-muted align-items-center">
+                        <small>Admins can view, add, and delete users. Click a row to view that user's tokens.</small>
+                    </div>
+                </div>
+
+                <div id="users-loading" class="text-muted">Loading users...</div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped" id="users-table" style="display:none">
+                        <thead>
+                            <tr><th>Username</th><th>Role</th><th>Created</th><th>Actions</th></tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div id="no-users" class="text-muted" style="display:none">No users found.</div>
+            </div>
+        </div>
     </div>
+
+    <!-- Modal: Create user -->
+    <div class="modal fade" id="createUserModal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title">Create User</h5>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button></div>
+                <div class="modal-body">
+                    <form id="create-user-form">
+                        <div class="form-group">
+                            <label for="new_username">Username</label>
+                            <input id="new_username" name="username" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="new_password">Password</label>
+                            <input id="new_password" name="password" type="password" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="new_role">Role</label>
+                            <select id="new_role" name="role" class="form-control">
+                                <option value="user">User</option>
+                                <option value="admin">Admin</option>
+                                <option value="guest">Guest</option>
+                            </select>
+                        </div>
+                        <div id="create-user-feedback" class="text-muted small"></div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button id="submit-create-user" class="btn btn-primary">Create</button>
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: User tokens -->
+    <div class="modal fade" id="userTokensModal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title">User Tokens</h5>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button></div>
+                <div class="modal-body">
+                    <div id="tokens-loading" class="text-muted">Loading tokens...</div>
+                    <table class="table table-sm table-striped" id="user-tokens-table" style="display:none">
+                        <thead><tr><th>Name</th><th>Prefix</th><th>App</th><th>Created</th><th>Expires</th><th>Actions</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                    <div id="no-user-tokens" class="text-muted" style="display:none">No tokens for this user.</div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.14.7/dist/umd/popper.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/js/bootstrap.min.js" crossorigin="anonymous"></script>
+    <script>
+    (function(){
+        const usersTable = document.getElementById('users-table');
+        const usersTbody = usersTable.querySelector('tbody');
+        const usersLoading = document.getElementById('users-loading');
+        const noUsers = document.getElementById('no-users');
+
+        function fmt(ts){ if(!ts) return ''; return new Date(ts*1000).toLocaleString(); }
+
+        async function loadUsers(){
+            usersLoading.style.display='';
+            try{
+                const res = await fetch('/admin/users');
+                if(!res.ok) throw new Error('no endpoint');
+                const ct = (res.headers.get('content-type')||'');
+                let data = [];
+                if(ct.indexOf('application/json') !== -1){ data = await res.json(); }
+                usersTbody.innerHTML='';
+                if(!data || data.length === 0){ usersTable.style.display='none'; noUsers.style.display=''; }
+                else{
+                    noUsers.style.display='none'; usersTable.style.display='';
+                    data.forEach(u=>{
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `<td class="align-middle">${u.username}</td><td class="align-middle">${u.role||''}</td><td class="align-middle">${u.created?fmt(u.created):''}</td><td class="align-middle"><button class="btn btn-sm btn-danger btn-delete" data-user="${u.username}">Delete</button> <button class="btn btn-sm btn-outline-secondary btn-view-tokens" data-user="${u.username}">Tokens</button></td>`;
+                        usersTbody.appendChild(tr);
+                    });
+                }
+            }catch(e){ console.warn(e); usersLoading.textContent='User endpoints not available.' }
+            finally{ usersLoading.style.display='none' }
+        }
+
+        // Add user modal
+        document.getElementById('btn-add-user').addEventListener('click', function(){
+            document.getElementById('create-user-form').reset();
+            document.getElementById('create-user-feedback').textContent='';
+            $('#createUserModal').modal('show');
+        });
+
+        document.getElementById('submit-create-user').addEventListener('click', async function(){
+            const btn = this; btn.disabled = true; btn.textContent = 'Creating...';
+            try{
+                const form = document.getElementById('create-user-form');
+                const body = new URLSearchParams(new FormData(form));
+                const res = await fetch('/admin/users', { method: 'POST', body });
+                const text = await res.text();
+                if(!res.ok){ document.getElementById('create-user-feedback').textContent = text || 'Create failed'; }
+                else{ $('#createUserModal').modal('hide'); }
+                await loadUsers();
+            }catch(e){ document.getElementById('create-user-feedback').textContent = 'Request failed'; }
+            finally{ btn.disabled = false; btn.textContent = 'Create'; }
+        });
+
+        // Delete user / view tokens handlers
+        document.body.addEventListener('click', async function(ev){
+            if(ev.target.classList.contains('btn-delete')){
+                const user = ev.target.getAttribute('data-user');
+                if(!confirm('Delete user '+user+'?')) return;
+                try{
+                    const res = await fetch('/admin/users/'+encodeURIComponent(user), { method: 'DELETE' });
+                    if(res.ok) await loadUsers(); else alert('Delete failed');
+                }catch(e){ alert('Delete failed'); }
+            }
+            if(ev.target.classList.contains('btn-view-tokens')){
+                const user = ev.target.getAttribute('data-user');
+                await loadUserTokens(user);
+                $('#userTokensModal').modal('show');
+            }
+        });
+
+        // User tokens
+        const tokensTable = document.getElementById('user-tokens-table');
+        const tokensTbody = tokensTable.querySelector('tbody');
+        const tokensLoading = document.getElementById('tokens-loading');
+        const noTokens = document.getElementById('no-user-tokens');
+
+        async function loadUserTokens(user){
+            tokensLoading.style.display=''; tokensTable.style.display='none'; noTokens.style.display='none';
+            try{
+                const res = await fetch('/admin/users/'+encodeURIComponent(user)+'/tokens');
+                if(!res.ok) throw new Error('no endpoint');
+                const ct = (res.headers.get('content-type')||'');
+                let data = [];
+                if(ct.indexOf('application/json') !== -1){ data = await res.json(); }
+                tokensTbody.innerHTML='';
+                if(!data || data.length === 0){ noTokens.style.display=''; }
+                else{
+                    tokensTable.style.display='';
+                    data.forEach(t=>{
+                        const tr = document.createElement('tr');
+                        const dot = '\u00B7';
+                        const prefix = t.prefix || (t.token ? t.token.slice(0,3) : '');
+                        tr.innerHTML = `<td>${t.token_name||''}</td><td class="mono">${prefix+dot.repeat(8)}</td><td>${t.application||''}</td><td>${fmt(t.created)}</td><td>${fmt(t.expires)}</td><td><button class="btn btn-sm btn-danger btn-delete-token" data-hash="${t.hash}">Delete</button></td>`;
+                        tokensTbody.appendChild(tr);
+                    });
+                }
+            }catch(e){ console.warn(e); tokensLoading.textContent='Token endpoints not available.' }
+            finally{ tokensLoading.style.display='none' }
+        }
+
+        // Delete token from modal
+        document.body.addEventListener('click', async function(ev){
+            if(ev.target.classList.contains('btn-delete-token')){
+                const h = ev.target.getAttribute('data-hash');
+                if(!confirm('Delete token?')) return;
+                try{
+                    const res = await fetch('/tokens/'+encodeURIComponent(h), { method: 'DELETE' });
+                    if(res.ok){
+                        // refresh tokens list
+                        const modalTitle = document.querySelector('#userTokensModal .modal-title');
+                        const user = modalTitle && modalTitle.dataset && modalTitle.dataset.user;
+                        if(user) await loadUserTokens(user);
+                    } else alert('Delete failed');
+                }catch(e){ alert('Delete failed'); }
+            }
+        });
+
+        // Store current user in modal title dataset for refresh logic
+        $('#userTokensModal').on('show.bs.modal', function(e){
+            // nothing here; loadUserTokens sets content
+        });
+
+        // initial load
+        loadUsers();
+    })();
+    </script>
 </body>
 </html>

@@ -110,6 +110,18 @@ def callback():
 
     if 'type' in data: data['application'] = data['type']
 
+    auth_header = request.headers.get('Authorization')
+
+    if not auth_header:
+        return "Not authorized\n"
+
+    token = auth_header.split(' ')[1]
+
+    verification = verifyAccessToken(token, data['application'])
+
+    if (verification == False):
+        return "Not authorized\n"
+
     if 'ips' in data and isinstance(data['ips'], list):
         for ip in data['ips']:
             d = dict(data)
@@ -137,15 +149,27 @@ def creds_callback():
     # data = {"ip": <ip>, "username": <username>, "password": <password>, "admin": 0/1} --> callback
     data['last_seen'] = getEpoch()
     # Make sure username and password are in the data
-    if 'username' not in data and 'password' not in data:
-        return "Invalid: Missing 'username' or 'password' in the request"
+    if 'username' not in data or 'password' not in data or 'application' not in data:
+        return "Invalid: Missing 'username', 'password', or 'application' in the request\n"
     
     if 'admin' in data:
         if data['admin'] not in [0,1]:
-            return "Invalid: admin must be set to either 0 (not admin) or 1 (admin)"
+            return "Invalid: admin must be set to either 0 (not admin) or 1 (admin)\n"
     else:
         # -1 = unknown
         data['admin'] = -1
+
+        auth_header = request.headers.get('Authorization')
+
+    if not auth_header:
+        return "Not authorized\n"
+
+    token = auth_header.split(' ')[1]
+
+    verification = verifyAccessToken(token, data['application'])
+
+    if (verification == False):
+        return "Not authorized\n"
 
     if 'ips' in data and isinstance(data['ips'], list):
         for ip in data['ips']:
@@ -211,6 +235,9 @@ def callbacks():
 @login_required
 def manage_apps():
     """Placeholder Manage Apps view."""
+    # Guests are not allowed to manage apps or create tokens
+    if session.get('role') == 'guest':
+        abort(403)
     return render_template('manage_apps.html')
 
 
@@ -230,11 +257,100 @@ def manage_user_accounts():
         abort(403)
     return render_template('manage_user_accounts.html')
 
+
+def admin_required(f):
+    """Decorator to require an admin role for API endpoints."""
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if not session.get('user'):
+            return redirect(url_for('login'))
+        if session.get('role') != 'admin':
+            return ("Forbidden", 403)
+        return f(*args, **kwargs)
+    return wrapper
+
+
+@app.route('/admin/users', methods=['GET'])
+@login_required
+@admin_required
+def admin_list_users():
+    """Return JSON list of users for admin UI."""
+    db = get_db()
+    cur = db.execute('SELECT username, role FROM users ORDER BY username COLLATE NOCASE;')
+    rows = cur.fetchall()
+    out = []
+    for r in rows:
+        out.append({
+            'username': r['username'],
+            'role': r['role']
+        })
+    return jsonify(out)
+
+
+@app.route('/admin/users', methods=['POST'])
+@login_required
+@admin_required
+def admin_create_user():
+    """Create a new user. Expects form data: username, password, role."""
+    username = request.form.get('username', '').strip()
+    password = request.form.get('password', '')
+    role = request.form.get('role', 'user')
+    if not username or not password:
+        return ("Missing fields", 400)
+    # reuse authentication.createUser
+    res = createUser(username, password, role)
+    if res is True:
+        return ("", 201)
+    else:
+        # createUser returns an error string on failure
+        return (res or 'Create failed', 400)
+
+
+@app.route('/admin/users/<username>', methods=['DELETE'])
+@login_required
+@admin_required
+def admin_delete_user(username):
+    """Delete a user from the sqlite users DB. Admin-only. Prevent deleting self."""
+    username = username or ''
+    username = username.strip()
+    if not username:
+        return ("Missing username", 400)
+    # prevent deleting yourself
+    if session.get('user') == username:
+        return ("Cannot delete current user", 400)
+    db = get_db()
+    cur = db.execute('SELECT 1 FROM users WHERE username = ?;', (username,))
+    if cur.fetchone() is None:
+        return ("Not found", 404)
+    try:
+        db.execute('DELETE FROM users WHERE username = ?;', (username,))
+        db.commit()
+        return ("", 204)
+    except Exception as e:
+        logger.exception('Failed to delete user %s', username)
+        return ("Error", 500)
+
+
+@app.route('/admin/users/<username>/tokens', methods=['GET'])
+@login_required
+@admin_required
+def admin_list_user_tokens(username):
+    """Return token metadata for a specific user. Admin-only."""
+    username = username or ''
+    username = username.strip()
+    if not username:
+        return ("Missing username", 400)
+    tokens = list_user_tokens(username)
+    return jsonify(tokens)
+
 @app.route('/tokens/create', methods=['POST'])
 @login_required
 def create_token():
     token_name = request.form.get('token_name', '').strip()
     username = session.get('user')
+    # Guests may not create access tokens
+    if session.get('role') == 'guest':
+        return ("Forbidden", 403)
     application = request.form.get('application', '').strip()
     description = request.form.get('description', '')
     expiry = request.form.get('expiry', '7d')
