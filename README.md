@@ -61,12 +61,18 @@ This generates `board.json` in the project root, which defines which IP addresse
    export DEFAULT_USER_PASSWORD="strong-password"
    ```
 
-2. **Deploy**:
+2. **Set up HTTPS**:
+   ```bash
+   cd scripts
+   sudo setup_certs.sh
+   ```
+
+3. **Deploy**:
    ```bash
    docker compose up -d
    ```
 
-3. **Access the dashboard**:
+4. **Access the dashboard**:
    - Navigate to `http://your-domain.com:8080`
    - Login with default credentials (multiple users/roles/access tokens to be added soon)
 
