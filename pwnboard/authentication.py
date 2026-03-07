@@ -134,7 +134,7 @@ def verifyAccessToken(token, application):
     if expires and int(expires) < int(time.time()):
         return False
 
-    if application and info.get('application') != application and info.get('application') != 'global':
+    if application and info.get('application').lower() != application.lower() and info.get('application') != 'global':
         return False
 
     return info
