@@ -13,6 +13,7 @@ services:
       - DEFAULT_USER=admin
       - DEFAULT_USER_PASSWORD=password
       - LOGIN_PAGE_MESSAGE=Contact an admin to get an account!
+      - USE_ACCESS_TOKENS=true
       - USERS_DB=/opt/pwnboard/data/users.db
       - LOGS_DB=/opt/pwnboard/data/logs.db
     volumes:

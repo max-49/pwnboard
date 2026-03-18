@@ -8,7 +8,7 @@ import pandas as pd
 
 from .authentication import verifyUser
 from .data import getBoardDict, getEpoch, getAlert
-from . import app, BOARD, get_logs_db, login_required, admin_required
+from . import app, BOARD, get_logs_db, login_required, admin_required, USE_ACCESS_TOKENS
 
 # The cache of the main board page
 try:
@@ -19,7 +19,6 @@ BOARDCACHE = ""
 BOARDCACHE_TIME = 0
 BOARDCACHE_UPDATED = True
 LOGIN_PAGE_MESSAGE = os.environ.get("LOGIN_PAGE_MESSAGE", "Contact an admin to make an account!")
-
 
 def mark_board_cache_dirty():
     """Mark in-memory board cache as stale."""
@@ -180,7 +179,7 @@ def manage_apps():
     # Guests are not allowed to manage apps or create tokens
     if session.get('role') == 'guest' or session.get('role') == 'restricted':
         abort(403)
-    return render_template('manage_apps.html')
+    return render_template('manage_apps.html', USE_ACCESS_TOKENS=USE_ACCESS_TOKENS)
 
 
 @app.route('/account_settings')

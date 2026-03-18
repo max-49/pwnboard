@@ -6,7 +6,7 @@ from .authentication import *
 from .data import getEpoch, saveData, saveCredData
 from .routes import mark_board_cache_dirty
 
-from . import app, logger, r, IP_SET, get_db, login_required, admin_required
+from . import app, logger, r, IP_SET, get_db, login_required, admin_required, USE_ACCESS_TOKENS
 
 @app.route('/checkin', methods=['POST'])
 @app.route('/generic', methods=['POST'])
@@ -25,17 +25,23 @@ def callback():
 
     if 'type' in data: data['application'] = data['type']
 
-    auth_header = request.headers.get('Authorization')
+    if USE_ACCESS_TOKENS:
+        auth_header = request.headers.get('Authorization')
 
-    if not auth_header:
-        return "Not authorized\n", 401
+        if not auth_header:
+            return "Not authorized\n", 401
 
-    token = auth_header.split(' ')[1]
+        
+        auth_header_split = auth_header.split(' ')
+        if auth_header_split[0].strip().lower() != "Bearer":
+            return "Please use Bearer Token\n", 401
+        
+        token = auth_header_split[1].strip()
 
-    verification = verifyAccessToken(token, data['application'])
+        verification = verifyAccessToken(token, data['application'])
 
-    if (verification == False):
-        return "Not authorized\n", 401
+        if (verification == False):
+            return "Not authorized\n", 401
 
     if 'ips' in data and isinstance(data['ips'], list):
         for ip in data['ips']:

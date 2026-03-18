@@ -16,6 +16,7 @@ from .logging_handler import DBHandler
 
 BOARD = []
 IP_SET = set()
+USE_ACCESS_TOKENS = os.environ.get("USE_ACCESS_TOKENS", True)
 
 # Load the board.json file
 def loadBoard():
