@@ -100,6 +100,8 @@ PWNBoard is configured via environment variables, set in `docker-compose.yml`.
 | `PWN_THEME` | `blue` | Color theme: `blue` (red=active) or `green` (green=active) |
 | `CACHE_TIME` | `-1` | Board cache seconds (-1 = disabled) |
 | `LOGIN_PAGE_MESSAGE` | `Contact an admin to get an account!` | Message that shows on the login page by default
+| `USERS_DB` | `users.db` | Path to SQLite user database (set to a volume-backed path for persistence) |
+| `LOGS_DB` | `logs.db` | Path to SQLite logs database (set to a volume-backed path for persistence) |
 
 For a complete list of configuration options, see [doc/config.md](doc/config.md).
 

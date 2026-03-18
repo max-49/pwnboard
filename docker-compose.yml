@@ -1,4 +1,3 @@
-version: '3'
 services:
   pwnboard:
     image: ghcr.io/max-49/pwnboard:latest
@@ -13,9 +12,12 @@ services:
       - CREDS_TIMEOUT=30
       - DEFAULT_USER=admin
       - DEFAULT_USER_PASSWORD=password
-      - LOGIN_PAGE_MESSAGE="Contact an admin to get an account!"
+      - LOGIN_PAGE_MESSAGE=Contact an admin to get an account!
+      - USERS_DB=/opt/pwnboard/data/users.db
+      - LOGS_DB=/opt/pwnboard/data/logs.db
     volumes:
       - ./board.json:/opt/pwnboard/board.json:ro
+      - pwnboard-data:/opt/pwnboard/data # users.db and logs.db
 
   redis:
     image: redis:alpine
@@ -26,3 +28,6 @@ services:
     restart: always
     ports:
       - "443:443"
+
+volumes:
+  pwnboard-data:
