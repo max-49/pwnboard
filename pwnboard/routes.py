@@ -179,7 +179,7 @@ def manage_apps():
     # Guests are not allowed to manage apps or create tokens
     if session.get('role') == 'guest' or session.get('role') == 'restricted':
         abort(403)
-    return render_template('manage_apps.html', USE_ACCESS_TOKENS=USE_ACCESS_TOKENS)
+    return render_template('manage_apps.html', USE_ACCESS_TOKENS=str(USE_ACCESS_TOKENS).upper())
 
 
 @app.route('/account_settings')
