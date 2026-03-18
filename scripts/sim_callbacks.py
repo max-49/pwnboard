@@ -40,7 +40,7 @@ def main():
         access_token = input("Input your global access token (token with application name global): ").strip()
     server = input("Full POST URL for PWNBoard website (ex. https://www.pwnboard.win/pwn): ").strip()
     self = input("Using self signed certs (Y/N)?: ")
-    self_res = True if self.strip().lower() == "y" else False
+    self_res = False if self.strip().lower() == "y" else True
     random_callbacks(server, 5, board, access_token, self_res)
 
 if __name__ == '__main__':
