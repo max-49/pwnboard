@@ -132,23 +132,25 @@ Contributions are welcome! Please:
 See [doc/DEVELOPMENT.md](doc/DEVELOPMENT.md) for detailed contribution guidelines.
 
 ## Troubleshooting/Known Issues
-**ISSUE:** Visual bug on home page showing incorrect user on navbar + incorrect options for current logged in user
+### 1) Navbar shows wrong user/options
+> **Issue:** Home page navbar may show the wrong logged-in user and incorrect account options. The session details are correct, this is only a visual bug.
+>
+> **Current workaround:** No permanent fix in this commit. If you need admin user management, go directly to `/manage_user_accounts`.
 
-**SOLUTION:** No solution as of this commit, if you need to access user account management page as an admin user, go to `/manage_user_accounts`
+### 2) POST requests are not appearing
+> **Issue:** Beacon/POST data is not showing up on PWNBoard.
+>
+> **Check the following:**
+> - Confirm you are POSTing to the correct PWNBoard IP/URL.
+> - Confirm the `application` field exactly matches your token's application name.
+> - Tokens with application name `global` accept any application name, but this is not recommended.
 
-**ISSUE:** Alpine Docker container hangs on package installation
+### 3) Self-signed certs and failed POST requests
+> **Issue:** POST requests fail when using self-signed certificates.
+>
+> **Fix:** Disable certificate validation in your client/tool (for example, `curl -k ...`).
 
-**SOLUTION:** Diagnose your own networking issues by creating your own Alpine docker container and trying to install packages using apk. If Alpine isn't working, you can try swapping Alpine for debian:slim and changing apk to apt
-
-**ISSUE:** My POST requests are not appearing on PWNBoard
-
-**SOLUTION:** Ensure the IP address you are POSTing to PWNBoard is correct and ensure the application field value matches your token application name. An access token with the application name "global" will accept POST requests from any application name, but it is not recommended you use this.
-
-**ISSUE:** I am using self signed certs and my POST requests aren't working
-
-**SOLUTION:** You are going to need to look up how to disable certificate validation in however you are POSTing data (e.g. -k with curl)
-
-For more troubleshooting tips, check the bottom of the [setup guide](doc/setup.md)!
+💡 For more troubleshooting tips, check the bottom of the [setup guide](doc/setup.md).
 
 ## License
 
