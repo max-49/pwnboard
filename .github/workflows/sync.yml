@@ -1,4 +1,5 @@
 name: Sync to RITSEC GitLab
+
 on:
   push:
     branches:

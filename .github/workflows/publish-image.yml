@@ -1,0 +1,15 @@
+name: PWNBoard Container Build
+
+on: 
+  push
+
+jobs:
+  build_and_publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build and push Image
+        run: |
+          docker login --username max-49 --password ${{ secrets.DOCKER_ACTION_SECRET }} ghcr.io
+          docker build . -t ghcr.io/max-49/pwnboard:latest
+          docker push ghcr.io/max-49/pwnboard:latest

@@ -1,7 +1,7 @@
 version: '3'
 services:
   pwnboard:
-    build: .
+    image: ghcr.io/max-49/pwnboard:latest
     environment:
       - FLASK_DEBUG=false
       - FLASK_PORT=5000
