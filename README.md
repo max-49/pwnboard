@@ -53,7 +53,7 @@ This generates `board.json` in the project root, which defines which IP addresse
 
 **Docker Compose is the recommended deployment method.**
 
-1. **Configure environment** (edit `docker-compose.yml` or create `.env`):
+1. **Configure environment** (edit `docker-compose.yml`):
    ```bash
    export PWNBOARD_URL="http://your-domain.com:8080"
    export PWNBOARD_PORT=8080
@@ -161,6 +161,7 @@ Some things are on the todo list for PWNBoard and any pull requests would be gre
 
 1. **Visual logging** - the logger Python library is currently used for some backend logging, but the logging/graphing capabilities of PWNBoard need to be greatly expanded. An actual filterable page (visible to admins) allowing logs to be visualized would greatly assist in debugging, red team management, and my personal happiness.
 2. **Stop PWNBoard from getting DDoSed** - with the amount of POST requests that PWNBoard receives every minute during full-blown engagements, the poor Flask app sometimes gets overwhelmed and will stop responding for a couple of seconds. Some sort of load balancing should be implemented to prevent this.
+3. **Polling features with Discord webhooks** - add a feature that polls the data periodically and tracks lost beacons across categories so large losses trigger webhook alerts (ex. if 50% of beacons for Team 5 have been lost within the last 5 minutes, this should trigger a notification) (ideally find a way to interact with the cached JSON rather than querying the website over HTTP, this might involve having to write the currently cached JSON to a file or database instead of having it in memory like it is currently)
 
 ## License
 

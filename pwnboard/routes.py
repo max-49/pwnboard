@@ -91,25 +91,6 @@ def index():
                            board=board, teams=BOARD['teams'])
     return make_response(html)
 
-# @app.route('/install/<tool>/', methods=['GET'])
-# @app.route('/install/<tool>', methods=['GET'])
-# def installTools(tool):
-#     '''
-#     Returns a script that can be used as an installer for the specific tool.
-#     E.g. If you request '/install/empire' you will get a script to run that
-#     will update your empire with the needed functions
-#     '''
-#     host = os.environ.get("PWNBOARD_URL", "PWNBOARD_URL")
-#     # Try to render a template for the tool
-#     try:
-#         text = render_template('clients/{}.j2'.format(tool), server=host)
-#         logger.info("{} requested {} install script".format(
-#                                                 request.remote_addr, tool))
-#         return Response(text+"\n", mimetype='text/plain')
-#     except Exception as E:
-#         print(E)
-#         abort(404)
-
 @app.route("/graphs")
 @login_required
 def callbacks():

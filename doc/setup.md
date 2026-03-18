@@ -1,4 +1,4 @@
-# Pwnboard Setup
+# PWNBoard Setup
 Written by Massimo Marino (max-49)
 
 # Board Setup
