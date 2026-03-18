@@ -33,7 +33,7 @@ def callback():
 
         
         auth_header_split = auth_header.split(' ')
-        if auth_header_split[0].strip().lower() != "Bearer":
+        if auth_header_split[0].strip().lower() != "bearer":
             return "Please use Bearer Token\n", 401
         
         token = auth_header_split[1].strip()
