@@ -17,20 +17,21 @@ except (TypeError, ValueError):
 BOARDCACHE = ""
 BOARDCACHE_TIME = 0
 BOARDCACHE_UPDATED = True
+LOGIN_PAGE_MESSAGE = os.environ.get("LOGIN_PAGE_MESSAGE", "Contact an admin to make an account!")
 
 @app.route("/", methods=['GET'])
 def login():
     # If already authenticated, redirect to dashboard
     if session.get('user'):
         return redirect(url_for('index'))
-    return render_template("login.html")
+    return render_template("login.html", LOGIN_PAGE_MESSAGE=LOGIN_PAGE_MESSAGE)
 
 @app.route("/", methods=['POST'])
 def login_post():
     username = request.form.get('username', '').strip()
     password = request.form.get('password', '')
     if not username or not password:
-        return render_template('login.html', error='Username and password required')
+        return render_template('login.html', LOGIN_PAGE_MESSAGE=LOGIN_PAGE_MESSAGE, error='Username and password required')
     
     login_res = verifyUser(username, password)
     if login_res:
@@ -38,7 +39,7 @@ def login_post():
         session['role'] = login_res[1]
         return redirect(url_for('index'))
     else:
-        return render_template('login.html', error='Invalid username or password')
+        return render_template('login.html', LOGIN_PAGE_MESSAGE=LOGIN_PAGE_MESSAGE, error='Invalid username or password')
 
 @app.route('/pwnboard', methods=['GET'])
 @login_required

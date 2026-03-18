@@ -99,8 +99,12 @@ PWNBoard is configured via environment variables, set in `docker-compose.yml`.
 | `CREDS_TIMEOUT` | `30` | Minutes before credentials marked stale |
 | `PWN_THEME` | `blue` | Color theme: `blue` (red=active) or `green` (green=active) |
 | `CACHE_TIME` | `-1` | Board cache seconds (-1 = disabled) |
+| `LOGIN_PAGE_MESSAGE` | `Contact an admin to get an account!` | Message that shows on the login page by default
 
 For a complete list of configuration options, see [doc/config.md](doc/config.md).
+
+## Using PWNBoard
+
 
 ## Documentation
 
@@ -126,6 +130,16 @@ Contributions are welcome! Please:
 5. Submit a Pull Request
 
 See [doc/DEVELOPMENT.md](doc/DEVELOPMENT.md) for detailed contribution guidelines.
+
+## Troubleshooting/Known Issues
+**ISSUE:** Visual bug on home page showing incorrect user on navbar + incorrect options for current logged in user
+**SOLUTION:** No solution as of this commit, if you need to access user account management page as an admin user, go to `/manage_user_accounts`
+
+**ISSUE:** Alpine Docker container hangs on package installation
+**SOLUTION:** Diagnose your own networking issues by creating your own Alpine docker container and trying to install packages using apk. If Alpine isn't working, you can try swapping Alpine for debian:slim and changing apk to apt
+
+**ISSUE:** My POST requests are not appearing on PWNBoard
+**SOLUTION:** Ensure the IP address you are POSTing to PWNBoard is correct and ensure the application field value matches your token application name. An access token with the application name "global" will accept POST requests from any application name, but it is not recommended you use this.
 
 ## License
 

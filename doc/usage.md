@@ -1,5 +1,11 @@
 **PWNBOARD URL AND DOCUMENTATION**
-PWNboard URL: https://www.pwnboard.win/
+Replace pwnboard.win with your PWNBoard URL
+
+To create an access token for your application:
+1. Ask the admin to make a PWNBoard account for you
+2. Go to Settings --> Manage Apps (/manage_apps) --> Add Token
+3. Ensure the Application is the same name you are putting in the Application field (not case sensitive)
+4. Copy and save the created token (you will not be able to see it again)
 
 HOW TO SEND YOUR *CALLBACKS* (C2 callbacks):
 POST data in this format to https://www.pwnboard.win/pwn :
@@ -7,9 +13,9 @@ POST data in this format to https://www.pwnboard.win/pwn :
 `{"ip": "<ip>", "application": "<your tool>"}`
 
 *Optional Parameters*
-`{"ip": "<ip>", "application": "<your tool>", "access_type": "<type/method of access>"}`
+`{"ip": "<ip>", "application": "<your tool>", "access_type": "<type/method of access>", "access_info": "<optional information to access this tool (URL, creds, etc.)>" }`
 
-HOW TO SEND YOUR *CREDENTIALS* (send valid credentials to pwnboard!)
+HOW TO SEND YOUR *CREDENTIALS* (send valid credentials to PWNBoard!)
 POST data in this format to https://www.pwnboard.win/creds :
 *Minimum Required Parameters*
 `{"ip": "<ip>", "username": "<username>", "password": "<password>"}`
@@ -17,11 +23,11 @@ POST data in this format to https://www.pwnboard.win/creds :
 *Optional Parameters*
 `{"ip": "<ip>", "username": "<username>", "password": "<password>", "admin": <0 or 1>}`
 
-Examples of POSTing data to pwnboard:
+Examples of POSTing data to PWNBoard:
 
 Curl
 ```bash
-curl -X POST -H "Content-Type: application/json" -d '{"ip": "10.1.1.254", "application": "Javalanche", "access_type": "https c2"}' https://www.pwnboard.win/pwn
+curl -X POST -H "Content-Type: application/json" -H "Authorization: Bearer <ACCESS TOKEN GENERATED IN /manage_apps>" -d '{"ip": "10.1.1.254", "application": "Javalanche", "access_type": "https c2"}' https://www.pwnboard.win/pwn
 ```
 
 Python
@@ -31,17 +37,9 @@ import requests
 
 url = "https://www.pwnboard.win/pwn"
 payload = {"ip": "10.1.1.254", "application": "Javalanche", "access_type": "https c2"}
-resp = requests.post(url, json=payload, headers={"Content-Type": "application/json"})
+resp = requests.post(url, json=payload, headers={"Content-Type": "application/json", "Authorization": "Bearer <ACCESS TOKEN GENERATED IN /manage_apps>"})
 
 assert resp.text.strip() == "valid"
-```
-
-PowerShell
-```ps
-$uri = "https://www.pwnboard.win/pwn"
-$body = '{"ip":"10.1.1.254","application":"Javalanche","access_type":"https c2"}'
-
-$response = Invoke-RestMethod -Uri $uri -Method Post -Body $body -ContentType 'application/json'
 ```
 
 Go
@@ -60,42 +58,9 @@ func main() {
     jsonStr := []byte(`{"ip":"10.1.1.254","application":"Javalanche","access_type":"https c2"}`)
     req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
     req.Header.Set("Content-Type", "application/json")
+    req.Header.Set("Authorization", "Bearer <ACCESS TOKEN GENERATED IN /manage_apps>")
     client := &http.Client{}
     resp, err := client.Do(req)
     defer resp.Body.Close()
 }
-```
-
-NEW ADDITION AS OF PWNBOARD v2.0.0!!!!
-
-Everything above still applies, except you need an extra header (Authorization) to POST data.
-
-To get an Access Key:
-1. Ask the admin to make a pwnboard account for you
-2. Go to Settings --> Manage Apps --> Add Token
-3. Ensure the Application is the same name you are putting in the Application field
-4. Copy and save the created token (you will not be able to see it again)
-
-When POSTing data:
-Add an extra HTTP Header "Authorization" with the value "Bearer <access token>"
-
-ex. 
-
-Curl
-```bash
-curl -X POST -H "Content-Type: application/json" -H "Authorization: Bearer d4h80fh08dh80aa1222" -d '{"ip": "10.1.1.254", "application": "Javalanche", "access_type": "https c2"}' https://www.pwnboard.win/pwn
-```
-
-Python
-```py
-# pip install requests
-import os
-import requests
-
-PWNBOARD_ACCESS = os.environ.get("PWNBOARD_ACCESS", None)
-url = "https://www.pwnboard.win/pwn"
-payload = {"ip": "10.1.1.254", "application": "Javalanche", "access_type": "https c2"}
-resp = requests.post(url, json=payload, headers={"Content-Type": "application/json", "Authorization": f"Bearer {PWNBOARD_ACCESS}"})
-
-assert resp.text.strip() == "valid"
 ```

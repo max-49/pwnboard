@@ -4,7 +4,7 @@ Each setting can be set as an environment variable in docker-compose.yml. Below 
 environment variables and their default settings.
 
 
-- `PWNBOARD_URL` _No default_ - Used to set the url for the code in `/install/<tool>`. Usually looks something like this `http://pwn.board.com:8080` or `http://pwnboard.hack`
+- `PWNBOARD_URL` _No default_ - Used to set the url of PWNBoard for certificate generation
 
 - `BOARD` _Default: "./board.json"_ - The location of the board configuration file. This really has no use case
 
@@ -12,7 +12,6 @@ environment variables and their default settings.
 
 - `REDIS_HOST` _Default: "localhost"_ - The location of the redis server
 - `REDIS_PORT` _Default: "6379"_ - The location of the redis server
-
 
 - `FLASK_HOST` _Default: "0.0.0.0"_ - Which interface Flask should bind to
 - `FLASK_PORT` _Default: "80"_ - Which port Flask should bind to
@@ -22,7 +21,5 @@ environment variables and their default settings.
 
 - `HOST_TIMEOUT` _Default: 2_ - Number of minutes of inactivity before a host expires
 - `CREDS_TIMEOUT` _Default: 30_ - Number of minutes of inactivity before credentials expire
-
-- `DISCORD_WEBHOOK` _No default_ - Link to Discord webhook used for notifying of lost hosts
 
 this is an easter egg
