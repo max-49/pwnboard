@@ -104,7 +104,7 @@ PWNBoard is configured via environment variables, set in `docker-compose.yml`.
 For a complete list of configuration options, see [doc/config.md](doc/config.md).
 
 ## Using PWNBoard
-
+See the [usage guide](doc/usage.md) for detailed instructions on how to actually use PWNBoard!
 
 ## Documentation
 
@@ -133,13 +133,22 @@ See [doc/DEVELOPMENT.md](doc/DEVELOPMENT.md) for detailed contribution guideline
 
 ## Troubleshooting/Known Issues
 **ISSUE:** Visual bug on home page showing incorrect user on navbar + incorrect options for current logged in user
+
 **SOLUTION:** No solution as of this commit, if you need to access user account management page as an admin user, go to `/manage_user_accounts`
 
 **ISSUE:** Alpine Docker container hangs on package installation
+
 **SOLUTION:** Diagnose your own networking issues by creating your own Alpine docker container and trying to install packages using apk. If Alpine isn't working, you can try swapping Alpine for debian:slim and changing apk to apt
 
 **ISSUE:** My POST requests are not appearing on PWNBoard
+
 **SOLUTION:** Ensure the IP address you are POSTing to PWNBoard is correct and ensure the application field value matches your token application name. An access token with the application name "global" will accept POST requests from any application name, but it is not recommended you use this.
+
+**ISSUE:** I am using self signed certs and my POST requests aren't working
+
+**SOLUTION:** You are going to need to look up how to disable certificate validation in however you are POSTing data (e.g. -k with curl)
+
+For more troubleshooting tips, check the bottom of the [setup guide](doc/setup.md)!
 
 ## License
 
