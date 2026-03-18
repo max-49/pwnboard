@@ -3,6 +3,7 @@ from flask import request, session, render_template, make_response, url_for, red
 
 import os
 import logging
+import copy
 import pandas as pd
 
 from .authentication import verifyUser
@@ -18,6 +19,12 @@ BOARDCACHE = ""
 BOARDCACHE_TIME = 0
 BOARDCACHE_UPDATED = True
 LOGIN_PAGE_MESSAGE = os.environ.get("LOGIN_PAGE_MESSAGE", "Contact an admin to make an account!")
+
+
+def mark_board_cache_dirty():
+    """Mark in-memory board cache as stale."""
+    global BOARDCACHE_UPDATED
+    BOARDCACHE_UPDATED = True
 
 @app.route("/", methods=['GET'])
 def login():
@@ -47,35 +54,42 @@ def index():
     '''
     Return the board with the most recent data (cached for 10 seconds)
     '''
-    html = ""
     log = logging.getLogger('werkzeug')
+    board = None
+    error = None
 
     # Find the time since the last cache
     # The server will return the cache in two situations
     #  1. It has been less than 'cache_time' since the last cache
     #  2. There has been no new data since the last cache AND the cache is
     #     younger than 30 seconds
-    if BOARDCACHE_TIMEOUT == -1:
+    if BOARDCACHE_TIMEOUT > 0:
         global BOARDCACHE
         global BOARDCACHE_TIME
         global BOARDCACHE_UPDATED
         ctime = getEpoch() - BOARDCACHE_TIME
-        if (ctime < BOARDCACHE_TIMEOUT or
+        if BOARDCACHE and (ctime < BOARDCACHE_TIMEOUT or
                 (not BOARDCACHE_UPDATED and ctime < 30)):
-            log.info("Pulling board html from cache")
-            # return the cached dictionary
-            return make_response(BOARDCACHE)
-    # Get the board data and render the template
-    error = getAlert()
-    board = getBoardDict()
+            log.info("Pulling board data from cache")
+            error = BOARDCACHE.get('error', "")
+            board = copy.deepcopy(BOARDCACHE.get('board', []))
+
+    # Build fresh board data when cache is disabled/expired/missing
+    if board is None:
+        error = getAlert()
+        board = getBoardDict()
+        if BOARDCACHE_TIMEOUT > 0:
+            BOARDCACHE_TIME = getEpoch()
+            BOARDCACHE = {
+                'error': error,
+                'board': copy.deepcopy(board)
+            }
+            BOARDCACHE_UPDATED = False
+
+    # Always render HTML per-request so session-specific navbar data stays accurate
     theme = os.environ.get('PWN_THEME', "blue")
     html = render_template('index.html', error=error, theme=theme,
                            board=board, teams=BOARD['teams'])
-    # Update the cache and the cache time
-    if BOARDCACHE_TIMEOUT == -1:
-        BOARDCACHE_TIME = getEpoch()
-        BOARDCACHE = html
-        BOARDCACHE_UPDATED = False
     return make_response(html)
 
 # @app.route('/install/<tool>/', methods=['GET'])

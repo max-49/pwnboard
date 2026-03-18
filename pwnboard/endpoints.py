@@ -4,6 +4,7 @@ from flask import request, session, jsonify
 import re
 from .authentication import *
 from .data import getEpoch, saveData, saveCredData
+from .routes import mark_board_cache_dirty
 
 from . import app, logger, r, IP_SET, get_db, login_required, admin_required
 
@@ -51,9 +52,8 @@ def callback():
             return 'invalid IP\n', 400
     else:
         return 'invalid POST\n', 400
-    # Tell us that new data has come
-    global BOARDCACHE_UPDATED
-    BOARDCACHE_UPDATED = True
+    # Tell routes cache that new data has come in
+    mark_board_cache_dirty()
     return "valid\n"
 
 @app.route('/creds', methods=['POST'])
@@ -100,9 +100,8 @@ def creds_callback():
             return 'invalid IP\n', 400
     else:
         return 'invalid POST\n', 400
-    # Tell us that new data has come
-    global BOARDCACHE_UPDATED
-    BOARDCACHE_UPDATED = True
+    # Tell routes cache that new data has come in
+    mark_board_cache_dirty()
     return "valid\n"
 
 @app.route('/admin/users', methods=['GET'])
