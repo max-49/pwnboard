@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 import os
 import random
+import urllib3
 import requests
 import json
 import time
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def random_callbacks(server, time_interval, hosts, access_token, verify):
     callback_infos = ["https://thisisac2.xyz/<hostinfo>/<shell> - red:letredin", "https://discord.com/channel/<id>", "https://c2domain.com - goop:bob"]
