@@ -145,6 +145,7 @@ See [doc/DEVELOPMENT.md](doc/DEVELOPMENT.md) for detailed contribution guideline
 >
 > **Check the following:**
 > - Confirm you are POSTing to the correct PWNBoard IP/URL.
+> - Confirm the `ip` field matches an IP address present on PWNBoard
 > - Confirm the `application` field exactly matches your token's application name.
 > - Tokens with application name `global` accept any application name, but this is not recommended.
 
@@ -160,7 +161,6 @@ Some things are on the todo list for PWNBoard and any pull requests would be gre
 
 1. **Visual logging** - the logger Python library is currently used for some backend logging, but the logging/graphing capabilities of PWNBoard need to be greatly expanded. An actual filterable page (visible to admins) allowing logs to be visualized would greatly assist in debugging, red team management, and my personal happiness.
 2. **Stop PWNBoard from getting DDoSed** - with the amount of POST requests that PWNBoard receives every minute during full-blown engagements, the poor Flask app sometimes gets overwhelmed and will stop responding for a couple of seconds. Some sort of load balancing should be implemented to prevent this.
-3. **Add option to disable access tokens** - some red teams might not want authorization to PWNBoard due to the extra step, so an option to disable this feature would be nice
 
 ## License
 
