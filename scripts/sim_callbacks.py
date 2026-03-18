@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 import random
 import requests
 import json
@@ -34,7 +35,9 @@ def get_board():
 
 def main():
     board = get_board()
-    access_token = input("Input your global access token (token with application name global): ").strip()
+    env_token = os.environ.get("ACCESS_TOKEN", None)
+    if not env_token:
+        access_token = input("Input your global access token (token with application name global): ").strip()
     server = input("Full POST URL for PWNBoard website (ex. https://www.pwnboard.win/pwn): ").strip()
     self = input("Using self signed certs (Y/N)?: ")
     self_res = True if self.strip().lower() == "y" else False
