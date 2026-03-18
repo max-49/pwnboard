@@ -6,7 +6,7 @@
 ![Python](https://img.shields.io/badge/python-3.8+-blue.svg)
 ![Flask](https://img.shields.io/badge/flask-latest-green.svg)
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [Overview](#overview)
 - [Features](#features)
@@ -61,10 +61,15 @@ This generates `board.json` in the project root, which defines which IP addresse
    export DEFAULT_USER_PASSWORD="strong-password"
    ```
 
-2. **Set up HTTPS**:
+2. **Set up HTTPS with certificiates**:
    ```bash
    cd scripts
-   sudo setup_certs.sh
+   sudo ./setup_certs_letsencrypt.sh
+   ```
+
+   ```bash
+   cd scripts
+   sudo ./setup_certs_self_signed.sh
    ```
 
 3. **Deploy**:
@@ -73,8 +78,8 @@ This generates `board.json` in the project root, which defines which IP addresse
    ```
 
 4. **Access the dashboard**:
-   - Navigate to `http://your-domain.com:8080`
-   - Login with default credentials (multiple users/roles/access tokens to be added soon)
+   - Navigate to `https://your-domain.com/`
+   - Login with default credentials
 
 For detailed setup instructions and troubleshooting, see [doc/setup.md](doc/setup.md).
 
@@ -86,15 +91,14 @@ PWNBoard is configured via environment variables, set in `docker-compose.yml`.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SECRET_KEY` | `dev-secret` | Flask secret key for sessions (**change in production!**) |
+| `SECRET_KEY` | `dev-secret` | Flask secret key for sessions (**please change**) |
 | `DEFAULT_USER` | `admin` | Default admin username |
-| `DEFAULT_USER_PASSWORD` | `password` | Default admin password (**change immediately!**) |
-| `PWNBOARD_URL` | — | Base URL for your deployment (e.g., `http://pwnboard.example.com:8080`) |
+| `DEFAULT_USER_PASSWORD` | `password` | Default admin password |
+| `PWNBOARD_URL` | — | Base URL for your deployment (e.g., `https://pwnboard.example.com:8080`) |
 | `HOST_TIMEOUT` | `2` | Minutes before host marked offline |
 | `CREDS_TIMEOUT` | `30` | Minutes before credentials marked stale |
 | `PWN_THEME` | `blue` | Color theme: `blue` (red=active) or `green` (green=active) |
 | `CACHE_TIME` | `-1` | Board cache seconds (-1 = disabled) |
-| `DISCORD_WEBHOOK` | — | Discord webhook URL for notifications (optional) |
 
 For a complete list of configuration options, see [doc/config.md](doc/config.md).
 

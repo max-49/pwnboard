@@ -10,7 +10,7 @@ def random_callbacks(server, time_interval, hosts):
         for i in range(random.randint(0,20)):
             ip = random.choice(hosts)
             data = json.dumps({'ip': ip, "application": f"c2_{random.randint(1,12)}", "access_type": "c2", "access_info": random.choice(callback_infos)})
-            headers = {'Content-Type': 'application/json', 'Authorization': 'Bearer BwjQsumIwiKfkK1EFssjGkzuY20WS9_hTVB-Z-4CU8Q'}
+            headers = {'Content-Type': 'application/json', 'Authorization': 'Bearer ZO1PK2fF9kf73P9wLpQbeFo5f7maXIMvwZbn1K_IIco'}
             r = requests.post(server,headers=headers,data=data)
             print(r)
             time.sleep(0.1)

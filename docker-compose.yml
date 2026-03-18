@@ -7,11 +7,12 @@ services:
       - FLASK_PORT=5000
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - "PWNBOARD_URL=${PWNBOARD_URL}:${PWNBOARD_PORT}"
+      - PWNBOARD_URL=https://pwnboard.win
       - CACHE_TIME=-1    # Seconds to cache for. set to -1 to disable
-      - DISCORD_WEBHOOK=${DISCORD_WEBHOOK}
       - HOST_TIMEOUT=5
       - CREDS_TIMEOUT=30
+      - DEFAULT_USER=admin
+      - DEFAULT_USER_PASSWORD=password
     volumes:
       - ./board.json:/opt/pwnboard/board.json:ro
 
