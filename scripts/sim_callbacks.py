@@ -4,14 +4,14 @@ import requests
 import json
 import time
 
-def random_callbacks(server, time_interval, hosts, access_token):
+def random_callbacks(server, time_interval, hosts, access_token, verify):
     callback_infos = ["https://thisisac2.xyz/<hostinfo>/<shell> - red:letredin", "https://discord.com/channel/<id>", "https://c2domain.com - goop:bob"]
     while True:
         for i in range(random.randint(0,20)):
             ip = random.choice(hosts)
             data = json.dumps({'ip': ip, "application": f"c2_{random.randint(1,12)}", "access_type": "c2", "access_info": random.choice(callback_infos)})
             headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {access_token}'}
-            r = requests.post(server,headers=headers,data=data)
+            r = requests.post(server,headers=headers,data=data,verify=verify)
             print(r)
             time.sleep(0.1)
         time.sleep(time_interval)
@@ -36,7 +36,9 @@ def main():
     board = get_board()
     access_token = input("Input your global access token (token with application name global): ").strip()
     server = input("Full POST URL for PWNBoard website (ex. https://www.pwnboard.win/pwn): ").strip()
-    random_callbacks(server, 5, board, access_token)
+    self = input("Using self signed certs (Y/N)?: ")
+    self_res = True if self.strip().lower() == "y" else False
+    random_callbacks(server, 5, board, access_token, self_res)
 
 if __name__ == '__main__':
     main()
