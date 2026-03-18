@@ -16,7 +16,7 @@ def random_callbacks(server, time_interval, hosts, access_token, verify):
             data = json.dumps({'ip': ip, "application": f"c2_{random.randint(1,12)}", "access_type": "c2", "access_info": random.choice(callback_infos)})
             headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {access_token}'}
             r = requests.post(server,headers=headers,data=data,verify=verify)
-            print(r)
+            print({'status_code': r.status_code, 'response': r.text})
             time.sleep(0.1)
         time.sleep(time_interval)
 
