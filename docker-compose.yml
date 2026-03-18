@@ -2,8 +2,6 @@ version: '3'
 services:
   pwnboard:
     build: .
-    ports:
-      - "${PWNBOARD_PORT}:5000"
     environment:
       - FLASK_DEBUG=true
       - FLASK_PORT=5000
@@ -20,3 +18,9 @@ services:
   redis:
     image: redis:alpine
     restart: always
+
+  reverse-proxy:
+    build: ./reverse-proxy
+    restart: always
+    ports:
+      - "443:443"

@@ -20,21 +20,21 @@ def callback():
 
     # Make sure 'application' is in the data
     if 'application' not in data and 'type' not in data:
-        return "Invalid: Missing 'application' or 'type' in the request"
+        return "Invalid: Missing 'application' or 'type' in the request", 400
 
     if 'type' in data: data['application'] = data['type']
 
     auth_header = request.headers.get('Authorization')
 
     if not auth_header:
-        return "Not authorized\n"
+        return "Not authorized\n", 401
 
     token = auth_header.split(' ')[1]
 
     verification = verifyAccessToken(token, data['application'])
 
     if (verification == False):
-        return "Not authorized\n"
+        return "Not authorized\n", 401
 
     if 'ips' in data and isinstance(data['ips'], list):
         for ip in data['ips']:
@@ -43,14 +43,14 @@ def callback():
             if ip in IP_SET:
                 saveData(d)
             else:
-                return 'invalid IP\n'
+                return 'invalid IP\n', 400
     elif 'ip' in data:
         if data['ip'] in IP_SET:
             saveData(data)
         else:
-            return 'invalid IP\n'
+            return 'invalid IP\n', 400
     else:
-        return 'invalid POST\n'
+        return 'invalid POST\n', 400
     # Tell us that new data has come
     global BOARDCACHE_UPDATED
     BOARDCACHE_UPDATED = True
@@ -64,11 +64,11 @@ def creds_callback():
     data['last_seen'] = getEpoch()
     # Make sure username and password are in the data
     if 'username' not in data or 'password' not in data or 'application' not in data:
-        return "Invalid: Missing 'username', 'password', or 'application' in the request\n"
+        return "Invalid: Missing 'username', 'password', or 'application' in the request\n", 400
     
     if 'admin' in data:
         if data['admin'] not in [0,1]:
-            return "Invalid: admin must be set to either 0 (not admin) or 1 (admin)\n"
+            return "Invalid: admin must be set to either 0 (not admin) or 1 (admin)\n", 400
     else:
         # -1 = unknown
         data['admin'] = -1
@@ -76,14 +76,14 @@ def creds_callback():
         auth_header = request.headers.get('Authorization')
 
     if not auth_header:
-        return "Not authorized\n"
+        return "Not authorized\n", 401
 
     token = auth_header.split(' ')[1]
 
     verification = verifyAccessToken(token, data['application'])
 
     if (verification == False):
-        return "Not authorized\n"
+        return "Not authorized\n", 401
 
     if 'ips' in data and isinstance(data['ips'], list):
         for ip in data['ips']:
@@ -92,14 +92,14 @@ def creds_callback():
             if ip in IP_SET:
                 saveCredData(d)
             else:
-                return 'invalid IP\n'
+                return 'invalid IP\n', 400
     elif 'ip' in data:
         if data['ip'] in IP_SET:
             saveCredData(data)
         else:
-            return 'invalid IP\n'
+            return 'invalid IP\n', 400
     else:
-        return 'invalid POST\n'
+        return 'invalid POST\n', 400
     # Tell us that new data has come
     global BOARDCACHE_UPDATED
     BOARDCACHE_UPDATED = True
