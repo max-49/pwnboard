@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import sys
 import random
 import urllib3
 import requests
@@ -37,6 +38,8 @@ def get_board():
     return board
 
 def main():
+    if (len(sys.argv) > 1):
+        board_path = sys.argv[1]
     board = get_board()
     access_token = os.environ.get("ACCESS_TOKEN", None)
     if not access_token:

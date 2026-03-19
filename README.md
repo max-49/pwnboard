@@ -115,24 +115,22 @@ See the [usage guide](doc/usage.md) for detailed instructions on how to actually
 - **[Configuration Reference](doc/config.md)** — Complete environment variable reference
 - **[Development Guide](doc/DEVELOPMENT.md)** — Architecture, file structure, and contribution guidelines
 
-## Acknowledgements
+## Testing your PWNBoard deployment
+The [sim_callbacks](scripts/sim_callbacks.py) testing tool can be used to test your PWNBoard deployment
+1. Log into PWNBoard
 
-This project builds upon the work of:
-- **[ztgrace/pwnboard](https://github.com/ztgrace/pwnboard)** — Original pwnboard implementation
-- **[nullmonk/pwnboard](https://github.com/nullmonk/pwnboard)** — Improvements for RIT Red Team
-- **[RITRedteam/Topology-Generator](https://github.com/RITRedteam/Topology-Generator)** — Topology generation tool
+2. If `USE_ACCESS_TOKENS=true`, create an access token at `/manage_apps` with the application name `global` and copy it. If you don't want to input it into the script, you can configure an environment variable `ACCESS_TOKEN` on your local machine.
 
-## Contributing
+3. Run the Python script
+```bash
+python3 scripts/sim_callbacks.py [/path/to/board/file]
+```
 
-Contributions are welcome! Please:
+4. If board file was not specified, follow the script instructions to set up IP addresses to POST to
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes with clear commit messages
-4. Test thoroughly
-5. Submit a Pull Request
+5. Include your `global` Access Token when prompted (if using access tokens)
 
-See [doc/DEVELOPMENT.md](doc/DEVELOPMENT.md) for detailed contribution guidelines.
+6. Include the full POST endpoint URL of your PWNBoard (ex. https://www.pwnboard.win/pwn, https://10.1.1.11:8443/pwn)
 
 ## Troubleshooting/Known Issues
 ### 1) Navbar shows wrong user/options (SHOULD BE FIXED NOW)
@@ -162,6 +160,25 @@ Some things are on the todo list for PWNBoard and any pull requests would be gre
 1. **Visual logging** - the logger Python library is currently used for some backend logging, but the logging/graphing capabilities of PWNBoard need to be greatly expanded. An actual filterable page (visible to admins) allowing logs to be visualized would greatly assist in debugging, red team management, and my personal happiness.
 2. **Stop PWNBoard from getting DDoSed** - with the amount of POST requests that PWNBoard receives every minute during full-blown engagements, the poor Flask app sometimes gets overwhelmed and will stop responding for a couple of seconds. Some sort of load balancing should be implemented to prevent this.
 3. **Polling features with Discord webhooks** - add a feature that polls the data periodically and tracks lost beacons across categories so large losses trigger webhook alerts (ex. if 50% of beacons for Team 5 have been lost within the last 5 minutes, this should trigger a notification) (ideally find a way to interact with the cached JSON rather than querying the website over HTTP, this might involve having to write the currently cached JSON to a file or database instead of having it in memory like it is currently)
+
+## Acknowledgements
+
+This project builds upon the work of:
+- **[ztgrace/pwnboard](https://github.com/ztgrace/pwnboard)** — Original pwnboard implementation
+- **[nullmonk/pwnboard](https://github.com/nullmonk/pwnboard)** — Improvements for RIT Red Team
+- **[RITRedteam/Topology-Generator](https://github.com/RITRedteam/Topology-Generator)** — Topology generation tool
+
+## Contributing
+
+Contributions are welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes with clear commit messages
+4. Test thoroughly
+5. Submit a Pull Request
+
+See [doc/DEVELOPMENT.md](doc/DEVELOPMENT.md) for detailed contribution guidelines.
 
 ## License
 
