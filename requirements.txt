@@ -1,4 +1,4 @@
-Flask
+flask
 PyYAML
 redis
 requests
@@ -6,3 +6,4 @@ python-dotenv
 pandas
 markupsafe
 argon2-cffi
+gunicorn
