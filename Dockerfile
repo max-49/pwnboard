@@ -3,7 +3,7 @@ FROM alpine:latest
 EXPOSE 5000
 
 # Install package dependencies
-RUN apk add --update python3 uwsgi py3-pip
+RUN apk add --update python3 py3-pip
 COPY requirements.txt /tmp/requirements.txt
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
@@ -20,6 +20,6 @@ WORKDIR /opt/pwnboard
 # Build the board file if one isnt given
 RUN /bin/sh scripts/setup.sh
 
-CMD ["python", "pwnboard.py"]
-
+#CMD ["python", "pwnboard.py"]
+CMD ["/opt/venv/bin/gunicorn", "--bind", "0.0.0.0:5000", "--workers", "3", "--threads", "4", "pwnboard:app"]
 #CMD ["uwsgi", "--yaml", "/opt/pwnboard/config/wsgi.yml"]
