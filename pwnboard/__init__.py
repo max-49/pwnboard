@@ -117,7 +117,7 @@ with sqlite3.connect(USERS_DB) as _init_conn:
     cur = _init_conn.execute('SELECT username FROM users WHERE username = ?;', (default_user,))
     if cur.fetchone() is None:
         _init_conn.execute(
-            'INSERT INTO users(username, password, role) VALUES (?, ?, "admin");',
+            'INSERT OR IGNORE INTO users(username, password, role) VALUES (?, ?, "admin");',
             (default_user, ph.hash(default_password))
         )
         _init_conn.commit()
