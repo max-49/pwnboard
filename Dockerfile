@@ -21,5 +21,5 @@ WORKDIR /opt/pwnboard
 RUN /bin/sh scripts/setup.sh
 
 #CMD ["python", "pwnboard.py"]
-CMD ["/opt/venv/bin/gunicorn", "--bind", "0.0.0.0:5000", "--workers", "3", "--threads", "4", "pwnboard:app"]
+CMD /opt/venv/bin/gunicorn --bind 0.0.0.0:$FLASK_PORT --workers 3 --threads 4 pwnboard:app
 #CMD ["uwsgi", "--yaml", "/opt/pwnboard/config/wsgi.yml"]
