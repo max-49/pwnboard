@@ -23,9 +23,10 @@
         <div class="card mb-4">
             <div class="card-header">Users</div>
             <div class="card-body">
-                <div class="d-flex mb-3">
-                    <button id="btn-add-user" class="btn btn-success mr-3">+ Add User</button>
-                    <div class="form-inline text-muted align-items-center">
+                <div class="d-flex flex-wrap mb-3 align-items-center">
+                    <button id="btn-add-user" class="btn btn-success mr-2 mb-1">+ Add User</button>
+                    <button id="btn-bulk-add" class="btn btn-primary mr-3 mb-1">+ Bulk Add Users</button>
+                    <div class="form-inline text-muted align-items-center mb-1">
                         <small>Admins can view, add, and delete users. Click a row to view that user's tokens.</small>
                     </div>
                 </div>
@@ -40,6 +41,71 @@
                     </table>
                 </div>
                 <div id="no-users" class="text-muted" style="display:none">No users found.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Bulk Add Users -->
+    <div class="modal fade" id="bulkAddModal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Bulk Add Users</h5>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <ul class="nav nav-tabs mb-3" id="bulkAddTabs" role="tablist">
+                        <li class="nav-item">
+                            <a class="nav-link active" id="tab-sep-link" data-toggle="tab" href="#tab-sep" role="tab">Comma-Separated Usernames</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="tab-csv-link" data-toggle="tab" href="#tab-csv" role="tab">CSV File Upload</a>
+                        </li>
+                    </ul>
+                    <div class="tab-content" id="bulkAddTabContent">
+                        <!-- Tab 1: Comma-separated -->
+                        <div class="tab-pane fade show active" id="tab-sep" role="tabpanel">
+                            <form id="bulk-sep-form" autocomplete="off">
+                                <div class="form-group">
+                                    <label for="bulk_usernames">Usernames <small class="text-muted">(comma-separated)</small></label>
+                                    <textarea id="bulk_usernames" name="usernames" class="form-control" rows="3" placeholder="alice, bob, charlie"></textarea>
+                                    <small class="form-text text-muted">Enter comma-separated usernames. Only letters, digits, <code>_</code>, <code>.</code>, and <code>-</code> are allowed in each username.</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="bulk_password">Password <small class="text-muted">(shared for all new users)</small></label>
+                                    <input id="bulk_password" name="password" type="password" class="form-control">
+                                </div>
+                                <div class="form-group">
+                                    <label for="bulk_role">Role <small class="text-muted">(shared for all new users)</small></label>
+                                    <select id="bulk_role" name="role" class="form-control">
+                                        <option value="user">User</option>
+                                        <option value="admin">Admin</option>
+                                        <option value="guest">Guest</option>
+                                        <option value="restricted">Restricted</option>
+                                    </select>
+                                </div>
+                                <div id="bulk-sep-feedback" class="small mt-1"></div>
+                            </form>
+                        </div>
+                        <!-- Tab 2: CSV file upload -->
+                        <div class="tab-pane fade" id="tab-csv" role="tabpanel">
+                            <p class="text-muted mb-1">Upload a CSV file to create multiple users at once. The file <strong>must include a header row</strong> with exactly these columns in order: <code>username</code>, <code>password</code>, <code>role</code>.</p>
+                            <p class="mb-3"><a href="/admin/users/bulk_csv_template" class="btn btn-sm btn-outline-secondary">Download Template CSV</a></p>
+                            <form id="bulk-csv-form" enctype="multipart/form-data">
+                                <div class="form-group">
+                                    <label for="bulk_csv_file">CSV File</label>
+                                    <input id="bulk_csv_file" name="file" type="file" class="form-control-file" accept=".csv,text/csv">
+                                    <small class="form-text text-muted">Allowed roles: <code>user</code>, <code>admin</code>, <code>guest</code>, <code>restricted</code>. Usernames may only contain letters, digits, <code>_</code>, <code>.</code>, and <code>-</code>. The entire file is validated before any users are created.</small>
+                                </div>
+                                <div id="bulk-csv-feedback" class="small mt-1"></div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="submit-bulk-add" class="btn btn-primary">Add Users</button>
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                </div>
             </div>
         </div>
     </div>
@@ -224,6 +290,106 @@
         $('#userTokensModal').on('show.bs.modal', function(e){
             // nothing here; loadUserTokens sets content
         });
+
+        // Bulk add modal
+        document.getElementById('btn-bulk-add').addEventListener('click', function(){
+            document.getElementById('bulk-sep-form').reset();
+            document.getElementById('bulk-csv-form').reset();
+            document.getElementById('bulk-sep-feedback').innerHTML='';
+            document.getElementById('bulk-csv-feedback').innerHTML='';
+            // always start on the first tab
+            document.getElementById('tab-sep-link').click();
+            $('#bulkAddModal').modal('show');
+        });
+
+        document.getElementById('submit-bulk-add').addEventListener('click', async function(){
+            const btn = this; btn.disabled=true; btn.textContent='Adding...';
+            try{
+                const activeTabHref = document.querySelector('#bulkAddTabs .nav-link.active').getAttribute('href');
+                if(activeTabHref === '#tab-sep'){
+                    await submitBulkSep();
+                } else {
+                    await submitBulkCsv();
+                }
+            } finally { btn.disabled=false; btn.textContent='Add Users'; }
+        });
+
+        async function submitBulkSep(){
+            const feedback = document.getElementById('bulk-sep-feedback');
+            feedback.innerHTML='';
+            const usernamesRaw = document.getElementById('bulk_usernames').value.trim();
+            const password = document.getElementById('bulk_password').value;
+            const role = document.getElementById('bulk_role').value;
+
+            if(!usernamesRaw){ feedback.innerHTML='<span class="text-danger">Please enter at least one username.</span>'; return; }
+            if(!password){ feedback.innerHTML='<span class="text-danger">Please enter a password.</span>'; return; }
+
+            // client-side validation
+            const parts = usernamesRaw.split(',').map(u=>u.trim()).filter(u=>u);
+            if(parts.length === 0){ feedback.innerHTML='<span class="text-danger">No valid usernames found after splitting on commas.</span>'; return; }
+            const invalidNames = parts.filter(u=>!/^[a-zA-Z0-9_.\-]+$/.test(u));
+            if(invalidNames.length > 0){
+                feedback.innerHTML='<span class="text-danger">Invalid username(s): '+invalidNames.map(u=>'<code>'+escHtml(u)+'</code>').join(', ')+'. Only letters, digits, <code>_</code>, <code>.</code>, and <code>-</code> are allowed.</span>';
+                return;
+            }
+
+            try{
+                const body = new URLSearchParams({ usernames: usernamesRaw, password, role });
+                const res = await fetch('/admin/users/bulk', { method: 'POST', body });
+                const text = await res.text();
+                if(!res.ok){
+                    feedback.innerHTML='<span class="text-danger">'+escHtml(text)+'</span>';
+                } else {
+                    let data;
+                    try{ data = JSON.parse(text); } catch(e){ data = {created:[], failed:[]}; }
+                    let msg = '<span class="text-success"><strong>Created (' + data.created.length + '):</strong> '+(data.created.length ? data.created.map(escHtml).join(', ') : 'none')+'</span>';
+                    if(data.failed && data.failed.length > 0){
+                        msg += '<br><span class="text-danger"><strong>Failed (' + data.failed.length + '):</strong> '+data.failed.map(f=>escHtml(f.username)+' ('+escHtml(f.error||'')+')').join(', ')+'</span>';
+                    }
+                    feedback.innerHTML = msg;
+                    await loadUsers();
+                }
+            } catch(e){ feedback.innerHTML='<span class="text-danger">Request failed</span>'; }
+        }
+
+        async function submitBulkCsv(){
+            const feedback = document.getElementById('bulk-csv-feedback');
+            feedback.innerHTML='';
+            const fileInput = document.getElementById('bulk_csv_file');
+            if(!fileInput.files || !fileInput.files.length){
+                feedback.innerHTML='<span class="text-danger">Please select a CSV file.</span>'; return;
+            }
+
+            try{
+                const formData = new FormData();
+                formData.append('file', fileInput.files[0]);
+                const res = await fetch('/admin/users/bulk_csv', { method: 'POST', body: formData });
+                const ct = res.headers.get('content-type') || '';
+                if(!res.ok){
+                    if(ct.indexOf('application/json') !== -1){
+                        const data = await res.json();
+                        if(data.errors && data.errors.length){
+                            feedback.innerHTML='<span class="text-danger"><strong>Validation errors &mdash; no users were created:</strong><ul class="mb-0 mt-1">'+ data.errors.map(e=>'<li>'+escHtml(e)+'</li>').join('') +'</ul></span>';
+                        } else {
+                            feedback.innerHTML='<span class="text-danger">'+escHtml(JSON.stringify(data))+'</span>';
+                        }
+                    } else {
+                        const text = await res.text();
+                        feedback.innerHTML='<span class="text-danger">'+escHtml(text)+'</span>';
+                    }
+                } else {
+                    const data = await res.json();
+                    let msg = '<span class="text-success"><strong>Created (' + data.created.length + '):</strong> '+(data.created.length ? data.created.map(escHtml).join(', ') : 'none')+'</span>';
+                    if(data.failed && data.failed.length > 0){
+                        msg += '<br><span class="text-danger"><strong>Failed (' + data.failed.length + '):</strong> '+data.failed.map(f=>escHtml(f.username)+' ('+escHtml(f.error||'')+')').join(', ')+'</span>';
+                    }
+                    feedback.innerHTML = msg;
+                    await loadUsers();
+                }
+            } catch(e){ feedback.innerHTML='<span class="text-danger">Request failed</span>'; }
+        }
+
+        function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
         // initial load
         loadUsers();
