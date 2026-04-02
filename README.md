@@ -59,7 +59,7 @@ This generates `board.json` in the project root, which defines which IP addresse
 **Docker Compose is the recommended deployment method.**
 
 1. **Configure environment** (edit `docker-compose.yml`):
-   ```bash
+   ```yaml
    - SECRET_KEY=change-me-please # PLEASE CHANGE THIS TO SOMETHING ELSE BEFORE DEPLOYING
    - PWNBOARD_URL=https://pwnboard.win # Change this line to your full PWNBoard URL (https://domain[:port], ex. https://pwnboard.win, https://10.1.1.10:443)
    - CACHE_TIME=-1 # Change this to a positive value to cache the board JSON for a certain amount of time. Might help with performance
