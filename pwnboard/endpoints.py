@@ -1,7 +1,9 @@
 
-from flask import request, session, jsonify
+from flask import request, session, jsonify, Response
 
 import re
+import csv
+import io
 from .authentication import *
 from .data import getEpoch, saveData, saveCredData
 from .routes import mark_board_cache_dirty
@@ -248,6 +250,130 @@ def delete_token_route(token_hash):
     if ok:
         return ("", 204)
     return ("Error", 500)
+
+
+@app.route('/admin/users/bulk_csv_template', methods=['GET'])
+@login_required
+@admin_required
+def admin_bulk_csv_template():
+    """Return a CSV template file for bulk user creation."""
+    template = "username,password,role\nexample_user,securepassword,user\n"
+    return Response(
+        template,
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename=users_template.csv'}
+    )
+
+
+@app.route('/admin/users/bulk', methods=['POST'])
+@login_required
+@admin_required
+def admin_bulk_create_users():
+    """Bulk create users from comma-separated usernames with a shared password and role."""
+    usernames_raw = request.form.get('usernames', '').strip()
+    password = request.form.get('password', '')
+    role = request.form.get('role', 'user')
+
+    if not usernames_raw or not password:
+        return ("Missing fields", 400)
+
+    valid_roles = {'user', 'admin', 'guest', 'restricted'}
+    if role not in valid_roles:
+        return ("Invalid role", 400)
+
+    USERNAME_RE = re.compile(r'^[a-zA-Z0-9_.\-]+$')
+    usernames = [u.strip() for u in usernames_raw.split(',')]
+    usernames = [u for u in usernames if u]
+
+    if not usernames:
+        return ("No valid usernames provided", 400)
+
+    errors = []
+    for uname in usernames:
+        if not USERNAME_RE.match(uname):
+            errors.append(f"Invalid username {uname!r}: only letters, digits, _, ., - are allowed")
+
+    if errors:
+        return ("\n".join(errors), 400)
+
+    results = {'created': [], 'failed': []}
+    for uname in usernames:
+        res = createUser(uname, password, role)
+        if res is True:
+            results['created'].append(uname)
+        else:
+            results['failed'].append({'username': uname, 'error': res or 'Create failed'})
+
+    return jsonify(results), 200
+
+
+@app.route('/admin/users/bulk_csv', methods=['POST'])
+@login_required
+@admin_required
+def admin_bulk_create_users_csv():
+    """Bulk create users from a CSV file upload. Validates entire file before creating any users."""
+    if 'file' not in request.files:
+        return ("No file uploaded", 400)
+
+    f = request.files['file']
+    if not f.filename:
+        return ("No file selected", 400)
+
+    try:
+        content = f.read().decode('utf-8')
+    except Exception:
+        return ("Could not decode file as UTF-8", 400)
+
+    USERNAME_RE = re.compile(r'^[a-zA-Z0-9_.\-]+$')
+    PASSWORD_RE = re.compile(r'^.{1,128}$')
+    VALID_ROLES = {'user', 'admin', 'guest', 'restricted'}
+
+    try:
+        reader = csv.reader(io.StringIO(content))
+        rows = list(reader)
+    except Exception as e:
+        return (f"Failed to parse CSV: {e}", 400)
+
+    if not rows:
+        return ("CSV file is empty", 400)
+
+    header = [h.strip().lower() for h in rows[0]]
+    if header != ['username', 'password', 'role']:
+        return ("Invalid header. The CSV must have exactly these columns in order: username,password,role", 400)
+
+    if len(rows) < 2:
+        return ("CSV contains no data rows", 400)
+
+    errors = []
+    for i, row in enumerate(rows[1:], start=2):
+        if len(row) != 3:
+            errors.append(f"Row {i}: expected 3 columns, got {len(row)}")
+            continue
+        uname, passwd, role = [v.strip() for v in row]
+        if not uname:
+            errors.append(f"Row {i}: username is empty")
+        elif not USERNAME_RE.match(uname):
+            errors.append(f"Row {i}: invalid username {uname!r} (only letters, digits, _, ., - allowed)")
+        if not passwd:
+            errors.append(f"Row {i}: password is empty")
+        elif not PASSWORD_RE.match(passwd):
+            errors.append(f"Row {i}: password must be between 1 and 128 characters")
+        if role not in VALID_ROLES:
+            errors.append(f"Row {i}: invalid role {role!r} (must be one of: {', '.join(sorted(VALID_ROLES))})")
+
+    if errors:
+        return jsonify({'errors': errors}), 400
+
+    results = {'created': [], 'failed': []}
+    for row in rows[1:]:
+        uname, passwd, role = [v.strip() for v in row]
+        res = createUser(uname, passwd, role)
+        if res is True:
+            results['created'].append(uname)
+        else:
+            results['failed'].append({'username': uname, 'error': res or 'Create failed'})
+
+    return jsonify(results), 200
 
 
 @app.route('/account/change_password', methods=['POST'])
