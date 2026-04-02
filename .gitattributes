@@ -1,1 +1,6 @@
-placeholder
+* text=auto
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+* text eol=lf
