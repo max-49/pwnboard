@@ -6,6 +6,7 @@ services:
       - FLASK_PORT=5000
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - SECRET_KEY=change-me-please
       - PWNBOARD_URL=https://pwnboard.win
       - CACHE_TIME=-1    # Seconds to cache for. set to -1 to disable
       - HOST_TIMEOUT=5

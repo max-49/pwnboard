@@ -19,9 +19,14 @@
 
 PWNBoard provides a centralized dashboard for tracking compromised hosts, active beacons, and harvested credentials across multiple teams during red team operations. This fork enhances the original [ztgrace/pwnboard](https://github.com/ztgrace/pwnboard) and [nullmonk/pwnboard](https://github.com/nullmonk/pwnboard) projects with a lot of really cool features (trust)
 
+![PWNBoard](doc/img/pwnboard.png)
+
 ## Features
 
-- There are a lot of features (They will be listed here soon)
+- Track active Red Team beacons and captured credentials in a visual dashboard
+- Optional tool authentication through access tokens
+- Easily manage multiple red teamers with RBAC features
+- Quick containerized deploy using Docker
 
 ## Quick Start
 
@@ -55,10 +60,15 @@ This generates `board.json` in the project root, which defines which IP addresse
 
 1. **Configure environment** (edit `docker-compose.yml`):
    ```bash
-   export PWNBOARD_URL="http://your-domain.com:8080"
-   export PWNBOARD_PORT=8080
-   export SECRET_KEY="your-secret-key-here"
-   export DEFAULT_USER_PASSWORD="strong-password"
+   - SECRET_KEY=change-me-please # PLEASE CHANGE THIS TO SOMETHING ELSE BEFORE DEPLOYING
+   - PWNBOARD_URL=https://pwnboard.win # Change this line to your full PWNBoard URL (https://domain[:port], ex. https://pwnboard.win, https://10.1.1.10:443)
+   - CACHE_TIME=-1 # Change this to a positive value to cache the board JSON for a certain amount of time. Might help with performance
+   - HOST_TIMEOUT=5 # Change this to the amount of time (in minutes) after which callbacks should time out if an update is not received
+   - CREDS_TIMEOUT=30 # Change this to the amount of time (in minutes) after which credentials should time out if an update is not received
+   - DEFAULT_USER=admin # Change this to be your default admin user
+   - DEFAULT_USER_PASSWORD=password # Change this to be your default admin password (can be changed later in the GUI)
+   - LOGIN_PAGE_MESSAGE=Contact an admin to get an account! # Change this if you want your welcome message on the home page to be different
+   - USE_ACCESS_TOKENS=true # SET THIS TO FALSE IF YOU DO NOT WANT TO USE ACCESS TOKENS 
    ```
 
 2. **Set up HTTPS with certificiates**:
@@ -78,8 +88,8 @@ This generates `board.json` in the project root, which defines which IP addresse
    ```
 
 4. **Access the dashboard**:
-   - Navigate to `https://your-domain.com/`
-   - Login with default credentials
+   - Navigate to `PWNBOARD_URL`
+   - Login with default credentials set up in environment variables
 
 For detailed setup instructions and troubleshooting, see [doc/setup.md](doc/setup.md).
 
@@ -91,7 +101,7 @@ PWNBoard is configured via environment variables, set in `docker-compose.yml`.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SECRET_KEY` | `dev-secret` | Flask secret key for sessions (**please change**) |
+| `SECRET_KEY` | `change-me-please` | Flask secret key for sessions (**please change**) |
 | `DEFAULT_USER` | `admin` | Default admin username |
 | `DEFAULT_USER_PASSWORD` | `password` | Default admin password |
 | `PWNBOARD_URL` | — | Base URL for your deployment (e.g., `https://pwnboard.example.com:8080`) |
@@ -107,6 +117,7 @@ PWNBoard is configured via environment variables, set in `docker-compose.yml`.
 For a complete list of configuration options, see [doc/config.md](doc/config.md).
 
 ## Using PWNBoard
+
 See the [usage guide](doc/usage.md) for detailed instructions on how to actually use PWNBoard!
 
 ## Documentation
@@ -116,6 +127,7 @@ See the [usage guide](doc/usage.md) for detailed instructions on how to actually
 - **[Development Guide](doc/DEVELOPMENT.md)** — Architecture, file structure, and contribution guidelines
 
 ## Testing your PWNBoard deployment
+
 The [sim_callbacks](scripts/sim_callbacks.py) testing tool can be used to test your PWNBoard deployment
 1. Log into PWNBoard
 
@@ -133,41 +145,31 @@ python3 scripts/sim_callbacks.py [/path/to/board/file]
 6. Include the full POST endpoint URL of your PWNBoard (ex. https://www.pwnboard.win/pwn, https://10.1.1.11:8443/pwn)
 
 ## Troubleshooting/Known Issues
+
 ### 1) Navbar shows wrong user/options (SHOULD BE FIXED NOW)
 > **Issue:** Home page navbar may show the wrong logged-in user and incorrect account options. The session details are correct, this is only a visual bug.
 >
-> **Current workaround:** No permanent fix in this commit. If you need admin user management, go directly to `/manage_user_accounts`.
+> **Current workaround:** This should be working now. If it doesn't work and you need admin user management, go directly to `/manage_user_accounts` and open an issue on GitHub!
 
 ### 2) POST requests are not appearing
 > **Issue:** Beacon/POST data is not showing up on PWNBoard.
 >
 > **Check the following:**
 > - Confirm you are POSTing to the correct PWNBoard IP/URL.
-> - Confirm the `ip` field matches an IP address present on PWNBoard
-> - Confirm the `application` field exactly matches your token's application name.
-> - Tokens with application name `global` accept any application name, but this is not recommended.
+> - Confirm the `ip` field matches an IP address present on PWNBoard (sometimes tools will return the wrong IP address depending on how you gather it)
+> - Confirm the `application` field exactly matches your token's application name (if using Access Tokens).
+> - If necessary, tokens with application name `global` will ignore the application name in the POST request, so you can use this token for everything
 
 ### 3) Self-signed certs and failed POST requests
 > **Issue:** POST requests fail when using self-signed certificates.
 >
-> **Fix:** Disable certificate validation in your client/tool (for example, `curl -k ...`).
+> **Fix:** Disable certificate validation in your client/tool (for example: `curl -k ...`, `requests.post("...", verify=False)`, etc.).
 
 For more troubleshooting tips, check the bottom of the [setup guide](doc/setup.md).
 
-## To Do/Feature Wishlist
-Some things are on the todo list for PWNBoard and any pull requests would be greatly appreciated
+## Feature Wishlist
 
-1. **Visual logging** - the logger Python library is currently used for some backend logging, but the logging/graphing capabilities of PWNBoard need to be greatly expanded. An actual filterable page (visible to admins) allowing logs to be visualized would greatly assist in debugging, red team management, and my personal happiness.
-2. **Stop PWNBoard from getting DDoSed** - with the amount of POST requests that PWNBoard receives every minute during full-blown engagements, the poor Flask app sometimes gets overwhelmed and will stop responding for a couple of seconds. Some sort of load balancing should be implemented to prevent this.
-3. **Polling features with Discord webhooks** - add a feature that polls the data periodically and tracks lost beacons across categories so large losses trigger webhook alerts (ex. if 50% of beacons for Team 5 have been lost within the last 5 minutes, this should trigger a notification) (ideally find a way to interact with the cached JSON rather than querying the website over HTTP, this might involve having to write the currently cached JSON to a file or database instead of having it in memory like it is currently)
-4. **Auto User Generation Script** - either a script to mass generate users (red teamers) or a Web GUI feature to mass generate users.
-
-## Acknowledgements
-
-This project builds upon the work of:
-- **[ztgrace/pwnboard](https://github.com/ztgrace/pwnboard)** — Original pwnboard implementation
-- **[nullmonk/pwnboard](https://github.com/nullmonk/pwnboard)** — Improvements for RIT Red Team
-- **[RITRedteam/Topology-Generator](https://github.com/RITRedteam/Topology-Generator)** — Topology generation tool
+To view the PWNBoard feature wishlist, please navigate to the [Issues](https://github.com/max-49/pwnboard/issues) tab on GitHub and look for issues that start with `FEATURE REQUEST`!
 
 ## Contributing
 
@@ -180,6 +182,13 @@ Contributions are welcome! Please:
 5. Submit a Pull Request
 
 See [doc/DEVELOPMENT.md](doc/DEVELOPMENT.md) for detailed contribution guidelines.
+
+## Acknowledgements
+
+This project builds upon the work of:
+- **[ztgrace/pwnboard](https://github.com/ztgrace/pwnboard)** — Original pwnboard implementation
+- **[nullmonk/pwnboard](https://github.com/nullmonk/pwnboard)** — Improvements for RIT Red Team
+- **[RITRedteam/Topology-Generator](https://github.com/RITRedteam/Topology-Generator)** — Topology generation tool
 
 ## License
 
