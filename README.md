@@ -92,6 +92,16 @@ This generates `board.json` in the project root, which defines which IP addresse
    docker compose up -d
    ```
 
+### Local Development Without Pulling from GHCR
+
+When testing local uncommitted changes, use the development override file so Docker builds from your working tree and never pulls the `ghcr.io` image for `pwnboard`:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
+```
+
+This keeps `docker-compose.yml` suitable for quick deployment while `docker-compose.dev.yml` forces local image use during development.
+
 4. **Access the dashboard**:
    - Navigate to `PWNBOARD_URL`
    - Login with default credentials set up in environment variables
