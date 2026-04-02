@@ -24,10 +24,6 @@ services:
     depends_on:
       - db
 
-  # redis:
-  #   image: redis:alpine
-  #   restart: always
-
   db:
     image: postgres:15-alpine
     restart: always
@@ -39,18 +35,18 @@ services:
       - pwnboard-data:/var/lib/postgresql/data
       - ./scripts/init_postgres.sql:/docker-entrypoint-initdb.d/init.sql
 
-  data:
-    image: metabase/metabase:latest
-    restart: always
-    environment:
-      MB_DB_TYPE: postgres
-      MB_DB_DBNAME: metabase_db
-      MB_DB_PORT: 5432
-      MB_DB_USER: metabase_user # user from init_postgres.sql
-      MB_DB_PASS: password
-      MB_DB_HOST: db
-    depends_on:
-      - db
+  # data:
+  #   image: metabase/metabase:latest
+  #   restart: always
+  #   environment:
+  #     MB_DB_TYPE: postgres
+  #     MB_DB_DBNAME: metabase_db
+  #     MB_DB_PORT: 5432
+  #     MB_DB_USER: metabase_user # user from init_postgres.sql
+  #     MB_DB_PASS: password
+  #     MB_DB_HOST: db
+  #   depends_on:
+  #     - db
 
   reverse-proxy:
     build: ./reverse-proxy
