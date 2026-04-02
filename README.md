@@ -19,7 +19,7 @@
 
 PWNBoard provides a centralized dashboard for tracking compromised hosts, active beacons, and harvested credentials across multiple teams during red team operations. This fork enhances the original [ztgrace/pwnboard](https://github.com/ztgrace/pwnboard) and [nullmonk/pwnboard](https://github.com/nullmonk/pwnboard) projects with a lot of really cool features (trust)
 
-![PWNBoard](doc/img/pwnboard-grid.png)
+![PWNBoard](doc/img/pwnboard.png)
 
 ## Features
 
