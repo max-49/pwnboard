@@ -74,7 +74,7 @@ This generates `board.json` in the project root, which defines which IP addresse
 
 3. **Deploy**:
    ```bash
-   docker compose up -d
+   docker-compose up -d
    ```
 
 4. **Access the dashboard**:
