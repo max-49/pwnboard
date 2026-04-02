@@ -1,0 +1,7 @@
+services:
+  pwnboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: pwnboard:dev
+    pull_policy: never

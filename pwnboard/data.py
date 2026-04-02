@@ -3,10 +3,9 @@ import datetime
 import time
 import os
 import copy
-import json
 import socket
 import requests
-from . import r, logger, BOARD
+from . import logger, BOARD, get_db
 
 DISCORD_WEBHOOK=os.environ.get("DISCORD_WEBHOOK", None)
 
@@ -46,42 +45,76 @@ def getBoardDict():
     return board
 
 def getActiveCreds(ip):
+    db = get_db()
     try:
         total_creds = 0
         all_valid_creds = []
-        creds_data = r.hgetall(f"{ip}:allcreds")
         creds_timeout = int(os.environ.get("CREDS_TIMEOUT", 30))
+        stale_usernames = []
 
-        for username, cred_json in creds_data.items():
-            cred_data = json.loads(cred_json)
-            time_delta = getTimeDelta(cred_data["last_seen"])
+        with db.cursor() as cur:
+            cur.execute(
+                """
+                SELECT username, creds, last_seen, creds_online
+                FROM credentials_by_user
+                WHERE ip = %s
+                """,
+                (ip,),
+            )
+            rows = cur.fetchall()
+
+        for username, creds, last_seen, creds_online in rows:
+            time_delta = getTimeDelta(last_seen)
 
             if time_delta is None:
                 continue
 
             if time_delta < creds_timeout:
-                all_valid_creds.append((cred_data['creds'], "{}m".format(time_delta)))
+                all_valid_creds.append((creds, "{}m".format(time_delta)))
                 total_creds += 1
-            elif time_delta >= creds_timeout and cred_data.get("creds_online") == "True":
-                cred_data["creds_online"] = "False"
-                r.hset(f"{ip}:allcreds", username, json.dumps(cred_data))
+            elif time_delta >= creds_timeout and creds_online:
+                stale_usernames.append(username)
 
-    except Exception as e:
+        if stale_usernames:
+            with db.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE credentials_by_user
+                    SET creds_online = FALSE, updated_at = NOW()
+                    WHERE ip = %s AND username = ANY(%s)
+                    """,
+                    (ip, stale_usernames),
+                )
+            db.commit()
+
+    except Exception:
+        db.rollback()
         total_creds = 0
         all_valid_creds = []
 
     return total_creds, all_valid_creds
 
 def getActiveCallbacks(ip):
+    db = get_db()
     try:
         num_valid_callbacks = 0
         active_callbacks = []
-        callbacks_data = r.hgetall(f"{ip}:callbacks")
         host_timeout = int(os.environ.get("HOST_TIMEOUT", 5))
+        stale_apps = []
+
+        with db.cursor() as cur:
+            cur.execute(
+                """
+                SELECT application, access_info, last_seen, online
+                FROM callbacks
+                WHERE ip = %s
+                """,
+                (ip,),
+            )
+            rows = cur.fetchall()
         
-        for app_name, callback_json in callbacks_data.items():
-            callback_data = json.loads(callback_json)
-            time_delta = getTimeDelta(callback_data["last_seen"])
+        for app_name, access_info, last_seen, online in rows:
+            time_delta = getTimeDelta(last_seen)
             
             # Skip if time_delta is None (invalid timestamp)
             if time_delta is None:
@@ -90,15 +123,26 @@ def getActiveCallbacks(ip):
             # Check if callback is valid (within timeout)
             if time_delta < host_timeout:
                 num_valid_callbacks += 1
-                active_callbacks.append((app_name, "{}m".format(time_delta), callback_data['access_info']))
+                active_callbacks.append((app_name, "{}m".format(time_delta), access_info))
 
             # Check if callback exceeded timeout but is still marked as online
-            elif time_delta >= host_timeout and callback_data.get("online") == "True":
-                callback_data["online"] = "False"
-                # Update the callback in Redis
-                r.hset(f"{ip}:callbacks", app_name, json.dumps(callback_data))
+            elif time_delta >= host_timeout and online:
+                stale_apps.append(app_name)
                 # send_discord(f"LOST BEACON ON {ip}: {app_name}")
-    except Exception as e:
+
+        if stale_apps:
+            with db.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE callbacks
+                    SET online = FALSE, updated_at = NOW()
+                    WHERE ip = %s AND application = ANY(%s)
+                    """,
+                    (ip, stale_apps),
+                )
+            db.commit()
+    except Exception:
+        db.rollback()
         num_valid_callbacks = 0
         active_callbacks = []
 
@@ -111,10 +155,36 @@ def getHostData(ip):
     last_seen - The last known callback time
     type - The last service the host called back through
     '''
-    # Request the data from the database
-    server, app, last, message, online, access_type = r.hmget(ip, ('server', 'application',
-                                      'last_seen', 'message', 'online', 'access_type'))
-    creds_last, creds, creds_online = r.hmget(f"{ip}:creds", ('last_seen', 'creds', 'creds_online'))
+    db = get_db()
+    server = app = last = message = online = access_type = None
+    creds_last = creds = creds_online = None
+
+    # Request the data from PostgreSQL
+    with db.cursor() as cur:
+        cur.execute(
+            """
+            SELECT server, application, last_seen, message, online, access_type
+            FROM hosts
+            WHERE ip = %s
+            """,
+            (ip,),
+        )
+        host_row = cur.fetchone()
+
+        if host_row:
+            server, app, last, message, online, access_type = host_row
+
+        cur.execute(
+            """
+            SELECT last_seen, creds, creds_online
+            FROM credentials_latest
+            WHERE ip = %s
+            """,
+            (ip,),
+        )
+        creds_row = cur.fetchone()
+        if creds_row:
+            creds_last, creds, creds_online = creds_row
 
     # Add the data to a dictionary
     status = {}
@@ -134,7 +204,19 @@ def getHostData(ip):
         else:
             status['creds_online'] = "True"
         
-        r.hmset(f"{ip}:creds", {'creds_online': status['creds_online']})
+        try:
+            with db.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE credentials_latest
+                    SET creds_online = %s, updated_at = NOW()
+                    WHERE ip = %s
+                    """,
+                    (status['creds_online'] == "True", ip),
+                )
+            db.commit()
+        except Exception:
+            db.rollback()
 
         total_creds, all_valid_creds = getActiveCreds(ip)
         status['Active Creds'] = total_creds
@@ -145,7 +227,7 @@ def getHostData(ip):
     # Set the last seen time based on time calculations
     last = getTimeDelta(last)
     if last and last > int(os.environ.get("HOST_TIMEOUT", 2)):
-        if online and online.lower().strip() == "true":
+        if online:
             logger.warning("{} offline".format(ip))
         status['online'] = ''
     else:
@@ -162,9 +244,28 @@ def getHostData(ip):
     num_valid_callbacks, active_callbacks = getActiveCallbacks(ip)
     total_creds, all_valid_creds = getActiveCreds(ip)
     
-    # Write the status to the database
-    r.hmset(ip, {'online': status['online']})
-    r.hmset(f"{ip}:creds", {'creds_online': status['creds_online']})
+    # Write status booleans to the database
+    try:
+        with db.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE hosts
+                SET online = %s, updated_at = NOW()
+                WHERE ip = %s
+                """,
+                (status['online'] == "True", ip),
+            )
+            cur.execute(
+                """
+                UPDATE credentials_latest
+                SET creds_online = %s, updated_at = NOW()
+                WHERE ip = %s
+                """,
+                (status['creds_online'] == "True", ip),
+            )
+        db.commit()
+    except Exception:
+        db.rollback()
 
     status['Last Seen'] = "{}m".format(last)
     status['Type'] = app
@@ -184,11 +285,19 @@ def getHostData(ip):
 
 def getAlert():
     '''
-    Pull the alert message from redis if is is recent.
+    Pull the alert message from PostgreSQL if it is recent.
     Return nothing if it is not recent
     '''
-    time, msg = r.hmget("alert", ('time', 'message'))
-    time = getTimeDelta(time)
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute('SELECT event_time, message FROM alerts WHERE id = 1;')
+        row = cur.fetchone()
+
+    if not row:
+        return ""
+
+    event_time, msg = row
+    time = getTimeDelta(event_time)
     if time is None or msg is None:
         return ""
     # If the time is within X minutes, display the message
@@ -228,23 +337,50 @@ def saveData(data):
     data['access_type'] = data['access_type'] if 'access_type' in data else "generic"
     data['access_info'] = data['access_info'] if 'access_info' in data else ""
 
-    super_callback_data = {
-        "access_type": data['access_type'],
-        "access_info": data['access_info'],
-        "last_seen": data['last_seen'],
-        "online": "True"
-    }
+    db = get_db()
+    try:
+        with db.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO callbacks(ip, application, access_info, last_seen, online, updated_at)
+                VALUES (%s, %s, %s, %s, TRUE, NOW())
+                ON CONFLICT (ip, application)
+                DO UPDATE SET
+                    access_info = EXCLUDED.access_info,
+                    last_seen = EXCLUDED.last_seen,
+                    online = TRUE,
+                    updated_at = NOW()
+                """,
+                (data['ip'], data['application'], data['access_info'], data['last_seen']),
+            )
 
-    r.hset(f"{data['ip']}:callbacks", data['application'], json.dumps(super_callback_data))
-
-    # save this to the DB
-    r.hmset(data['ip'], {
-        'application': data['application'],
-        'access_type': data['access_type'],
-        'message': data['message'],
-        'server': data['server'],
-        'last_seen': data['last_seen']
-    })
+            cur.execute(
+                """
+                INSERT INTO hosts(ip, application, access_type, message, server, last_seen, online, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, TRUE, NOW())
+                ON CONFLICT (ip)
+                DO UPDATE SET
+                    application = EXCLUDED.application,
+                    access_type = EXCLUDED.access_type,
+                    message = EXCLUDED.message,
+                    server = EXCLUDED.server,
+                    last_seen = EXCLUDED.last_seen,
+                    online = TRUE,
+                    updated_at = NOW()
+                """,
+                (
+                    data['ip'],
+                    data['application'],
+                    data['access_type'],
+                    data['message'],
+                    data['server'],
+                    data['last_seen'],
+                ),
+            )
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception("failed to save callback data")
 
 def saveCredData(data):
     '''
@@ -265,21 +401,42 @@ def saveCredData(data):
     data['server'] = data['server'] if 'server' in data else "pwnboard"
     data['message'] = data['message'] if 'message' in data else "Credentials received to {}".format(data['server'])
 
-    # save this to the DB
+    db = get_db()
     credstring = f"{'* ' if data['admin'] == 1 else ''}{data['username']}:{data['password']}"
-    r.hmset(f"{data['ip']}:creds", {
-        'creds': credstring,
-        'server': data['server'],
-        'last_seen': data['last_seen']
-    })
+    try:
+        with db.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO credentials_latest(ip, creds, server, last_seen, creds_online, updated_at)
+                VALUES (%s, %s, %s, %s, TRUE, NOW())
+                ON CONFLICT (ip)
+                DO UPDATE SET
+                    creds = EXCLUDED.creds,
+                    server = EXCLUDED.server,
+                    last_seen = EXCLUDED.last_seen,
+                    creds_online = TRUE,
+                    updated_at = NOW()
+                """,
+                (data['ip'], credstring, data['server'], data['last_seen']),
+            )
 
-    cred_data = {
-        "creds": credstring,
-        'server': data['server'],
-        'last_seen': data['last_seen'],
-        'creds_online': "True"
-    }
-
-    r.hset(f"{data['ip']}:allcreds", data['username'], json.dumps(cred_data))
+            cur.execute(
+                """
+                INSERT INTO credentials_by_user(ip, username, creds, server, last_seen, creds_online, updated_at)
+                VALUES (%s, %s, %s, %s, %s, TRUE, NOW())
+                ON CONFLICT (ip, username)
+                DO UPDATE SET
+                    creds = EXCLUDED.creds,
+                    server = EXCLUDED.server,
+                    last_seen = EXCLUDED.last_seen,
+                    creds_online = TRUE,
+                    updated_at = NOW()
+                """,
+                (data['ip'], data['username'], credstring, data['server'], data['last_seen']),
+            )
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception("failed to save credential data")
 
 

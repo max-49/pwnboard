@@ -6,13 +6,12 @@ from flask import Flask, g, session, redirect, url_for
 import re
 import os
 import json
-import redis
-import sqlite3
 import logging
 from functools import wraps
 from argon2 import PasswordHasher
 from markupsafe import Markup, escape
 from .logging_handler import DBHandler
+from .db import init_pool, init_schema, get_db_connection, close_db_connection
 
 BOARD = []
 IP_SET = set()
@@ -64,12 +63,8 @@ SH = logging.StreamHandler()
 SH.setFormatter(FMT)
 logger.addHandler(SH)
 logger.setLevel(logging.DEBUG)
-logger.addHandler(DBHandler())
 
-# Create the redis object. Make sure that we decode our responses
-rserver = os.environ.get('REDIS_HOST', 'localhost')
-rport = os.environ.get('REDIS_PORT', 6379)
-r = redis.StrictRedis(host=rserver, port=int(rport), decode_responses=True)
+init_pool()
 
 # Simple linkify filter: convert http(s) URLs inside a string into clickable links
 # Returns Markup so it's safe to render in templates
@@ -98,70 +93,24 @@ def linkify(text):
 # Register the filter with Jinja environment
 app.jinja_env.filters['linkify'] = linkify
 
-# Initialize user database (use a short-lived connection for init)
-USERS_DB = os.environ.get('USERS_DB', 'users.db')
-with sqlite3.connect(USERS_DB) as _init_conn:
-    _init_conn.execute("""
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY,
-        username TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        role TEXT
-    )
-    """)
-    _init_conn.commit()
-
-    default_user = os.environ.get("DEFAULT_USER", "admin")
-    default_password = os.environ.get("DEFAULT_USER_PASSWORD", "password")
-
-    cur = _init_conn.execute('SELECT username FROM users WHERE username = ?;', (default_user,))
-    if cur.fetchone() is None:
-        _init_conn.execute(
-            'INSERT OR IGNORE INTO users(username, password, role) VALUES (?, ?, "admin");',
-            (default_user, ph.hash(default_password))
-        )
-        _init_conn.commit()
+default_user = os.environ.get("DEFAULT_USER", "admin")
+default_password = os.environ.get("DEFAULT_USER_PASSWORD", "password")
+init_schema(default_user=default_user, default_password_hash=ph.hash(default_password))
+logger.addHandler(DBHandler())
 
 
 def get_db():
-    """Return a per-request sqlite3 connection stored on flask.g."""
-    if getattr(g, 'db', None) is None:
-        g.db = sqlite3.connect(USERS_DB, detect_types=sqlite3.PARSE_DECLTYPES)
-        g.db.row_factory = sqlite3.Row
-        try:
-            g.db.execute("PRAGMA foreign_keys = ON")
-            g.db.execute("PRAGMA busy_timeout = 5000")
-        except Exception:
-            pass
-    return g.db
+    """Return a per-request PostgreSQL connection stored on flask.g."""
+    return get_db_connection()
 
 
-# Logs DB handling (per-request connection similar to get_db)
-LOGS_DB = os.environ.get('LOGS_DB', 'logs.db')
 def get_logs_db():
-    """Return a per-request sqlite3 connection for logs.db stored on flask.g."""
-    if getattr(g, 'logs_db', None) is None:
-        g.logs_db = sqlite3.connect(LOGS_DB, detect_types=sqlite3.PARSE_DECLTYPES)
-        g.logs_db.row_factory = sqlite3.Row
-        try:
-            g.logs_db.execute("PRAGMA busy_timeout = 5000")
-        except Exception:
-            pass
-    return g.logs_db
+    """Return a PostgreSQL connection for logs queries."""
+    return get_db_connection()
 
 
 def close_db(e=None):
-    db = getattr(g, 'db', None)
-    if db is not None:
-        db.close()
-        delattr(g, 'db')
-    logs_db = getattr(g, 'logs_db', None)
-    if logs_db is not None:
-        try:
-            logs_db.close()
-        except Exception:
-            pass
-        delattr(g, 'logs_db')
+    close_db_connection()
 
 # Close DB when app is ended
 app.teardown_appcontext(close_db)

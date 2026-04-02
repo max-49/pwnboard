@@ -65,6 +65,11 @@ This generates `board.json` in the project root, which defines which IP addresse
    - CACHE_TIME=-1 # Change this to a positive value to cache the board JSON for a certain amount of time. Might help with performance
    - HOST_TIMEOUT=5 # Change this to the amount of time (in minutes) after which callbacks should time out if an update is not received
    - CREDS_TIMEOUT=30 # Change this to the amount of time (in minutes) after which credentials should time out if an update is not received
+   - POSTGRES_HOST=db # PostgreSQL host (docker compose service name)
+   - POSTGRES_PORT=5432 # PostgreSQL port
+   - POSTGRES_DB=pwnboard_db # Database name
+   - POSTGRES_USER=pwnboard_user # Database user
+   - POSTGRES_PASSWORD=password # Database password
    - DEFAULT_USER=admin # Change this to be your default admin user
    - DEFAULT_USER_PASSWORD=password # Change this to be your default admin password (can be changed later in the GUI)
    - LOGIN_PAGE_MESSAGE=Contact an admin to get an account! # Change this if you want your welcome message on the home page to be different
@@ -86,6 +91,16 @@ This generates `board.json` in the project root, which defines which IP addresse
    ```bash
    docker compose up -d
    ```
+
+### Local Development Without Pulling from GHCR
+
+When testing local uncommitted changes, use the development override file so Docker builds from your working tree and never pulls the `ghcr.io` image for `pwnboard`:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
+```
+
+This keeps `docker-compose.yml` suitable for quick deployment while `docker-compose.dev.yml` forces local image use during development.
 
 4. **Access the dashboard**:
    - Navigate to `PWNBOARD_URL`
@@ -111,8 +126,12 @@ PWNBoard is configured via environment variables, set in `docker-compose.yml`.
 | `CACHE_TIME` | `-1` | Board cache seconds (-1 = disabled) |
 | `LOGIN_PAGE_MESSAGE` | `Contact an admin to get an account!` | Message that shows on the login page by default
 | `USE_ACCESS_TOKENS` | `true` | Use access tokens for POST authentication
-| `USERS_DB` | `users.db` | Path to SQLite user database (set to a volume-backed path for persistence) |
-| `LOGS_DB` | `logs.db` | Path to SQLite logs database (set to a volume-backed path for persistence) |
+| `POSTGRES_HOST` | `db` | PostgreSQL host |
+| `POSTGRES_PORT` | `5432` | PostgreSQL port |
+| `POSTGRES_DB` | `pwnboard_db` | PostgreSQL database name |
+| `POSTGRES_USER` | `pwnboard_user` | PostgreSQL username |
+| `POSTGRES_PASSWORD` | `password` | PostgreSQL password |
+| `DATABASE_URL` | — | Optional full DSN override (`postgres://user:pass@host:5432/dbname`) |
 
 For a complete list of configuration options, see [doc/config.md](doc/config.md).
 
