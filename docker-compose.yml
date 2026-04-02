@@ -1,6 +1,7 @@
 services:
   pwnboard:
     image: ghcr.io/max-49/pwnboard:latest
+    restart: always
     environment:
       - FLASK_DEBUG=false
       - FLASK_PORT=5000
@@ -36,14 +37,14 @@ services:
       POSTGRES_PASSWORD: password
     volumes:
       - pwnboard-data:/var/lib/postgresql/data
-      - ./scripts/init_postgres.sql:/docker-entrypoint-initdb.d/init.sql # Init Read-Only user here
+      - ./scripts/init_postgres.sql:/docker-entrypoint-initdb.d/init.sql
 
   data:
     image: metabase/metabase:latest
     restart: always
     environment:
       MB_DB_TYPE: postgres
-      MB_DB_DBNAME: pwnboard_db
+      MB_DB_DBNAME: metabase_db
       MB_DB_PORT: 5432
       MB_DB_USER: metabase_user # user from init_postgres.sql
       MB_DB_PASS: password
@@ -56,6 +57,7 @@ services:
     restart: always
     ports:
       - "443:443"
+      - "8443:8443"
 
 volumes:
   pwnboard-data:
