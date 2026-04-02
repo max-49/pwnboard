@@ -7,8 +7,9 @@ import io
 from .authentication import *
 from .data import getEpoch, saveData, saveCredData
 from .routes import mark_board_cache_dirty
+from .db import dict_cursor
 
-from . import app, logger, r, IP_SET, get_db, login_required, admin_required, USE_ACCESS_TOKENS
+from . import app, logger, IP_SET, get_db, login_required, admin_required, USE_ACCESS_TOKENS
 
 @app.route('/checkin', methods=['POST'])
 @app.route('/generic', methods=['POST'])
@@ -81,17 +82,22 @@ def creds_callback():
         # -1 = unknown
         data['admin'] = -1
 
+    if USE_ACCESS_TOKENS:
         auth_header = request.headers.get('Authorization')
 
-    if not auth_header:
-        return "Not authorized\n", 401
+        if not auth_header:
+            return "Not authorized\n", 401
 
-    token = auth_header.split(' ')[1]
+        auth_header_split = auth_header.split(' ')
+        if auth_header_split[0].strip().lower() != "bearer":
+            return "Please use Bearer Token\n", 401
 
-    verification = verifyAccessToken(token, data['application'])
+        token = auth_header_split[1].strip()
 
-    if (verification == False):
-        return "Not authorized\n", 401
+        verification = verifyAccessToken(token, data['application'])
+
+        if (verification == False):
+            return "Not authorized\n", 401
 
     if 'ips' in data and isinstance(data['ips'], list):
         for ip in data['ips']:
@@ -118,8 +124,9 @@ def creds_callback():
 def admin_list_users():
     """Return JSON list of users for admin UI."""
     db = get_db()
-    cur = db.execute('SELECT username, role FROM users ORDER BY username COLLATE NOCASE;')
-    rows = cur.fetchall()
+    with dict_cursor(db) as cur:
+        cur.execute('SELECT username, role FROM users ORDER BY lower(username);')
+        rows = cur.fetchall()
     out = []
     for r in rows:
         out.append({
@@ -152,7 +159,7 @@ def admin_create_user():
 @login_required
 @admin_required
 def admin_delete_user(username):
-    """Delete a user from the sqlite users DB. Admin-only. Prevent deleting self."""
+    """Delete a user from PostgreSQL. Admin-only. Prevent deleting self."""
     username = username or ''
     username = username.strip()
     if not username:
@@ -161,14 +168,18 @@ def admin_delete_user(username):
     if session.get('user') == username:
         return ("Cannot delete current user", 400)
     db = get_db()
-    cur = db.execute('SELECT 1 FROM users WHERE username = ?;', (username,))
-    if cur.fetchone() is None:
+    with db.cursor() as cur:
+        cur.execute('SELECT 1 FROM users WHERE username = %s;', (username,))
+        row = cur.fetchone()
+    if row is None:
         return ("Not found", 404)
     try:
-        db.execute('DELETE FROM users WHERE username = ?;', (username,))
+        with db.cursor() as cur:
+            cur.execute('DELETE FROM users WHERE username = %s;', (username,))
         db.commit()
         return ("", 204)
-    except Exception as e:
+    except Exception:
+        db.rollback()
         logger.exception('Failed to delete user %s', username)
         return ("Error", 500)
 
@@ -236,13 +247,13 @@ def list_tokens():
 def delete_token_route(token_hash):
     # owner or admin may delete
     username = session.get('user')
-    data = r.get(f"token:{token_hash}")
-    if not data:
+    db = get_db()
+    with dict_cursor(db) as cur:
+        cur.execute('SELECT username FROM access_tokens WHERE token_hash = %s;', (token_hash,))
+        meta = cur.fetchone()
+    if not meta:
         return ("Not found", 404)
-    try:
-        meta = json.loads(str(data))
-    except Exception:
-        return ("Invalid token", 500)
+
     owner = meta.get('username')
     if owner != username and session.get('role') != 'admin':
         return ("Forbidden", 403)

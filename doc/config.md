@@ -10,17 +10,18 @@ environment variables and their default settings.
 
 - `PWN_THEME` _Default: "blue"_ - The theme of the pwnboard, `blue` is Red for active hosts and Blue for dead hosts. `green` is Green for active hosts and Red for dead hosts.
 
-- `REDIS_HOST` _Default: "localhost"_ - The location of the redis server
-- `REDIS_PORT` _Default: "6379"_ - The location of the redis server
+- `POSTGRES_HOST` _Default: "localhost"_ - The location of the PostgreSQL server
+- `POSTGRES_PORT` _Default: "5432"_ - The PostgreSQL server port
+- `POSTGRES_DB` _Default: "pwnboard_db"_ - PostgreSQL database name
+- `POSTGRES_USER` _Default: "pwnboard_user"_ - PostgreSQL username
+- `POSTGRES_PASSWORD` _Default: "password"_ - PostgreSQL password
+- `DATABASE_URL` _No default_ - Optional full PostgreSQL DSN. If set, it overrides all `POSTGRES_*` values.
 
 - `FLASK_HOST` _Default: "0.0.0.0"_ - Which interface Flask should bind to
 - `FLASK_PORT` _Default: "80"_ - Which port Flask should bind to
 - `FLASK_DEBUG` _Default: "false"_ - Whether or not flask should be in debug mode
 
 - `CACHE_TIME` _Default: "-1"_ - How many seconds to cache the web page for. Default is do not cache at all. This may be needed if you have many people watching the board at once.
-
-- `USERS_DB` _Default: "users.db"_ - Path to the SQLite user database file. Use a mounted volume path in Docker for persistent user accounts.
-- `LOGS_DB` _Default: "logs.db"_ - Path to the SQLite logs database file. Use a mounted volume path in Docker for persistent logging data.
 
 - `HOST_TIMEOUT` _Default: 2_ - Number of minutes of inactivity before a host expires
 - `CREDS_TIMEOUT` _Default: 30_ - Number of minutes of inactivity before credentials expire

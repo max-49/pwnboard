@@ -4,8 +4,11 @@ services:
     environment:
       - FLASK_DEBUG=false
       - FLASK_PORT=5000
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=pwnboard_db
+      - POSTGRES_USER=pwnboard_user
+      - POSTGRES_PASSWORD=password
       - SECRET_KEY=change-me-please
       - PWNBOARD_URL=https://pwnboard.win
       - CACHE_TIME=-1    # Seconds to cache for. set to -1 to disable
@@ -15,15 +18,38 @@ services:
       - DEFAULT_USER_PASSWORD=password
       - LOGIN_PAGE_MESSAGE=Contact an admin to get an account!
       - USE_ACCESS_TOKENS=true
-      - USERS_DB=/opt/pwnboard/data/users.db
-      - LOGS_DB=/opt/pwnboard/data/logs.db
     volumes:
       - ./board.json:/opt/pwnboard/board.json:ro
-      - pwnboard-data:/opt/pwnboard/data # users.db and logs.db
+    depends_on:
+      - db
 
-  redis:
-    image: redis:alpine
+  # redis:
+  #   image: redis:alpine
+  #   restart: always
+
+  db:
+    image: postgres:15-alpine
     restart: always
+    environment:
+      POSTGRES_DB: pwnboard_db
+      POSTGRES_USER: pwnboard_user
+      POSTGRES_PASSWORD: password
+    volumes:
+      - pwnboard-data:/var/lib/postgresql/data
+      - ./scripts/init_postgres.sql:/docker-entrypoint-initdb.d/init.sql # Init Read-Only user here
+
+  data:
+    image: metabase/metabase:latest
+    restart: always
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_DBNAME: pwnboard_db
+      MB_DB_PORT: 5432
+      MB_DB_USER: metabase_user # user from init_postgres.sql
+      MB_DB_PASS: password
+      MB_DB_HOST: db
+    depends_on:
+      - db
 
   reverse-proxy:
     build: ./reverse-proxy

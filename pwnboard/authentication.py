@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-import json
 import secrets
 import hashlib
 import time
-import inspect
-from . import r, logger, ph, get_db
+from . import logger, ph, get_db
+from .db import dict_cursor
 
 def _hash_token(raw_token):
     return hashlib.sha256(raw_token.encode('utf-8')).hexdigest()
@@ -13,8 +12,9 @@ def createUser(username, password, role):
     db = get_db()
 
     # Check if the user already exists
-    cur = db.execute('SELECT 1 FROM users WHERE username = ?;', (username,))
-    row = cur.fetchone()
+    with db.cursor() as cur:
+        cur.execute('SELECT 1 FROM users WHERE username = %s;', (username,))
+        row = cur.fetchone()
     if row is not None:
         return "User already exists"
 
@@ -26,15 +26,21 @@ def createUser(username, password, role):
         return "Password hashing failed"
 
     # Insert the new user and commit so the change persists
-    db.execute('INSERT INTO users(username, password, role) VALUES (?, ?, ?);', (username, hashed, role))
-    db.commit()
+    try:
+        with db.cursor() as cur:
+            cur.execute('INSERT INTO users(username, password, role) VALUES (%s, %s, %s);', (username, hashed, role))
+        db.commit()
+    except Exception:
+        db.rollback()
+        return "Create failed"
 
     return True
 
 def verifyUser(username, password):
     db = get_db()
-    cur = db.execute('SELECT password, role FROM users WHERE username = ?;', (username,))
-    row = cur.fetchone()
+    with dict_cursor(db) as cur:
+        cur.execute('SELECT password, role FROM users WHERE username = %s;', (username,))
+        row = cur.fetchone()
     if row is None:
         # User doesn't exist
         return None
@@ -59,11 +65,13 @@ def changeUserPassword(username, old_pass, new_pass, override=False):
     verify = verifyUser(username, old_pass)
     if (verify or (override == True and verify == False)):
         try:
-            db.execute('UPDATE users SET password = ? WHERE username = ?;',
-                (ph.hash(new_pass), username))
+            with db.cursor() as cur:
+                cur.execute('UPDATE users SET password = %s WHERE username = %s;',
+                    (ph.hash(new_pass), username))
             db.commit()
             return True
         except Exception:
+            db.rollback()
             return False
     else:
         return False
@@ -72,8 +80,9 @@ def changeUserPassword(username, old_pass, new_pass, override=False):
 def changeUserRole(username, new_role):
     db = get_db()
 
-    cur = db.execute('SELECT 1 FROM users WHERE username = ?;', (username,))
-    row = cur.fetchone()
+    with dict_cursor(db) as cur:
+        cur.execute('SELECT role FROM users WHERE username = %s;', (username,))
+        row = cur.fetchone()
     if row is None:
         # User doesn't exist
         return None
@@ -81,41 +90,48 @@ def changeUserRole(username, new_role):
     if row['role'] == new_role:
         return False
     else:
-        db.execute('UPDATE users SET role = ? WHERE username = ?;', (new_role, username))
-        db.commit()
-        return True
+        try:
+            with db.cursor() as cur:
+                cur.execute('UPDATE users SET role = %s WHERE username = %s;', (new_role, username))
+            db.commit()
+            return True
+        except Exception:
+            db.rollback()
+            return False
 
 def createAccessToken(token_name, username, application, description, expires_after=604800):
     # expires_after must be in seconds
     token = secrets.token_urlsafe(32)
     token_hash = _hash_token(token)
-    token_key = f"token:{token_hash}"
+    expires_at = None
+    if expires_after and int(expires_after) > 0:
+        expires_at = int(time.time()) + int(expires_after)
 
-    token_info = {
-        "token_name": token_name,
-        "application": application,
-        "description": description,
-        "username": username,
-        "created": int(time.time()),
-        "expires": (int(time.time()) + int(expires_after)) if expires_after else None,
-        # small prefix to help users identify tokens without exposing the secret
-        "prefix": token[:3]
-    }
+    db = get_db()
     try:
-        if expires_after and int(expires_after) > 0:
-            r.set(token_key, json.dumps(token_info), nx=True, ex=int(expires_after))
-        else:
-            r.set(token_key, json.dumps(token_info), nx=True)
+        with db.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO access_tokens(token_hash, token_name, application, description, username, prefix, created_at, expires_at)
+                VALUES (%s, %s, %s, %s, %s, %s, to_timestamp(%s), to_timestamp(%s))
+                ON CONFLICT (token_hash) DO NOTHING
+                """,
+                (
+                    token_hash,
+                    token_name,
+                    application,
+                    description,
+                    username,
+                    token[:3],
+                    int(time.time()),
+                    expires_at,
+                ),
+            )
+        db.commit()
     except Exception:
-        logger.exception('Failed to store token in Redis')
+        db.rollback()
+        logger.exception('Failed to store token in PostgreSQL')
         return None
-
-    # maintain index sets so users can list their tokens and admins can see all
-    try:
-        r.sadd(f"user_tokens:{username}", token_hash)
-        r.sadd("tokens:all", token_hash)
-    except Exception:
-        logger.exception('Failed to update token indexes in Redis')
 
     return token
 
@@ -124,11 +140,22 @@ def verifyAccessToken(token, application):
         return False
 
     token_hash = _hash_token(token)
-    data = r.get(f"token:{token_hash}")
-    if not data:
+    db = get_db()
+    with dict_cursor(db) as cur:
+        cur.execute(
+            """
+            SELECT token_name, application, description, username,
+                   extract(epoch from created_at)::bigint AS created,
+                   CASE WHEN expires_at IS NULL THEN NULL ELSE extract(epoch from expires_at)::bigint END AS expires,
+                   prefix
+            FROM access_tokens
+            WHERE token_hash = %s
+            """,
+            (token_hash,),
+        )
+        info = cur.fetchone()
+    if not info:
         return False
-
-    info = json.loads(str(data))
 
     expires = info.get('expires')
     if expires and int(expires) < int(time.time()):
@@ -140,45 +167,40 @@ def verifyAccessToken(token, application):
     return info
 
 def removeAccessToken(token_hash):
-    data = r.get(f"token:{token_hash}")
-    if not data:
+    db = get_db()
+    try:
+        with db.cursor() as cur:
+            cur.execute('DELETE FROM access_tokens WHERE token_hash = %s;', (token_hash,))
+            deleted = cur.rowcount
+        db.commit()
+        return deleted > 0
+    except Exception:
+        db.rollback()
         return False
-    info = json.loads(str(data))
-    username = info.get('username')
-    r.delete(f"token:{token_hash}")
-    r.srem(f"user_tokens:{username}", token_hash)
-    r.srem("tokens:all", token_hash)
-    return True
 
 
 def list_user_tokens(username):
     """Return metadata list for tokens belonging to username."""
+    db = get_db()
     try:
-        raw = r.smembers(f"user_tokens:{username}") or []
+        with dict_cursor(db) as cur:
+            cur.execute(
+                """
+                SELECT token_hash AS hash,
+                       token_name,
+                       application,
+                       description,
+                       username,
+                       extract(epoch from created_at)::bigint AS created,
+                       CASE WHEN expires_at IS NULL THEN NULL ELSE extract(epoch from expires_at)::bigint END AS expires,
+                       prefix
+                FROM access_tokens
+                WHERE username = %s
+                ORDER BY created_at DESC
+                """,
+                (username,),
+            )
+            return list(cur.fetchall())
     except Exception:
-        logger.exception('Failed to read user token set')
+        logger.exception('Failed to query user tokens')
         return []
-
-    out = []
-    if raw is None:
-        return out
-    hashes = []
-    try:
-        for h in raw:
-            hashes.append(h)
-    except Exception:
-        hashes = []
-
-    for h in hashes:
-        d = r.get(f"token:{h}")
-        if not d:
-            continue
-        try:
-            meta = json.loads(str(d))
-        except Exception:
-            continue
-        # don't include any encrypted token value here; only metadata and prefix
-        meta.pop('enc', None)
-        meta['hash'] = h
-        out.append(meta)
-    return out
