@@ -3,4 +3,3 @@
 *.jpg binary
 *.jpeg binary
 *.gif binary
-* text eol=lf
