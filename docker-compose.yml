@@ -12,7 +12,8 @@ services:
       - POSTGRES_PASSWORD=password
       - SECRET_KEY=change-me-please
       - PWNBOARD_URL=https://pwnboard.win
-      - CACHE_TIME=-1    # Seconds to cache for. set to -1 to disable
+      - CACHE_TIME=-1    # Seconds to cache data for. set to -1 to disable
+      - REFRESH_SECONDS=10 # Seconds after which to refresh the page
       - HOST_TIMEOUT=5
       - CREDS_TIMEOUT=30
       - DEFAULT_USER=admin

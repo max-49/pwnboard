@@ -19,6 +19,7 @@ BOARDCACHE = ""
 BOARDCACHE_TIME = 0
 BOARDCACHE_UPDATED = True
 LOGIN_PAGE_MESSAGE = os.environ.get("LOGIN_PAGE_MESSAGE", "Contact an admin to make an account!")
+REFRESH_SECONDS = os.environ.get("REFRESH_SECONDS", 10)
 
 def mark_board_cache_dirty():
     """Mark in-memory board cache as stale."""
@@ -88,7 +89,7 @@ def index():
     # Always render HTML per-request so session-specific navbar data stays accurate
     theme = os.environ.get('PWN_THEME', "blue")
     html = render_template('index.html', error=error, theme=theme,
-                           board=board, teams=BOARD['teams'])
+                           board=board, teams=BOARD['teams'], refresh_seconds=REFRESH_SECONDS)
     return make_response(html)
 
 @app.route("/graphs")

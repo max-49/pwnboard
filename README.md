@@ -143,7 +143,7 @@ See the [usage guide](doc/usage.md) for detailed instructions on how to actually
 
 - **[Setup Guide](doc/setup.md)** — Detailed deployment instructions and troubleshooting
 - **[Configuration Reference](doc/config.md)** — Complete environment variable reference
-- **[Development Guide](doc/DEVELOPMENT.md)** — Architecture, file structure, and contribution guidelines
+- **[Development Guide](doc/development.md)** — Architecture, file structure, and contribution guidelines
 
 ## Testing your PWNBoard deployment
 

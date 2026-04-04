@@ -27,27 +27,27 @@ Guide for developers contributing to or extending PWNboard.
 │  - Data Layer   │
 └────────┬────────┘
          │
-    ┌────┴────┐
-    ▼         ▼
-┌────────┐ ┌──────────┐
-│ Redis  │ │ SQLite   │
-│ (State)│ │ (Users)  │
-└────────┘ └──────────┘
+         ▼
+┌─────────────────┐
+│  PostgreSQL DB  │
+│  - Users        │
+│  - Callbacks    │
+│  - Tokens       │
+└─────────────────┘ 
 ```
 
 ### Data Flow
 
-1. **Beacons/Creds** → POST to `/checkin`, `/creds` endpoints
+1. **Beacons/Creds** → POST to `/pwn`, `/creds` endpoints
 2. **Validation** → IP checked against `board.json` configuration (loaded into `IP_SET`)
-3. **Storage** → Redis hashes store host state, callbacks, and credentials
-4. **Rendering** → Dashboard pulls data from Redis, applies timeouts, generates HTML
-5. **Caching** → Board HTML cached (configurable via `CACHE_TIME`) to reduce Redis load
+3. **Storage** → PostgreSQL database stores host state, callbacks, and credentials
+4. **Rendering** → Dashboard pulls data from Postgres, applies timeouts, generates HTML
+5. **Caching** → Board JSON cached (configurable via `CACHE_TIME`) to reduce Postgres load
 
 ### Technology Stack
 
 - **Flask** — Web framework
-- **Redis** — In-memory data store for host state and real-time data
-- **SQLite** — User authentication database
+- **PostgreSQL** — Database
 - **Argon2** — Password hashing
 - **Pandas** — Data aggregation for graphs
 - **Jinja2** — HTML templating
@@ -58,7 +58,7 @@ Guide for developers contributing to or extending PWNboard.
 ### Prerequisites
 
 - Python 3.8+
-- Redis server
+- PostgreSQL server
 - Git
 
 ### Setup Steps
