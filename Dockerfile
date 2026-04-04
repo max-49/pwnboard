@@ -9,17 +9,10 @@ RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 RUN pip3 install -r /tmp/requirements.txt
 
-# PWNboard environment variables (timeouts in minutes)
-ENV HOST_TIMEOUT=5
-ENV CREDS_TIMEOUT=30
-
 # Install the code
-COPY . /opt/pwnboard/
+COPY pwnboard.py /opt/pwnboard/
+COPY pwnboard/ /opt/pwnboard/
 WORKDIR /opt/pwnboard
 
-# Build the board file if one isnt given
-RUN /bin/sh scripts/setup.sh
-
-#CMD ["python", "pwnboard.py"]
+# CMD ["python", "pwnboard.py"]
 CMD /opt/venv/bin/gunicorn --bind 0.0.0.0:$FLASK_PORT --workers 3 --threads 4 pwnboard:app
-#CMD ["uwsgi", "--yaml", "/opt/pwnboard/config/wsgi.yml"]
