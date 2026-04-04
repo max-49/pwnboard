@@ -32,23 +32,20 @@ PWNBoard provides a centralized dashboard for tracking compromised hosts, active
 
 ### Prerequisites
 
-- Ensure Docker is installed (see Docker documentation for installation instructions)
-- A `board.json` configuration file (see [Board Setup](#board-setup))
+- Ensure the Docker Engine is installed on your machine
 
 ### Board Setup
 
-PWNBoard requires a topology configuration to define teams and target hosts. Generate your board configuration using the included Topology Generator:
+PWNBoard requires a topology configuration to define teams and hosts. Generate your board configuration using the included Topology Generator:
 
 1. **Create a board file** using `gen_config.py`:
    ```bash
    python3 scripts/gen_config.py
    ```
 
-Follow the steps in the script to define your hosts. This generates `board.json` in the project root, which defines which IP addresses can submit beacons.
+Follow the steps in the script to define your hosts. This will generate a `board.json` in the project root, necessary for PWNBoard to deploy correctly.
 
-### Deployment (Docker Compose)
-
-**Docker Compose is the recommended deployment method.**
+### Environment Setup
 
 1. **Configure environment** (edit `docker-compose.yml`):
    ```yaml
@@ -76,20 +73,18 @@ Follow the steps in the script to define your hosts. This generates `board.json`
    sudo ./setup_certs_self_signed.sh
    ```
 
-3. **Deploy with Docker!**:
+### Deploy
+
+1. **Start PWNBoard with Docker Compose**:
    ```bash
    docker compose up -d
    ```
 
-4. **Access the dashboard**:
+2. **Access the dashboard**:
    - Navigate to `PWNBOARD_URL` in your browser
    - Login with default credentials set up in environment variables!
 
 For detailed setup instructions and troubleshooting, see [doc/setup.md](doc/setup.md).
-
-## Configuration
-
-PWNBoard is configured via variables set in `docker-compose.yml`.
 
 ### Key Environment Variables
 
