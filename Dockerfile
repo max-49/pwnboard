@@ -10,8 +10,8 @@ ENV PATH="/opt/venv/bin:$PATH"
 RUN pip3 install -r /tmp/requirements.txt
 
 # Install the code
-# COPY pwnboard.py /opt/pwnboard/ # uncomment for non gunicorn deploy
-COPY pwnboard/ /opt/pwnboard/
+COPY pwnboard.py /opt/pwnboard/
+COPY pwnboard/ /opt/pwnboard/pwnboard/
 WORKDIR /opt/pwnboard
 
 # CMD ["python", "pwnboard.py"] # uncomment for non gunicorn deploy
