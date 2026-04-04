@@ -115,7 +115,7 @@ Guide for developers contributing to or extending PWNboard.
 When testing local uncommitted changes, use the development override file so Docker builds from your working tree and never pulls the `ghcr.io` image for `pwnboard`:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
+docker compose -f docker-compose.yml -f scripts/docker-compose.dev.yml up --build -d
 ```
 
 This keeps `docker-compose.yml` suitable for quick deployment while `docker-compose.dev.yml` forces local image use during development.
