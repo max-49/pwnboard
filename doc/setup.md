@@ -1,24 +1,13 @@
 # PWNBoard Setup
 Written by Massimo Marino (max-49)
 
-# Board Setup
-The pwnboard requires a topology to run specifying what IP addresses are in the competition. Generate a topology.json file using `Topology-Generator/generator.py`. When finished, copy the topology.json file to the root directory. Topology-Generator comes from [here](https://github.com/RITRedteam/Topology-Generator)
-
-To convert the topology to a board (so pwnboard can use it), use `gen_config.py`. Copy `scripts/gen_config.py` to the root directory (same directory as topology.json) and use the following command to convert it to a board
-
-```bash
-python3 gen_config.py topology.json board.json
-```
-
-board.json should be in the root directory as well.
-
 ## Deploying
 
 Install the Docker engine using the instructions on the Docker website.
 
-Docker makes deployment of the pwnboard very very simple. See [docker-compose.yml](../docker-compose.yml) for a well-commented example of a docker-compose file with basic configuration options.
+Docker makes deployment of the PWNBoard very very simple. See [docker-compose.yml](../docker-compose.yml) for a well-commented example of a docker-compose file with basic configuration options.
 
-You can deploy pwnboard with the following command:
+You can deploy PWNBoard with the following command:
 ```bash
 docker compose up -d
 ```
@@ -27,7 +16,7 @@ docker compose up -d
 
 You might run into some issues while deploying the containers. Here are some issues that I ran into with solutions:
 
-### Build hangs while installing packages on pwnboard container
+### Build hangs while installing packages on PWNBoard container
 
 > Find networking interface using `ip a`. Check MTU of interface using `ip link show <interface>` and note the number next to `mtu`. Then run the following command and note the container MTU.
 

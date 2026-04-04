@@ -39,20 +39,12 @@ PWNBoard provides a centralized dashboard for tracking compromised hosts, active
 
 PWNBoard requires a topology configuration to define teams and target hosts. Generate your board configuration using the included Topology Generator:
 
-1. **Create a topology** using `Topology-Generator/generator.py`:
+1. **Create a board file** using `gen_config.py`:
    ```bash
-   cd Topology-Generator
-   python3 generator.py
-   ```
-   Follow the prompts to define your teams and hosts. This creates `topology.json`.
-
-2. **Convert topology to board format**:
-   ```bash
-   # From project root
-   python3 scripts/gen_config.py Topology-Generator/topology.json board.json
+   python3 scripts/gen_config.py
    ```
 
-This generates `board.json` in the project root, which defines which IP addresses can submit beacons.
+Follow the steps in the script to define your hosts. This generates `board.json` in the project root, which defines which IP addresses can submit beacons.
 
 ### Deployment (Docker Compose)
 
