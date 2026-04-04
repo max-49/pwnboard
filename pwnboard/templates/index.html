@@ -148,7 +148,8 @@
             <!-- Auto-refresh & modal persistence script -->
             <script>
             (function(){
-                var reloadMs = {{ refresh_seconds * 100 }};
+                var refreshSeconds = {{ refresh_seconds|int }};
+                var reloadMs = refreshSeconds * 1000;
 
                 if (reloadMs > 0) {
                     // Periodically reload only if no modal is currently shown
