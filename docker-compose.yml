@@ -10,7 +10,7 @@ services:
       - POSTGRES_DB=pwnboard_db
       - POSTGRES_USER=pwnboard_user
       - POSTGRES_PASSWORD=password
-      - SECRET_KEY=change-me-please
+      - SECRET_KEY=change-me-please # Change this before deploy!
       - PWNBOARD_URL=https://pwnboard.win
       - CACHE_TIME=-1    # Seconds to cache data for. set to -1 to disable
       - REFRESH_SECONDS=10 # Seconds after which to refresh the page
@@ -50,11 +50,15 @@ services:
   #     - db
 
   reverse-proxy:
-    build: ./reverse-proxy
+    image: httpd:alpine
     restart: always
     ports:
       - "443:443"
-      - "8443:8443"
+      # - "8443:8443"
+    volumes:
+      - ./conf/httpd.conf:/usr/local/apache2/conf/httpd.conf:ro
+      - ./conf/cert.pem:/usr/local/apache2/conf/cert.pem
+      - ./conf/key.pem:/usr/local/apache2/conf/key.pem
 
 volumes:
   pwnboard-data:

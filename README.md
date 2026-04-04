@@ -52,23 +52,20 @@ Follow the steps in the script to define your hosts. This generates `board.json`
 
 1. **Configure environment** (edit `docker-compose.yml`):
    ```yaml
-   - SECRET_KEY=change-me-please # PLEASE CHANGE THIS TO SOMETHING ELSE BEFORE DEPLOYING
-   - PWNBOARD_URL=https://pwnboard.win # Change this line to your full PWNBoard URL (https://domain[:port], ex. https://pwnboard.win, https://10.1.1.10:443)
+   - SECRET_KEY=change-me-please # CHANGE THIS TO SOMETHING ELSE BEFORE DEPLOYING
+   - PWNBOARD_URL=https://pwnboard.win # Change this line to your full PWNBoard URL (https://domain[:port], ex. https://pwnboard.win, https://10.1.1.10:443). This is used in certificate generation
    - CACHE_TIME=-1 # Change this to a positive value to cache the board JSON for a certain amount of time. Might help with performance
+   - REFRESH_SECONDS=10 # Change this to the amount of time (in seconds) after which you want your page to refresh with new data. Setting this to 0 or -1 will disable refreshing
    - HOST_TIMEOUT=5 # Change this to the amount of time (in minutes) after which callbacks should time out if an update is not received
    - CREDS_TIMEOUT=30 # Change this to the amount of time (in minutes) after which credentials should time out if an update is not received
-   - POSTGRES_HOST=db # PostgreSQL host (docker compose service name)
-   - POSTGRES_PORT=5432 # PostgreSQL port
-   - POSTGRES_DB=pwnboard_db # Database name
-   - POSTGRES_USER=pwnboard_user # Database user
-   - POSTGRES_PASSWORD=password # Database password
+   - POSTGRES_PASSWORD=password # Database user password (if you change this, also change the variable in the db service)
    - DEFAULT_USER=admin # Change this to be your default admin user
    - DEFAULT_USER_PASSWORD=password # Change this to be your default admin password (can be changed later in the GUI)
    - LOGIN_PAGE_MESSAGE=Contact an admin to get an account! # Change this if you want your welcome message on the home page to be different
    - USE_ACCESS_TOKENS=true # SET THIS TO FALSE IF YOU DO NOT WANT TO USE ACCESS TOKENS 
    ```
 
-2. **Set up HTTPS with certificiates**:
+2. **Set up HTTPS certificiates**:
    ```bash
    cd scripts
    sudo ./setup_certs_letsencrypt.sh
@@ -79,57 +76,28 @@ Follow the steps in the script to define your hosts. This generates `board.json`
    sudo ./setup_certs_self_signed.sh
    ```
 
-3. **Deploy**:
+3. **Deploy with Docker!**:
    ```bash
    docker compose up -d
    ```
 
-### Local Development Without Pulling from GHCR
-
-When testing local uncommitted changes, use the development override file so Docker builds from your working tree and never pulls the `ghcr.io` image for `pwnboard`:
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
-```
-
-This keeps `docker-compose.yml` suitable for quick deployment while `docker-compose.dev.yml` forces local image use during development.
-
 4. **Access the dashboard**:
-   - Navigate to `PWNBOARD_URL`
-   - Login with default credentials set up in environment variables
+   - Navigate to `PWNBOARD_URL` in your browser
+   - Login with default credentials set up in environment variables!
 
 For detailed setup instructions and troubleshooting, see [doc/setup.md](doc/setup.md).
 
 ## Configuration
 
-PWNBoard is configured via environment variables, set in `docker-compose.yml`.
+PWNBoard is configured via variables set in `docker-compose.yml`.
 
 ### Key Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `SECRET_KEY` | `change-me-please` | Flask secret key for sessions (**please change**) |
-| `DEFAULT_USER` | `admin` | Default admin username |
-| `DEFAULT_USER_PASSWORD` | `password` | Default admin password |
-| `PWNBOARD_URL` | — | Base URL for your deployment (e.g., `https://pwnboard.example.com:8080`) |
-| `HOST_TIMEOUT` | `2` | Minutes before host marked offline |
-| `CREDS_TIMEOUT` | `30` | Minutes before credentials marked stale |
-| `PWN_THEME` | `blue` | Color theme: `blue` (red=active) or `green` (green=active) |
-| `CACHE_TIME` | `-1` | Board cache seconds (-1 = disabled) |
-| `LOGIN_PAGE_MESSAGE` | `Contact an admin to get an account!` | Message that shows on the login page by default
-| `USE_ACCESS_TOKENS` | `true` | Use access tokens for POST authentication
-| `POSTGRES_HOST` | `db` | PostgreSQL host |
-| `POSTGRES_PORT` | `5432` | PostgreSQL port |
-| `POSTGRES_DB` | `pwnboard_db` | PostgreSQL database name |
-| `POSTGRES_USER` | `pwnboard_user` | PostgreSQL username |
-| `POSTGRES_PASSWORD` | `password` | PostgreSQL password |
-| `DATABASE_URL` | — | Optional full DSN override (`postgres://user:pass@host:5432/dbname`) |
 
 For a complete list of configuration options, see [doc/config.md](doc/config.md).
 
 ## Using PWNBoard
 
-See the [usage guide](doc/usage.md) for detailed instructions on how to actually use PWNBoard!
+See the [usage guide](doc/usage.md) for detailed instructions on how to send data to PWNBoard!
 
 ## Documentation
 
@@ -157,26 +125,7 @@ python3 scripts/sim_callbacks.py [/path/to/board/file]
 
 ## Troubleshooting/Known Issues
 
-### 1) Navbar shows wrong user/options (SHOULD BE FIXED NOW)
-> **Issue:** Home page navbar may show the wrong logged-in user and incorrect account options. The session details are correct, this is only a visual bug.
->
-> **Current workaround:** This should be working now. If it doesn't work and you need admin user management, go directly to `/manage_user_accounts` and open an issue on GitHub!
-
-### 2) POST requests are not appearing
-> **Issue:** Beacon/POST data is not showing up on PWNBoard.
->
-> **Check the following:**
-> - Confirm you are POSTing to the correct PWNBoard IP/URL.
-> - Confirm the `ip` field matches an IP address present on PWNBoard (sometimes tools will return the wrong IP address depending on how you gather it)
-> - Confirm the `application` field exactly matches your token's application name (if using Access Tokens).
-> - If necessary, tokens with application name `global` will ignore the application name in the POST request, so you can use this token for everything
-
-### 3) Self-signed certs and failed POST requests
-> **Issue:** POST requests fail when using self-signed certificates.
->
-> **Fix:** Disable certificate validation in your client/tool (for example: `curl -k ...`, `requests.post("...", verify=False)`, etc.).
-
-For more troubleshooting tips, check the bottom of the [setup guide](doc/setup.md).
+For troubleshooting tips, check the bottom of the [setup guide](doc/setup.md).
 
 ## Feature Wishlist
 
@@ -192,12 +141,12 @@ Contributions are welcome! Please:
 4. Test thoroughly
 5. Submit a Pull Request
 
-See [doc/DEVELOPMENT.md](doc/DEVELOPMENT.md) for detailed contribution guidelines.
+See [doc/development.md](doc/development.md) for detailed contribution guidelines.
 
 ## Acknowledgements
 
 This project builds upon the work of:
-- **[ztgrace/pwnboard](https://github.com/ztgrace/pwnboard)** — Original pwnboard implementation
+- **[ztgrace/pwnboard](https://github.com/ztgrace/pwnboard)** — Original PWNboard
 - **[nullmonk/pwnboard](https://github.com/nullmonk/pwnboard)** — Improvements for RIT Red Team
 - **[RITRedteam/Topology-Generator](https://github.com/RITRedteam/Topology-Generator)** — Topology generation tool
 

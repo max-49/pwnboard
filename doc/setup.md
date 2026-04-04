@@ -14,9 +14,26 @@ docker compose up -d
 
 ## Troubleshooting
 
-You might run into some issues while deploying the containers. Here are some issues that I ran into with solutions:
+### 1) Navbar shows wrong user/options (SHOULD BE FIXED NOW)
+> **Issue:** Home page navbar may show the wrong logged-in user and incorrect account options. The session details are correct, this is only a visual bug.
+>
+> **Current workaround:** This should be working now. If it doesn't work and you need admin user management, go directly to `/manage_user_accounts` and open an issue on GitHub!
 
-### Build hangs while installing packages on PWNBoard container
+### 2) POST requests are not appearing
+> **Issue:** Beacon/POST data is not showing up on PWNBoard.
+>
+> **Check the following:**
+> - Confirm you are POSTing to the correct PWNBoard IP/URL.
+> - Confirm the `ip` field matches an IP address present on PWNBoard (sometimes tools will return the wrong IP address depending on how you gather it)
+> - Confirm the `application` field exactly matches your token's application name (if using Access Tokens).
+> - If necessary, tokens with application name `global` will ignore the application name in the POST request, so you can use this token for everything
+
+### 3) Self-signed certs and failed POST requests
+> **Issue:** POST requests fail when using self-signed certificates.
+>
+> **Fix:** Disable certificate validation in your client/tool (for example: `curl -k ...`, `requests.post("...", verify=False)`, etc.).
+
+### 4) Build hangs while installing packages on PWNBoard container (development deploy, ghcr container should not have this issue)
 
 > Find networking interface using `ip a`. Check MTU of interface using `ip link show <interface>` and note the number next to `mtu`. Then run the following command and note the container MTU.
 
@@ -42,6 +59,8 @@ docker compose build --no-cache
 docker compose up -d
 ```
 
-2. Any error that says "disk quota exceeded"
+### 5) Any error that says "disk quota exceeded"
 
 > Try to increase the amount of space on whichever disk partition you are working on
+
+
