@@ -26,7 +26,6 @@
                     {% if session.get('role') != 'restricted' %}
                     <a class="dropdown-item" href="{{ url_for('account_settings') }}">Account Settings</a>
                     {% endif %}
-                    <a class="dropdown-item" href="{{ url_for('callbacks') }}">Graphs</a>
                     <div class="dropdown-divider"></div>
                     <a class="dropdown-item text-danger" href="{{ url_for('logout') }}">Logout</a>
                 </div>

@@ -1,5 +1,4 @@
 flask
-pandas
 markupsafe
 argon2-cffi
 gunicorn
