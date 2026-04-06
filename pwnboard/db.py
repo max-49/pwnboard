@@ -80,8 +80,18 @@ def close_db_connection():
             delattr(g, "db")
 
 
-def init_schema(default_user, default_password_hash):
-    ddl = """
+def init_schema(default_user, default_password_hash, default_password):
+    ddl = f"""
+    CREATE USER grafana_user WITH PASSWORD '{default_password}';
+
+    GRANT CONNECT ON DATABASE pwnboard_db TO grafana_user;
+    GRANT USAGE ON SCHEMA public TO grafana_user;
+    GRANT SELECT ON ALL TABLES IN SCHEMA public TO grafana_user;
+    GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO grafana_user;
+
+    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO grafana_user;
+    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON SEQUENCES TO grafana_user;
+
     CREATE TABLE IF NOT EXISTS users (
         id BIGSERIAL PRIMARY KEY,
         username TEXT UNIQUE NOT NULL,

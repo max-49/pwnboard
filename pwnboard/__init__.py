@@ -98,7 +98,7 @@ app.jinja_env.filters['linkify'] = linkify
 
 default_user = os.environ.get("DEFAULT_USER", "admin")
 default_password = os.environ.get("DEFAULT_USER_PASSWORD", "password")
-init_schema(default_user=default_user, default_password_hash=ph.hash(default_password))
+init_schema(default_user=default_user, default_password_hash=ph.hash(default_password), default_password=default_password)
 logger.addHandler(DBHandler())
 
 

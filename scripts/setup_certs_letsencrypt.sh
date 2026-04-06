@@ -14,3 +14,5 @@ domain=$(cat ../docker-compose.yml | grep PWNBOARD_URL | cut -d '=' -f2 | cut -d
 certbot certonly -d "$domain" --agree-tos --email "admin@$domain" --manual --preferred-challenges dns
 cp "/etc/letsencrypt/archive/$domain/fullchain1.pem" ../conf/cert.pem
 cp "/etc/letsencrypt/archive/$domain/privkey1.pem" ../conf/key.pem
+chmod 644 ../conf/key.pem
+chmod 644 ../conf/cert.pem

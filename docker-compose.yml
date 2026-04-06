@@ -9,15 +9,15 @@ services:
       - POSTGRES_PORT=5432
       - POSTGRES_DB=pwnboard_db
       - POSTGRES_USER=pwnboard_user
-      - POSTGRES_PASSWORD=password
-      - SECRET_KEY=change-me-please # Change this before deploy!
+      - POSTGRES_PASSWORD=${PWNBOARD_PASSWORD}
+      - SECRET_KEY=${SECRET_KEY} # Change this before deploy!
       - PWNBOARD_URL=https://127.0.0.1
       - CACHE_TIME=-1    # Seconds to cache data for. set to -1 to disable
       - REFRESH_SECONDS=10 # Seconds after which to refresh the page
       - HOST_TIMEOUT=5
       - CREDS_TIMEOUT=30
       - DEFAULT_USER=admin
-      - DEFAULT_USER_PASSWORD=password
+      - DEFAULT_USER_PASSWORD=${PWNBOARD_PASSWORD}
       - LOGIN_PAGE_MESSAGE=Contact an admin to get an account!
       - USE_ACCESS_TOKENS=true
     volumes:
@@ -31,17 +31,16 @@ services:
     environment:
       POSTGRES_DB: pwnboard_db
       POSTGRES_USER: pwnboard_user
-      POSTGRES_PASSWORD: password
+      POSTGRES_PASSWORD: ${PWNBOARD_PASSWORD}
     volumes:
       - pwnboard-data:/var/lib/postgresql/data
-      - ./scripts/init_postgres.sql:/docker-entrypoint-initdb.d/init.sql
 
   data:
     image: grafana/grafana:latest
     restart: always
     environment:
       - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=password
+      - GF_SECURITY_ADMIN_PASSWORD=${PWNBOARD_PASSWORD}
       - GF_INSTALL_PLUGINS=magnesium-wordcloud-panel
       - GF_SECURITY_ALLOW_EMBEDDING=true 
     volumes:

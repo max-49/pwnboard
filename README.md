@@ -47,20 +47,26 @@ Follow the steps in the script to define your hosts. This will generate a `board
 
 ### Environment Setup
 
-1. **Configure environment** (edit `docker-compose.yml`):
+1. **Configure environment**:
+
+Start by changing the values in the .env file. You must edit these for a secure configuration, especially if you are exposing PWNBoard to the internet.
+
    ```yaml
-   - SECRET_KEY=change-me-please # CHANGE THIS TO SOMETHING ELSE BEFORE DEPLOYING
+   SECRET_KEY=change-me-please # Flask secret used for signing session cookies
+   PWNBOARD_PASSWORD=password # Default password for PWNBoard/Grafana
+   ```
+
+Edit optional paramters in the docker-compose.yml file. Here are some variables that you can change to best suit your needs. PWNBOARD_URL should be changed for certificate generation purposes.
+
+   ```yaml
    - PWNBOARD_URL=https://pwnboard.win # Change this line to your full PWNBoard URL (https://domain[:port], ex. https://pwnboard.win, https://10.1.1.10:443). This is used in certificate generation
    - CACHE_TIME=-1 # Change this to a positive value to cache the board JSON for a certain amount of time. Might help with performance
    - REFRESH_SECONDS=10 # Change this to the amount of time (in seconds) after which you want your page to refresh with new data. Setting this to 0 or -1 will disable refreshing
    - HOST_TIMEOUT=5 # Change this to the amount of time (in minutes) after which callbacks should time out if an update is not received
    - CREDS_TIMEOUT=30 # Change this to the amount of time (in minutes) after which credentials should time out if an update is not received
-   - POSTGRES_PASSWORD=password # Database user password (if you change this, also change the variable in the db service)
    - DEFAULT_USER=admin # Change this to be your default admin user
-   - DEFAULT_USER_PASSWORD=password # Change this to be your default admin password (can be changed later in the GUI)
    - LOGIN_PAGE_MESSAGE=Contact an admin to get an account! # Change this if you want your welcome message on the home page to be different
    - USE_ACCESS_TOKENS=true # SET THIS TO FALSE IF YOU DO NOT WANT TO USE ACCESS TOKENS 
-   - GF_SECURITY_ADMIN_PASSWORD=password # This will be your Grafana password. Change this.
    ```
 
 2. **Set up HTTPS certificates**:
@@ -84,13 +90,13 @@ If using only internally resolvable DNS or just your IP address to access PWNboa
    docker compose up -d
    ```
 
-2. **Access the dashboard**:
+2. **Access the PWNBoard dashboard**:
    - Navigate to `PWNBOARD_URL` in your browser
    - Login with default credentials set up in environment variables!
 
 3. **Access Grafana**:
    - Navigate to `PWNBOARD_URL:8443` in your browser
-   - Login with admin:PASSWORD
+   - Login with admin:PWNBOARD_PASSWORD
 
 For detailed setup instructions and troubleshooting, see [doc/setup.md](doc/setup.md).
 

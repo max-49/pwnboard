@@ -1,6 +1,5 @@
 # Cert stuff
 *.pem
-*.env
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -152,7 +151,6 @@ activemq-data/
 *.sage.py
 
 # Environments
-.env
 .envrc
 .venv
 env/
