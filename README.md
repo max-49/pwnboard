@@ -62,12 +62,14 @@ Follow the steps in the script to define your hosts. This will generate a `board
    - USE_ACCESS_TOKENS=true # SET THIS TO FALSE IF YOU DO NOT WANT TO USE ACCESS TOKENS 
    ```
 
-2. **Set up HTTPS certificiates**:
+2. **Set up HTTPS certificates**:
+If using a domain that you own (ex. pwnboard.win, pwnboard.red.team, etc.), run this command to generate letsencrypt certificates for your domain.
    ```bash
    cd scripts
    sudo ./setup_certs_letsencrypt.sh
    ```
 
+If using only internally resolvable DNS or just your IP address to access PWNboard, run this command to generate self signed certificates. Keep in mind that you might have to jump through some extra hoops to POST data "insecurely".
    ```bash
    cd scripts
    sudo ./setup_certs_self_signed.sh
