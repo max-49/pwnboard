@@ -63,6 +63,7 @@ Follow the steps in the script to define your hosts. This will generate a `board
    ```
 
 2. **Set up HTTPS certificates**:
+
 If using a domain that you own (ex. pwnboard.win, pwnboard.red.team, etc.), run these commands to generate letsencrypt certificates for your domain.
    ```bash
    cd scripts
