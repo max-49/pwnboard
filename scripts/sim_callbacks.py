@@ -39,8 +39,22 @@ def get_board():
 
 def main():
     if (len(sys.argv) > 1):
-        board_path = sys.argv[1]
-    board = get_board()
+        try:
+            board_path = sys.argv[1]
+            with open(board_path, 'r') as f:
+                board_file = json.load(f)
+            board = []
+            subnets = board_file["board"]
+            for subnet in subnets:
+                hosts = subnet["hosts"]
+                for host in hosts:
+                    board.append(host["ip"])  
+        except:
+            print("Invalid board file")
+            exit(1)
+    else:
+        board = get_board()
+
     access_token = os.environ.get("ACCESS_TOKEN", None)
     if not access_token:
         access_token = input("Input your global access token (token with application name global): ").strip()

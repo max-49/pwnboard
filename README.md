@@ -63,13 +63,13 @@ Follow the steps in the script to define your hosts. This will generate a `board
    ```
 
 2. **Set up HTTPS certificates**:
-If using a domain that you own (ex. pwnboard.win, pwnboard.red.team, etc.), run this command to generate letsencrypt certificates for your domain.
+If using a domain that you own (ex. pwnboard.win, pwnboard.red.team, etc.), run these commands to generate letsencrypt certificates for your domain.
    ```bash
    cd scripts
    sudo ./setup_certs_letsencrypt.sh
    ```
 
-If using only internally resolvable DNS or just your IP address to access PWNboard, run this command to generate self signed certificates. Keep in mind that you might have to jump through some extra hoops to POST data "insecurely".
+If using only internally resolvable DNS or just your IP address to access PWNboard, run these commands to generate self signed certificates. Keep in mind that you might have to jump through some extra hoops to POST data "insecurely".
    ```bash
    cd scripts
    sudo ./setup_certs_self_signed.sh
@@ -104,7 +104,7 @@ See the [usage guide](doc/usage.md) for detailed instructions on how to send dat
 
 ## Testing your PWNBoard deployment
 
-The [sim_callbacks](scripts/sim_callbacks.py) testing tool can be used to test your PWNBoard deployment
+The [sim_callbacks](scripts/sim_callbacks.py) and [sim_creds](scripts/sim_creds.py) testing tools can be used to test your PWNBoard deployment!
 1. Log into PWNBoard
 
 2. If `USE_ACCESS_TOKENS=true`, create an access token at `/manage_apps` with the application name `global` and copy it. If you don't want to input it into the script, you can configure an environment variable `ACCESS_TOKEN` on your local machine.
@@ -113,12 +113,16 @@ The [sim_callbacks](scripts/sim_callbacks.py) testing tool can be used to test y
 ```bash
 python3 scripts/sim_callbacks.py [/path/to/board/file]
 ```
+or
+```bash
+python3 scripts/sim_creds.py [/path/to/board/file]
+```
 
 4. If board file was not specified, follow the script instructions to set up IP addresses to POST to
 
 5. Include your `global` Access Token when prompted (if using access tokens)
 
-6. Include the full POST endpoint URL of your PWNBoard (ex. https://www.pwnboard.win/pwn, https://10.1.1.11:8443/pwn)
+6. Include the full POST endpoint URL of your PWNBoard (ex. https://www.pwnboard.win/pwn, https://10.1.1.11:8443/pwn, https://www.redteam.win/creds)
 
 ## Troubleshooting/Known Issues
 
