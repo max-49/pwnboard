@@ -3,27 +3,8 @@ import datetime
 import time
 import os
 import copy
-import socket
-import requests
+
 from . import logger, BOARD, get_db
-
-DISCORD_WEBHOOK=os.environ.get("DISCORD_WEBHOOK", None)
-
-def send_discord(string):
-    if DISCORD_WEBHOOK is None:
-        return
-
-    hook_data = {
-        'content': string,
-        'username': 'PWNboard Bot',
-        'avatar_url': 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRGtJooqzY8OA0YNFuArgmbax3cOuSzXbdBnA&s',
-    }
-
-    try:
-        requests.post(DISCORD_WEBHOOK, json=hook_data, timeout=5)
-    except Exception as e:
-        print(f"Discord webhook error: {e}")
-
 
 def getEpoch():
     '''
@@ -129,7 +110,6 @@ def getActiveCallbacks(ip):
             # Check if callback exceeded timeout but is still marked as online
             elif time_delta >= host_timeout and online:
                 stale_apps.append(app_name)
-                # send_discord(f"LOST BEACON ON {ip}: {app_name}")
 
         if stale_apps:
             with db.cursor() as cur:

@@ -1,18 +1,21 @@
-FROM alpine:latest
+FROM python:3.12-alpine
 
+WORKDIR /opt/pwnboard
 EXPOSE 5000
 
-# Install package dependencies
-RUN apk add --update python3 py3-pip
-COPY requirements.txt /tmp/requirements.txt
-RUN python3 -m venv /opt/venv
+RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
-RUN pip3 install -r /tmp/requirements.txt
+
+# Install package dependencies
+COPY requirements.txt /tmp/requirements.txt
+RUN /opt/venv/bin/pip install --no-cache-dir -r /tmp/requirements.txt
 
 # Install the code
 COPY pwnboard.py /opt/pwnboard/
 COPY pwnboard/ /opt/pwnboard/pwnboard/
-WORKDIR /opt/pwnboard
+
+RUN addgroup -S pwnboard && adduser -S pwnboard -G pwnboard
+USER pwnboard
 
 # CMD ["python", "pwnboard.py"] # uncomment for non gunicorn deploy
-CMD /opt/venv/bin/gunicorn --bind 0.0.0.0:$FLASK_PORT --workers 3 --threads 4 pwnboard:app
+CMD ["/opt/venv/bin/gunicorn", "--bind", "0.0.0.0:$FLASK_PORT", "--workers", "3", "--threads", "4", "pwnboard:app"]
