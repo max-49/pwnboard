@@ -140,7 +140,7 @@ def init_schema(default_user, default_password_hash):
     CREATE TABLE IF NOT EXISTS credentials_by_user (
         ip INET NOT NULL,
         username TEXT NOT NULL,
-        creds TEXT NOT NULL,
+        password TEXT NOT NULL,
         server TEXT NOT NULL,
         last_seen DOUBLE PRECISION NOT NULL,
         creds_online BOOLEAN NOT NULL DEFAULT TRUE,
@@ -188,6 +188,23 @@ def init_schema(default_user, default_password_hash):
             conn.rollback()
             raise
 
+def clear_callbacks():
+    ddl = """
+    TRUNCATE TABLE hosts;
+    TRUNCATE TABLE callbacks;
+    TRUNCATE TABLE credentials_latest;
+    TRUNCATE TABLE credentials_by_user;
+    """
+
+    with pooled_connection() as conn:
+        conn.autocommit = False
+        try:
+            with conn.cursor() as cur:
+                cur.execute(ddl)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
 
 def dict_cursor(conn):
     return conn.cursor(cursor_factory=RealDictCursor)

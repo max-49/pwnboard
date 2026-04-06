@@ -407,7 +407,7 @@ def saveCredData(data):
                 VALUES (%s, %s, %s, %s, %s, TRUE, NOW())
                 ON CONFLICT (ip, username)
                 DO UPDATE SET
-                    creds = EXCLUDED.creds,
+                    password = EXCLUDED.password,
                     server = EXCLUDED.server,
                     last_seen = EXCLUDED.last_seen,
                     creds_online = TRUE,
