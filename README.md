@@ -17,7 +17,7 @@
 
 ## Overview
 
-PWNBoard provides a centralized dashboard for tracking compromised hosts, active beacons, and harvested credentials across multiple teams during red team operations. This fork enhances the original [ztgrace/pwnboard](https://github.com/ztgrace/pwnboard) and [nullmonk/pwnboard](https://github.com/nullmonk/pwnboard) projects with a lot of really cool features (trust)
+PWNBoard provides a centralized dashboard for tracking compromised hosts, active beacons, and harvested credentials across multiple teams during red team operations. This fork enhances the original [ztgrace/pwnboard](https://github.com/ztgrace/pwnboard) and [nullmonk/pwnboard](https://github.com/nullmonk/pwnboard) projects with a lot of really cool features
 
 ![PWNBoard](doc/img/pwnboard.png)
 
@@ -26,6 +26,7 @@ PWNBoard provides a centralized dashboard for tracking compromised hosts, active
 - Track active Red Team beacons and captured credentials in a visual dashboard
 - Optional tool authentication through access tokens
 - Easily manage multiple red teamers with RBAC features
+- Beautiful Grafana dashboard for visualizing data
 - Quick containerized deploy using Docker
 
 ## Quick Start
@@ -33,6 +34,8 @@ PWNBoard provides a centralized dashboard for tracking compromised hosts, active
 ### Prerequisites
 
 - Ensure the Docker Engine is installed on your machine
+- Python 3.x
+- This setup is optimized for UNIX devices. The Docker Compose will work on Windows, but you will have to find a way to generate your own certificates for HTTPS
 
 ### Board Setup
 
@@ -49,14 +52,14 @@ Follow the steps in the script to define your hosts. This will generate a `board
 
 1. **Configure environment**:
 
-Start by changing the values in the .env file. You must edit these for a secure configuration, especially if you are exposing PWNBoard to the internet.
+Start by changing the values in the `.env` file. You must edit these for a secure configuration, especially if you are exposing PWNBoard to the internet.
 
    ```yaml
    SECRET_KEY=change-me-please # Flask secret used for signing session cookies
    PWNBOARD_PASSWORD=password # Default password for PWNBoard/Grafana
    ```
 
-Edit optional paramters in the docker-compose.yml file. Here are some variables that you can change to best suit your needs. PWNBOARD_URL should be changed for certificate generation purposes.
+Edit optional paramters in the docker-compose.yml file. Here are some variables that you can change to best suit your needs. At minimum, `PWNBOARD_URL` should be changed for certificate generation purposes.
 
    ```yaml
    - PWNBOARD_URL=https://pwnboard.win # Change this line to your full PWNBoard URL (https://domain[:port], ex. https://pwnboard.win, https://10.1.1.10:443). This is used in certificate generation
@@ -64,20 +67,22 @@ Edit optional paramters in the docker-compose.yml file. Here are some variables 
    - REFRESH_SECONDS=10 # Change this to the amount of time (in seconds) after which you want your page to refresh with new data. Setting this to 0 or -1 will disable refreshing
    - HOST_TIMEOUT=5 # Change this to the amount of time (in minutes) after which callbacks should time out if an update is not received
    - CREDS_TIMEOUT=30 # Change this to the amount of time (in minutes) after which credentials should time out if an update is not received
-   - DEFAULT_USER=admin # Change this to be your default admin user
+   - DEFAULT_USER=admin # This will be your default user
    - LOGIN_PAGE_MESSAGE=Contact an admin to get an account! # Change this if you want your welcome message on the home page to be different
-   - USE_ACCESS_TOKENS=true # SET THIS TO FALSE IF YOU DO NOT WANT TO USE ACCESS TOKENS 
+   - USE_ACCESS_TOKENS=true # Set this to false to disable the use of access tokens for authenticating POST requests
    ```
 
 2. **Set up HTTPS certificates**:
 
 If using a domain that you own (ex. pwnboard.win, pwnboard.red.team, etc.), run these commands to generate letsencrypt certificates for your domain.
+
    ```bash
    cd scripts
    sudo ./setup_certs_letsencrypt.sh
    ```
 
 If using only internally resolvable DNS or just your IP address to access PWNboard, run these commands to generate self signed certificates. Keep in mind that you might have to jump through some extra hoops to POST data "insecurely".
+
    ```bash
    cd scripts
    sudo ./setup_certs_self_signed.sh
