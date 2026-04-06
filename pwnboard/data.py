@@ -325,7 +325,7 @@ def saveData(data):
             cur.execute(
                 """
                 INSERT INTO callback_events(ip, team, application, access_info, last_seen, received_at)
-                VALUES (%s, %s, %s, %s, NOW())
+                VALUES (%s, %s, %s, %s, %s, NOW())
                 """,
                 (data['ip'], team, data['application'], data['access_info'], data['last_seen']),
             )
