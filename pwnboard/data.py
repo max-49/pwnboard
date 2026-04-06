@@ -323,6 +323,14 @@ def saveData(data):
         with db.cursor() as cur:
             cur.execute(
                 """
+                INSERT INTO callback_events(ip, application, access_info, last_seen, received_at)
+                VALUES (%s, %s, %s, %s, NOW())
+                """,
+                (data['ip'], data['application'], data['access_info'], data['last_seen']),
+            )
+
+            cur.execute(
+                """
                 INSERT INTO callbacks(ip, application, access_info, last_seen, online, updated_at)
                 VALUES (%s, %s, %s, %s, TRUE, NOW())
                 ON CONFLICT (ip, application)

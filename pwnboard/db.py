@@ -128,6 +128,19 @@ def init_schema(default_user, default_password_hash):
     CREATE INDEX IF NOT EXISTS idx_callbacks_ip ON callbacks(ip);
     CREATE INDEX IF NOT EXISTS idx_callbacks_last_seen ON callbacks(last_seen);
 
+    CREATE TABLE IF NOT EXISTS callback_events (
+        id BIGSERIAL PRIMARY KEY,
+        ip INET NOT NULL,
+        application TEXT NOT NULL,
+        access_info TEXT NOT NULL DEFAULT '',
+        last_seen DOUBLE PRECISION NOT NULL,
+        received_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_callback_events_ip ON callback_events(ip);
+    CREATE INDEX IF NOT EXISTS idx_callback_events_application_received_at ON callback_events(application, received_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_callback_events_received_at ON callback_events(received_at);
+
     CREATE TABLE IF NOT EXISTS credentials_latest (
         ip INET PRIMARY KEY,
         creds TEXT NOT NULL,
@@ -192,6 +205,7 @@ def clear_callbacks():
     ddl = """
     TRUNCATE TABLE hosts;
     TRUNCATE TABLE callbacks;
+    TRUNCATE TABLE callback_events;
     TRUNCATE TABLE credentials_latest;
     TRUNCATE TABLE credentials_by_user;
     """
