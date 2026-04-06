@@ -60,6 +60,7 @@ Follow the steps in the script to define your hosts. This will generate a `board
    - DEFAULT_USER_PASSWORD=password # Change this to be your default admin password (can be changed later in the GUI)
    - LOGIN_PAGE_MESSAGE=Contact an admin to get an account! # Change this if you want your welcome message on the home page to be different
    - USE_ACCESS_TOKENS=true # SET THIS TO FALSE IF YOU DO NOT WANT TO USE ACCESS TOKENS 
+   - GF_SECURITY_ADMIN_PASSWORD=password # This will be your Grafana password. Change this.
    ```
 
 2. **Set up HTTPS certificates**:
@@ -86,6 +87,10 @@ If using only internally resolvable DNS or just your IP address to access PWNboa
 2. **Access the dashboard**:
    - Navigate to `PWNBOARD_URL` in your browser
    - Login with default credentials set up in environment variables!
+
+3. **Access Grafana**:
+   - Navigate to `PWNBOARD_URL:8443` in your browser
+   - Login with admin:PASSWORD
 
 For detailed setup instructions and troubleshooting, see [doc/setup.md](doc/setup.md).
 
