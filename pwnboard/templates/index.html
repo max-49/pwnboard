@@ -149,12 +149,41 @@
             (function(){
                 var refreshSeconds = {{ refresh_seconds|int }};
                 var reloadMs = refreshSeconds * 1000;
+                var stateKeyPrefix = 'pwnboard:' + window.location.pathname + window.location.search;
+                var openModalKey = stateKeyPrefix + ':open_modal';
+                var scrollPosKey = stateKeyPrefix + ':scroll_y';
+
+                function saveScrollPosition() {
+                    try {
+                        sessionStorage.setItem(scrollPosKey, String(window.pageYOffset || window.scrollY || 0));
+                    } catch (e) { /* ignore */ }
+                }
+
+                function restoreScrollPosition() {
+                    try {
+                        var raw = sessionStorage.getItem(scrollPosKey);
+                        if (raw === null) return;
+                        var y = parseInt(raw, 10);
+                        if (!isNaN(y)) {
+                            // Defer slightly so layout and table sizing have settled.
+                            requestAnimationFrame(function(){
+                                window.scrollTo(0, y);
+                            });
+                        }
+                    } catch (e) { /* ignore */ }
+                }
+
+                // Persist scroll position for both auto-refresh and manual reload/navigation.
+                window.addEventListener('beforeunload', saveScrollPosition);
+                window.addEventListener('pagehide', saveScrollPosition);
+                window.addEventListener('scroll', saveScrollPosition, { passive: true });
 
                 if (reloadMs > 0) {
                     // Periodically reload only if no modal is currently shown
                     setInterval(function(){
                         try{
                             if (document.querySelectorAll('.modal.show').length === 0) {
+                                saveScrollPosition();
                                 window.location.reload();
                             }
                         } catch(e) { /* ignore */ }
@@ -167,24 +196,25 @@
                     try {
                         // move modal node to body so position:fixed works correctly on mobile
                         $(this).appendTo(document.body);
-                        sessionStorage.setItem('open_modal', this.id);
+                        sessionStorage.setItem(openModalKey, this.id);
                     } catch(e){}
                 });
 
                 $(document).on('hide.bs.modal', '.modal', function(){
-                    try { sessionStorage.removeItem('open_modal'); } catch(e){}
+                    try { sessionStorage.removeItem(openModalKey); } catch(e){}
                 });
 
                 // On load, reopen any modal that was open before refresh
                 $(document).ready(function(){
+                    restoreScrollPosition();
                     try{
-                        var id = sessionStorage.getItem('open_modal');
+                        var id = sessionStorage.getItem(openModalKey);
                         if (id) {
                             var el = document.getElementById(id);
                             if (el) {
                                 $('#' + id).modal('show');
                             } else {
-                                sessionStorage.removeItem('open_modal');
+                                sessionStorage.removeItem(openModalKey);
                             }
                         }
                     } catch(e) { /* ignore */ }
