@@ -18,4 +18,4 @@ RUN addgroup -S pwnboard && adduser -S pwnboard -G pwnboard
 USER pwnboard
 
 # CMD ["python", "pwnboard.py"] # uncomment for non gunicorn deploy
-CMD ["/bin/sh", "-c", "/opt/venv/bin/gunicorn --bind 0.0.0.0:$FLASK_PORT --workers 3 --threads 4 pwnboard:app"]
+CMD /opt/venv/bin/gunicorn --bind 0.0.0.0:$FLASK_PORT --workers 3 --threads 4 pwnboard:app
