@@ -131,6 +131,7 @@ def init_schema(default_user, default_password_hash):
     CREATE TABLE IF NOT EXISTS callback_events (
         id BIGSERIAL PRIMARY KEY,
         ip INET NOT NULL,
+        team TEXT NOT NULL,
         application TEXT NOT NULL,
         access_info TEXT NOT NULL DEFAULT '',
         last_seen DOUBLE PRECISION NOT NULL,

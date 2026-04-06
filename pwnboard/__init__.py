@@ -14,6 +14,7 @@ from .logging_handler import DBHandler
 from .db import init_pool, init_schema, get_db_connection, close_db_connection
 
 BOARD = []
+TEAM_MAP = {}
 IP_SET = set()
 USE_ACCESS_TOKENS = os.environ.get("USE_ACCESS_TOKENS", True)
 
@@ -34,6 +35,7 @@ def loadBoard():
             ip = host.get("ip")
             if ip:
                 IP_SET.add(ip)
+                TEAM_MAP[ip] = host.get("team")
 
 # Create the Flask app
 app = Flask(__name__)

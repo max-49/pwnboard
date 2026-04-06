@@ -4,7 +4,7 @@ import time
 import os
 import copy
 
-from . import logger, BOARD, get_db
+from . import logger, BOARD, TEAM_MAP, get_db
 
 def getEpoch():
     '''
@@ -317,16 +317,17 @@ def saveData(data):
     data['message'] = data['message'] if 'message' in data else "Callback received to {}".format(data['server'])
     data['access_type'] = data['access_type'] if 'access_type' in data else "generic"
     data['access_info'] = data['access_info'] if 'access_info' in data else ""
+    team = TEAM_MAP[data['ip']]
 
     db = get_db()
     try:
         with db.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO callback_events(ip, application, access_info, last_seen, received_at)
+                INSERT INTO callback_events(ip, team, application, access_info, last_seen, received_at)
                 VALUES (%s, %s, %s, %s, NOW())
                 """,
-                (data['ip'], data['application'], data['access_info'], data['last_seen']),
+                (data['ip'], team, data['application'], data['access_info'], data['last_seen']),
             )
 
             cur.execute(
