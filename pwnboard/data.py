@@ -178,8 +178,8 @@ def getHostData(ip):
             return status
 
         # Handle creds but no callbacks
-        status['Last Creds'] = creds
-        status['Last Creds Received'] = "{}m".format(creds_last)
+        status['Valid Creds'] = "Yes"
+        # status['Last Creds Received'] = "{}m".format(creds_last)
         if creds_last and creds_last > int(os.environ.get("CREDS_TIMEOUT", 30)):
             status['creds_online'] = ""
         else:
@@ -257,8 +257,8 @@ def getHostData(ip):
     status['all_valid_callbacks'] = active_callbacks
     
     if (creds is not None):
-        status['Last Creds'] = creds
-        status['Last Creds Received'] = "{}m".format(creds_last)
+        status['Valid Creds'] = "Yes"
+        # status['Last Creds Received'] = "{}m".format(creds_last)
         status['Active Creds'] = total_creds
 
     return status
