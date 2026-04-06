@@ -4,7 +4,6 @@ from flask import request, session, render_template, make_response, url_for, red
 import os
 import logging
 import copy
-import pandas as pd
 
 from .authentication import verifyUser
 from .data import getBoardDict, getEpoch, getAlert
@@ -91,69 +90,6 @@ def index():
     html = render_template('index.html', error=error, theme=theme,
                            board=board, teams=BOARD['teams'], refresh_seconds=REFRESH_SECONDS)
     return make_response(html)
-
-@app.route("/graphs")
-@login_required
-def callbacks():
-    # Read logs and build a time-series of callback counts per application.
-    # We adapt the resampling frequency based on the total time span so the
-    # chart remains readable for short and long time ranges.
-    try:
-        conn = get_logs_db()
-        df = pd.read_sql_query("SELECT * FROM logs", conn, parse_dates=["timestamp"])
-    except Exception:
-        # If the DB is missing/corrupt, render an empty chart
-        df = pd.DataFrame(columns=["timestamp", "app"])
-
-    if df.empty:
-        graph_data = {"timestamps": [], "series": []}
-        return render_template("graphs.html", graph_data=graph_data)
-
-    # Ensure timestamp is a datetime and sorted
-    df["timestamp"] = pd.to_datetime(df["timestamp"])
-    df = df.sort_values("timestamp")
-
-    start = df["timestamp"].min()
-    end = df["timestamp"].max()
-    span = end - start
-
-    # Choose an appropriate resample frequency based on span
-    if span <= pd.Timedelta(days=2):
-        freq = '1min'
-    elif span <= pd.Timedelta(days=14):
-        freq = '15min'
-    elif span <= pd.Timedelta(days=90):
-        freq = '1H'
-    else:
-        freq = '1D'
-
-    # Pivot into a time-indexed table of counts per application, resampled to the chosen freq
-    try:
-        counts = (df.set_index('timestamp')
-                    .groupby([pd.Grouper(freq=freq), 'app'])
-                    .size()
-                    .unstack(fill_value=0)
-                    .sort_index())
-    except Exception:
-        # Fallback to minute-level grouping if something goes wrong
-        counts = df.groupby(['app', pd.Grouper(key='timestamp', freq='1min')]).size().unstack(0).fillna(0)
-
-    # Ensure a deterministic ordering of apps (columns)
-    apps = list(counts.columns)
-
-    # Convert timestamps to ISO-like strings for the frontend
-    timestamps = [ts.strftime("%Y-%m-%d %H:%M:%S") for ts in counts.index]
-
-    series = []
-    for app_name in apps:
-        series.append({
-            'name': app_name,
-            'values': counts[app_name].tolist()
-        })
-
-    graph_data = {"timestamps": timestamps, "series": series}
-    return render_template("graphs.html", graph_data=graph_data)
-
 
 @app.route('/manage_apps')
 @login_required

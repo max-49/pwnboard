@@ -1,0 +1,16 @@
+apiVersion: 1
+
+datasources:
+  - name: PWNBoard Postgres
+    type: postgres
+    access: proxy
+    url: db:5432
+    user: grafana_user
+    secureJsonData:
+      password: 'password'
+    jsonData:
+      database: pwnboard_db
+      sslmode: 'disable'
+      postgresVersion: 15
+    isDefault: true
+    editable: false

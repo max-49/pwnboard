@@ -4,7 +4,7 @@ import time
 import os
 import copy
 
-from . import logger, BOARD, get_db
+from . import logger, BOARD, TEAM_MAP, get_db
 
 def getEpoch():
     '''
@@ -178,8 +178,8 @@ def getHostData(ip):
             return status
 
         # Handle creds but no callbacks
-        status['Last Creds'] = creds
-        status['Last Creds Received'] = "{}m".format(creds_last)
+        status['Valid Creds'] = "Yes"
+        # status['Last Creds Received'] = "{}m".format(creds_last)
         if creds_last and creds_last > int(os.environ.get("CREDS_TIMEOUT", 30)):
             status['creds_online'] = ""
         else:
@@ -257,8 +257,8 @@ def getHostData(ip):
     status['all_valid_callbacks'] = active_callbacks
     
     if (creds is not None):
-        status['Last Creds'] = creds
-        status['Last Creds Received'] = "{}m".format(creds_last)
+        status['Valid Creds'] = "Yes"
+        # status['Last Creds Received'] = "{}m".format(creds_last)
         status['Active Creds'] = total_creds
 
     return status
@@ -317,10 +317,19 @@ def saveData(data):
     data['message'] = data['message'] if 'message' in data else "Callback received to {}".format(data['server'])
     data['access_type'] = data['access_type'] if 'access_type' in data else "generic"
     data['access_info'] = data['access_info'] if 'access_info' in data else ""
+    team = TEAM_MAP[data['ip']]
 
     db = get_db()
     try:
         with db.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO callback_events(ip, team, application, access_info, last_seen, received_at)
+                VALUES (%s, %s, %s, %s, %s, NOW())
+                """,
+                (data['ip'], team, data['application'], data['access_info'], data['last_seen']),
+            )
+
             cur.execute(
                 """
                 INSERT INTO callbacks(ip, application, access_info, last_seen, online, updated_at)

@@ -32,7 +32,7 @@ def gen_board(data):
         row['name'] = host.get('name', host.get('ip'))
         row['hosts'] = []
         for team in data['teams']:
-            row['hosts'].append({'ip': host['ip'].replace("x", str(team))})
+            row['hosts'].append({'ip': host['ip'].replace("x", str(team)), 'team': str(team)})
         board.append(row)
     return board
 

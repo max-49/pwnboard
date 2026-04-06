@@ -11,7 +11,7 @@ services:
       - POSTGRES_USER=pwnboard_user
       - POSTGRES_PASSWORD=password
       - SECRET_KEY=change-me-please # Change this before deploy!
-      - PWNBOARD_URL=https://pwnboard.win
+      - PWNBOARD_URL=https://127.0.0.1
       - CACHE_TIME=-1    # Seconds to cache data for. set to -1 to disable
       - REFRESH_SECONDS=10 # Seconds after which to refresh the page
       - HOST_TIMEOUT=5
@@ -36,27 +36,29 @@ services:
       - pwnboard-data:/var/lib/postgresql/data
       - ./scripts/init_postgres.sql:/docker-entrypoint-initdb.d/init.sql
 
-  # data:
-  #   image: metabase/metabase:latest
-  #   restart: always
-  #   environment:
-  #     MB_DB_TYPE: postgres
-  #     MB_DB_DBNAME: metabase_db
-  #     MB_DB_PORT: 5432
-  #     MB_DB_USER: metabase_user # user from init_postgres.sql
-  #     MB_DB_PASS: password
-  #     MB_DB_HOST: db
-  #   depends_on:
-  #     - db
+  data:
+    image: grafana/grafana:latest
+    restart: always
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=password
+      - GF_INSTALL_PLUGINS=magnesium-wordcloud-panel
+      - GF_SECURITY_ALLOW_EMBEDDING=true 
+    volumes:
+      - ./conf/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./conf/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./conf/grafana/provisioning/dashboards:/var/lib/grafana/dashboards
+    depends_on:
+      - db
 
   reverse-proxy:
     image: httpd:alpine
     restart: always
     ports:
       - "443:443"
-      # - "8443:8443"
+      - "8443:8443"
     volumes:
-      - ./conf/httpd.conf:/usr/local/apache2/conf/httpd.conf:ro
+      - ./conf/reverse_proxy/httpd.conf:/usr/local/apache2/conf/httpd.conf:ro
       - ./conf/cert.pem:/usr/local/apache2/conf/cert.pem
       - ./conf/key.pem:/usr/local/apache2/conf/key.pem
 

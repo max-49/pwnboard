@@ -2,6 +2,6 @@ services:
   pwnboard:
     build:
       context: .
-      dockerfile: ../Dockerfile
+      dockerfile: Dockerfile
     image: pwnboard:dev
     pull_policy: never
