@@ -36,6 +36,7 @@ def loadBoard():
             if ip:
                 IP_SET.add(ip)
                 TEAM_MAP[ip] = host.get("team")
+                del host["team"]
 
 # Create the Flask app
 app = Flask(__name__)
