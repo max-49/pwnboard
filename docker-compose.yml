@@ -45,9 +45,9 @@ services:
       - GF_INSTALL_PLUGINS=magnesium-wordcloud-panel
       - GF_SECURITY_ALLOW_EMBEDDING=true 
     volumes:
-      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
-      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
-      - ./grafana/provisioning/dashboards:/var/lib/grafana/dashboards
+      - ./conf/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./conf/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./conf/grafana/provisioning/dashboards:/var/lib/grafana/dashboards
     depends_on:
       - db
 
@@ -58,7 +58,7 @@ services:
       - "443:443"
       - "8443:8443"
     volumes:
-      - ./conf/httpd.conf:/usr/local/apache2/conf/httpd.conf:ro
+      - ./conf/reverse_proxy/httpd.conf:/usr/local/apache2/conf/httpd.conf:ro
       - ./conf/cert.pem:/usr/local/apache2/conf/cert.pem
       - ./conf/key.pem:/usr/local/apache2/conf/key.pem
 
