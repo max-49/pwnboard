@@ -81,8 +81,19 @@ def close_db_connection():
 
 
 def init_schema(default_user, default_password_hash, default_password):
+    escaped_default_password = default_password.replace("'", "''")
     ddl = f"""
-    CREATE USER grafana_user WITH PASSWORD '{default_password}';
+    DO $$
+    BEGIN
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'grafana_user'
+        ) THEN
+            CREATE USER grafana_user WITH PASSWORD '{escaped_default_password}';
+        ELSE
+            ALTER USER grafana_user WITH PASSWORD '{escaped_default_password}';
+        END IF;
+    END
+    $$;
 
     GRANT CONNECT ON DATABASE pwnboard_db TO grafana_user;
     GRANT USAGE ON SCHEMA public TO grafana_user;
