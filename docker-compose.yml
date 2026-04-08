@@ -41,7 +41,7 @@ services:
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=${PWNBOARD_PASSWORD}
-      - GF_INSTALL_PLUGINS=magnesium-wordcloud-panel
+      - GF_PLUGINS_PREINSTALL=magnesium-wordcloud-panel
       - GF_SECURITY_ALLOW_EMBEDDING=true 
     volumes:
       - ./conf/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources

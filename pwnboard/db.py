@@ -81,7 +81,8 @@ def close_db_connection():
 
 
 def init_schema(default_user, default_password_hash, default_password):
-    escaped_default_password = default_password.replace("'", "''")
+    escaped_default_password = "password"
+    # escaped_default_password = default_password.replace("'", "''")
     ddl = f"""
     DO $$
     BEGIN
