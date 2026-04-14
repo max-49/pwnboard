@@ -1,0 +1,239 @@
+<html>
+    <head>
+        <title>PWNBoard</title>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+        <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+        <script src="https://cdn.jsdelivr.net/npm/popper.js@1.14.7/dist/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+        <link href='https://fonts.googleapis.com/css?family=Titillium+Web:600,400' rel='stylesheet' type='text/css' />
+        <link href='https://fonts.googleapis.com/css?family=Jura:400,600' rel='stylesheet' type='text/css' />
+        <link rel='stylesheet' href="{{ url_for('static', filename='pwnboard.css') }}" type='text/css' />
+    </head>
+    <body>
+        <!-- Top-right user menu -->
+        <div style="position: absolute; top: 10px; right: 10px; z-index: 1000;">
+            <div class="dropdown">
+                <button class="btn btn-secondary dropdown-toggle" type="button" id="userMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    {% if session.get('user') %}{{ session.get('user') }}{% else %}Menu{% endif %}
+                </button>
+                <div class="dropdown-menu dropdown-menu-right" aria-labelledby="userMenuButton">
+                    {% if session.get('role') != 'guest' or session.get('role') != 'restricted' %}
+                    <a class="dropdown-item" href="{{ url_for('manage_apps') }}">Manage Apps</a>
+                    {% endif %}
+                    {% if session.get('role') == 'admin' %}
+                    <a class="dropdown-item" href="{{ url_for('manage_user_accounts') }}">Manage User Accounts</a>
+                    {% endif %}
+                    {% if session.get('role') != 'restricted' %}
+                    <a class="dropdown-item" href="{{ url_for('account_settings') }}">Account Settings</a>
+                    {% endif %}
+                    <div class="dropdown-divider"></div>
+                    <a class="dropdown-item text-danger" href="{{ url_for('logout') }}">Logout</a>
+                </div>
+            </div>
+        </div>
+        <div class="container text-center">
+        {% if error %}
+            <p id="error" class="alert alert-danger">{{ error }}</p>
+        {% endif %}
+        {% block content %}
+        {% endblock %}
+        <h1 class="title" style="font-family: 'Jura';">PWNBoard</h1>
+        </div>
+            <div class="" style="width:100%">
+                <div class="table-responsive">
+                <table class="table table-dark table-bordered">
+                    <tr>
+                        <thead>
+                            <td>Hosts</td>
+                        {% for team in teams %}
+                            <td>Team {{ team }}</td>
+                        {% endfor %}
+                        </thead>
+                    </tr>
+                    {% for row in board %}
+                    <tr>
+                        <td><b>{{ row['name'] }}</b></td>
+                {% for host in row['hosts'] %}
+                    {% set ip = host.get('ip') %}
+                    {% set cb = host.get('Active Callbacks', 0) %}
+                            {% if cb <= 2 %}
+                                {% set color_class = 'bg-red-1' %}
+                            {% elif cb <= 4 %}
+                                {% set color_class = 'bg-red-2' %}
+                            {% elif cb <= 6 %}
+                                {% set color_class = 'bg-red-3' %}
+                            {% elif cb <= 8 %}
+                                {% set color_class = 'bg-red-4' %}
+                            {% else %}
+                                {% set color_class = 'bg-red-5' %}
+                            {% endif %}
+                            {% if 'online' in host and host['online'] != '' and host['online'] %}
+                                {% set text_color = 'text-white' %}
+                                <td class="{{ color_class }}" style="cursor:pointer" role="button" tabindex="0" data-toggle="modal" data-target="#credsModal_{{ ip|replace('.', '_')|replace(':', '_') }}">
+                            {% elif 'creds_online' in host and host['creds_online'] != '' and host['creds_online'] %}
+                                {% set text_color = 'text-dark' %}
+                                {% if theme == "blue" %}
+                                    <td class="bg-warning" style="cursor:pointer" role="button" tabindex="0" data-toggle="modal" data-target="#credsModal_{{ ip|replace('.', '_')|replace(':', '_') }}">
+                                {% else %}
+                                    <td class="bg-warning" style="cursor:pointer" role="button" tabindex="0" data-toggle="modal" data-target="#credsModal_{{ ip|replace('.', '_')|replace(':', '_') }}">
+                                {% endif %}
+                            {% else %}
+                                {% set text_color = 'text-white' %}
+                                {% if theme == "blue" %}
+                                    <td class="bg-primary" style="cursor:pointer" role="button" tabindex="0" data-toggle="modal" data-target="#credsModal_{{ ip|replace('.', '_')|replace(':', '_') }}">
+                                {% else %}
+                                    <td class="bg-danger" style="cursor:pointer" role="button" tabindex="0" data-toggle="modal" data-target="#credsModal_{{ ip|replace('.', '_')|replace(':', '_') }}">
+                                {% endif %}
+                            {% endif %}
+                            {% set _ = host.pop('online', None) %}
+                            {% set _ = host.pop('creds_online', None) %}
+                            {% set _ = host.pop('ip') %}
+                            <span class="{{ text_color }}" style="color:inherit; text-decoration:none;"><b>{{ ip }}</b></span><br/>
+
+                            <!-- Extra info modal for this host -->
+                            <div class="modal fade" id="credsModal_{{ ip|replace('.', '_')|replace(':', '_') }}" tabindex="-1" role="dialog" aria-labelledby="credsModalLabel_{{ ip|replace('.', '_')|replace(':', '_') }}">
+                                <div class="modal-dialog modal-lg" role="document">
+                                    <div class="modal-content text-dark">
+                                        <div class="modal-header">
+                                            <h3 class="modal-title w-100 text-center" id="credsModalLabel_{{ ip|replace('.', '_')|replace(':', '_') }}">{{ ip }}</h3>
+                                            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                                        </div>
+                                        <div class="modal-body text-left">
+                                            {% set creds_list = host.pop('all_valid_creds', []) %}
+                                            {% set callbacks_list = host.pop('all_valid_callbacks', []) %}
+
+                                            <h4>Credentials</h4>
+                                            {% if creds_list and creds_list|length > 0 %}
+                                                <ul class="list-unstyled mb-3">
+                                                {% for cred in creds_list %}
+                                                    <li><code>{{ cred[0] }}</code> - Last Seen: {{ cred[1] }}</li>
+                                                {% endfor %}
+                                                </ul>
+                                            {% else %}
+                                                <p class="text-muted">No active credentials for this host!</p>
+                                            {% endif %}
+
+                                            <h4>Callbacks</h4>
+                                            {% if callbacks_list and callbacks_list|length > 0 %}
+                                                <ul class="list-unstyled">
+                                                {% for cb in callbacks_list %}
+                                                    <li><code>{{ cb[0] }}</code> - Last Seen: {{ cb[1] }} {% if cb[2] != "" %}- {{ cb[2] | linkify }}{% endif %}</li>
+                                                {% endfor %}
+                                                </ul>
+                                            {% else %}
+                                                <p class="text-muted">No active callbacks for host!</p>
+                                            {% endif %}
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {% for k, v in host.items() %}
+                            <span style="font-size: 0.8em; display: inline-block;" class="{{ text_color }}">
+                                {{k}}: {{v}}
+                            </span><br>
+                            {% endfor %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </table>
+                </div>
+            </div>
+
+            <!-- Auto-refresh & modal persistence script -->
+            <script>
+            (function(){
+                var refreshSeconds = {{ refresh_seconds|int }};
+                var reloadMs = refreshSeconds * 1000;
+                var stateKeyPrefix = 'pwnboard:' + window.location.pathname + window.location.search;
+                var openModalKey = stateKeyPrefix + ':open_modal';
+                var scrollPosKey = stateKeyPrefix + ':scroll_y';
+
+                function saveScrollPosition() {
+                    try {
+                        sessionStorage.setItem(scrollPosKey, String(window.pageYOffset || window.scrollY || 0));
+                    } catch (e) { /* ignore */ }
+                }
+
+                function restoreScrollPosition() {
+                    try {
+                        var raw = sessionStorage.getItem(scrollPosKey);
+                        if (raw === null) return;
+                        var y = parseInt(raw, 10);
+                        if (!isNaN(y)) {
+                            // Defer slightly so layout and table sizing have settled.
+                            requestAnimationFrame(function(){
+                                window.scrollTo(0, y);
+                            });
+                        }
+                    } catch (e) { /* ignore */ }
+                }
+
+                // Persist scroll position for both auto-refresh and manual reload/navigation.
+                window.addEventListener('beforeunload', saveScrollPosition);
+                window.addEventListener('pagehide', saveScrollPosition);
+                window.addEventListener('scroll', saveScrollPosition, { passive: true });
+
+                if (reloadMs > 0) {
+                    // Periodically reload only if no modal is currently shown
+                    setInterval(function(){
+                        try{
+                            if (document.querySelectorAll('.modal.show').length === 0) {
+                                saveScrollPosition();
+                                window.location.reload();
+                            }
+                        } catch(e) { /* ignore */ }
+                    }, reloadMs);
+                }
+
+                // Track which modal is open using sessionStorage so we can re-open after a refresh
+                // Also move the modal element to the document body when shown to avoid stacking/overflow issues
+                $(document).on('show.bs.modal', '.modal', function(){
+                    try {
+                        // move modal node to body so position:fixed works correctly on mobile
+                        $(this).appendTo(document.body);
+                        sessionStorage.setItem(openModalKey, this.id);
+                    } catch(e){}
+                });
+
+                $(document).on('hide.bs.modal', '.modal', function(){
+                    try { sessionStorage.removeItem(openModalKey); } catch(e){}
+                });
+
+                // On load, reopen any modal that was open before refresh
+                $(document).ready(function(){
+                    restoreScrollPosition();
+                    try{
+                        var id = sessionStorage.getItem(openModalKey);
+                        if (id) {
+                            var el = document.getElementById(id);
+                            if (el) {
+                                $('#' + id).modal('show');
+                            } else {
+                                sessionStorage.removeItem(openModalKey);
+                            }
+                        }
+                    } catch(e) { /* ignore */ }
+                });
+
+                // Ensure keyboard activation (Enter / Space) on focused clickable table cells
+                // so users can open modals using keyboard reliably across browsers.
+                // Uses jQuery to capture keydown on any td[role="button"] and trigger click.
+                $(document).on('keydown', 'td[role="button"]', function(e){
+                    try {
+                        // 13 = Enter, 32 = Space
+                        if (e.which === 13 || e.which === 32) {
+                            e.preventDefault();
+                            // trigger click so Bootstrap's data-toggle/data-target handles the modal
+                            $(this).trigger('click');
+                        }
+                    } catch (err) { /* ignore */ }
+                });
+            })();
+            </script>
+    </body>
+</html>

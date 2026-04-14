@@ -1,0 +1,125 @@
+#!/usr/bin/env python3
+from flask import request, session, render_template, make_response, url_for, redirect, abort
+
+import os
+import logging
+import copy
+
+from .authentication import verifyUser
+from .data import getBoardDict, getEpoch, getAlert
+from . import app, BOARD, get_logs_db, login_required, admin_required, USE_ACCESS_TOKENS
+
+# The cache of the main board page
+try:
+    BOARDCACHE_TIMEOUT = int(os.environ.get('CACHE_TIME', -1))  # -1 means disabled
+except (TypeError, ValueError):
+    BOARDCACHE_TIMEOUT = -1
+BOARDCACHE = ""
+BOARDCACHE_TIME = 0
+BOARDCACHE_UPDATED = True
+LOGIN_PAGE_MESSAGE = os.environ.get("LOGIN_PAGE_MESSAGE", "Contact an admin to make an account!")
+REFRESH_SECONDS = os.environ.get("REFRESH_SECONDS", 10)
+
+def mark_board_cache_dirty():
+    """Mark in-memory board cache as stale."""
+    global BOARDCACHE_UPDATED
+    BOARDCACHE_UPDATED = True
+
+@app.route("/", methods=['GET'])
+def login():
+    # If already authenticated, redirect to dashboard
+    if session.get('user'):
+        return redirect(url_for('index'))
+    return render_template("login.html", LOGIN_PAGE_MESSAGE=LOGIN_PAGE_MESSAGE)
+
+@app.route("/", methods=['POST'])
+def login_post():
+    username = request.form.get('username', '').strip()
+    password = request.form.get('password', '')
+    if not username or not password:
+        return render_template('login.html', LOGIN_PAGE_MESSAGE=LOGIN_PAGE_MESSAGE, error='Username and password required')
+    
+    login_res = verifyUser(username, password)
+    if login_res:
+        session['user'] = login_res[0]
+        session['role'] = login_res[1]
+        return redirect(url_for('index'))
+    else:
+        return render_template('login.html', LOGIN_PAGE_MESSAGE=LOGIN_PAGE_MESSAGE, error='Invalid username or password')
+
+@app.route('/pwnboard', methods=['GET'])
+@login_required
+def index():
+    '''
+    Return the board with the most recent data (cached for 10 seconds)
+    '''
+    log = logging.getLogger('werkzeug')
+    board = None
+    error = None
+
+    # Find the time since the last cache
+    # The server will return the cache in two situations
+    #  1. It has been less than 'cache_time' since the last cache
+    #  2. There has been no new data since the last cache AND the cache is
+    #     younger than 30 seconds
+    if BOARDCACHE_TIMEOUT > 0:
+        global BOARDCACHE
+        global BOARDCACHE_TIME
+        global BOARDCACHE_UPDATED
+        ctime = getEpoch() - BOARDCACHE_TIME
+        if BOARDCACHE and (ctime < BOARDCACHE_TIMEOUT or
+                (not BOARDCACHE_UPDATED and ctime < 30)):
+            log.info("Pulling board data from cache")
+            error = BOARDCACHE.get('error', "")
+            board = copy.deepcopy(BOARDCACHE.get('board', []))
+
+    # Build fresh board data when cache is disabled/expired/missing
+    if board is None:
+        error = getAlert()
+        board = getBoardDict()
+        if BOARDCACHE_TIMEOUT > 0:
+            BOARDCACHE_TIME = getEpoch()
+            BOARDCACHE = {
+                'error': error,
+                'board': copy.deepcopy(board)
+            }
+            BOARDCACHE_UPDATED = False
+
+    # Always render HTML per-request so session-specific navbar data stays accurate
+    theme = os.environ.get('PWN_THEME', "blue")
+    html = render_template('index.html', error=error, theme=theme,
+                           board=board, teams=BOARD['teams'], refresh_seconds=REFRESH_SECONDS)
+    return make_response(html)
+
+@app.route('/manage_apps')
+@login_required
+def manage_apps():
+    # Guests are not allowed to manage apps or create tokens
+    if session.get('role') == 'guest' or session.get('role') == 'restricted':
+        abort(403)
+    return render_template('manage_apps.html', USE_ACCESS_TOKENS=str(USE_ACCESS_TOKENS).upper())
+
+
+@app.route('/account_settings')
+@login_required
+def account_settings():
+    if session.get('role') == 'restricted':
+        abort(403)
+    return render_template('account_settings.html')
+
+
+@app.route('/manage_user_accounts')
+@login_required
+@admin_required
+def manage_user_accounts():
+    """Admin-only Manage User Accounts page."""
+    # Only allow users with admin role
+    if session.get('role') != 'admin':
+        abort(403)
+    return render_template('manage_user_accounts.html')
+
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))

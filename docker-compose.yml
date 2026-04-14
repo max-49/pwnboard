@@ -1,7 +1,7 @@
 services:
   pwnboard:
     image: ghcr.io/max-49/pwnboard:latest
-    restart: always
+    restart: unless-stopped
     environment:
       - FLASK_DEBUG=false
       - FLASK_PORT=5000
@@ -49,7 +49,7 @@ services:
 
   data:
     image: grafana/grafana:latest
-    restart: always
+    restart: unless-stopped
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=${PWNBOARD_PASSWORD}
@@ -70,7 +70,7 @@ services:
       - "443:443"
       - "8443:8443"
     volumes:
-      - ./conf/Caddyfile:/etc/caddy/Caddyfile
+      - ./conf/reverse-proxy/Caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data
       - caddy_config:/config
     environment:
