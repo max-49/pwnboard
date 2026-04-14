@@ -4,7 +4,8 @@ import time
 import os
 import copy
 
-from . import logger, BOARD, TEAM_MAP, get_db
+from . import logger, get_db
+from .board_config import BOARD, TEAM_MAP
 
 def getEpoch():
     '''
@@ -22,11 +23,11 @@ def getBoardDict(db_conn=None):
     board = copy.deepcopy(BOARD['board'])
     for row in board:
         for _host in row['hosts']:
-            _host.update(getHostData(_host['ip']))
+            _host.update(getHostData(_host['ip'], db_conn=db_conn))
     return board
 
 def getActiveCreds(ip, db_conn=None):
-    db = get_db()
+    db = db_conn or get_db()
     try:
         total_creds = 0
         all_valid_creds = []
@@ -77,7 +78,7 @@ def getActiveCreds(ip, db_conn=None):
     return total_creds, all_valid_creds
 
 def getActiveCallbacks(ip, db_conn=None):
-    db = get_db()
+    db = db_conn or get_db()
     try:
         num_valid_callbacks = 0
         active_callbacks = []
@@ -136,8 +137,8 @@ def getHostData(ip, db_conn=None):
     last_seen - The last known callback time
     type - The last service the host called back through
     '''
-    db = get_db()
-    server = app = last = message = online = access_type = None
+    db = db_conn or get_db()
+    server = app = last = message = online = None
     creds_last = creds = creds_online = None
 
     # Request the data from PostgreSQL
@@ -200,7 +201,7 @@ def getHostData(ip, db_conn=None):
         except Exception:
             db.rollback()
 
-        total_creds, all_valid_creds = getActiveCreds(ip)
+        total_creds, all_valid_creds = getActiveCreds(ip, db_conn=db)
         status['Active Creds'] = total_creds
         status['all_valid_creds'] = all_valid_creds
 
@@ -223,8 +224,8 @@ def getHostData(ip, db_conn=None):
         status['creds_online'] = ''
 
     # get num valid callbacks
-    num_valid_callbacks, active_callbacks = getActiveCallbacks(ip)
-    total_creds, all_valid_creds = getActiveCreds(ip)
+    num_valid_callbacks, active_callbacks = getActiveCallbacks(ip, db_conn=db)
+    total_creds, all_valid_creds = getActiveCreds(ip, db_conn=db)
     
     # Write status booleans to the database
     try:

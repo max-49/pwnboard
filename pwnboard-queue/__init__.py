@@ -12,32 +12,13 @@ from functools import wraps
 from argon2 import PasswordHasher
 from markupsafe import Markup, escape
 from .logging_handler import DBHandler
+from .board_config import BOARD, TEAM_MAP, IP_SET
 from .db import init_pool, init_schema, get_db_connection, close_db_connection
 
-BOARD = []
-TEAM_MAP = {}
-IP_SET = set()
+BOARD = BOARD
+TEAM_MAP = TEAM_MAP
+IP_SET = IP_SET
 USE_ACCESS_TOKENS = os.environ.get("USE_ACCESS_TOKENS", True)
-
-# Load the board.json file
-def loadBoard():
-    global BOARD
-    global IP_SET
-    fil = os.environ.get("BOARD", "board.json")
-    try:
-        with open(fil) as fil:
-            BOARD = json.load(fil)
-    except FileNotFoundError:
-        print("Please generate a board.json file first! See doc/config.md")
-        exit(1)
-    
-    for row in BOARD.get("board", []):
-        for host in row.get("hosts", []):
-            ip = host.get("ip")
-            if ip:
-                IP_SET.add(ip)
-                TEAM_MAP[ip] = f"Team {host.get('team')}"
-                del host["team"]
 
 # Create the Flask app
 app = Flask(__name__)
@@ -45,7 +26,6 @@ app.config['STATIC_FOLDER'] = "lib/static"
 # Basic secret key for session support (override in production)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret')
 logger = logging.getLogger('pwnboard')
-loadBoard()
 
 r = redis.StrictRedis(host="redis", port=6379, decode_responses=True)
 ph = PasswordHasher()

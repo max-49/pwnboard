@@ -7,7 +7,7 @@ import copy
 import json
 
 from .authentication import verifyUser
-from .data import getBoardDict, getEpoch, getAlert
+from .data import getBoardDict, getEpoch
 from . import app, BOARD, r, login_required, admin_required, USE_ACCESS_TOKENS
 
 LOGIN_PAGE_MESSAGE = os.environ.get("LOGIN_PAGE_MESSAGE", "Contact an admin to make an account!")

@@ -4,21 +4,148 @@ import redis
 import threading
 from psycopg2.extras import execute_values
 
-# Import from your existing pwnboard modules
 from db import pooled_connection, init_pool
 from data import getBoardDict
-from . import TEAM_MAP
+from .board_config import TEAM_MAP
 
 init_pool()
 r = redis.StrictRedis(host="redis", port=6379, decode_responses=True)
 
 cache_update_event = threading.Event()
 
-def process_creds(batch_json, db):
-    pass
-
 def process_callbacks(batch_json, db):
-    pass
+    if not batch_json: return
+    
+    events_data = []
+    latest_hosts = {}
+    latest_callbacks = {}
+
+    # Since we RPOP, the batch is older -> newer.
+    for item in batch_json:
+        data = json.loads(item)
+        ip = data['ip']
+        app = data.get('application', 'unknown')
+        access_info = data.get('access_info', '')
+        last_seen = data.get('last_seen', 0)
+        server = data.get('server', 'pwnboard')
+        message = data.get('message', f"Callback received to {server}")
+        team = TEAM_MAP.get(ip, "Unknown")
+
+        # 1. Every event goes to the historical log
+        events_data.append((ip, team, app, access_info, last_seen))
+
+        # 2. Deduplicate state tables by dict key assignment (Newer events overwrite older ones)
+        latest_callbacks[(ip, app)] = (ip, app, access_info, last_seen)
+        latest_hosts[ip] = (ip, app, message, server, last_seen)
+
+    with db.cursor() as cur:
+        # Insert all historical events
+        execute_values(
+            cur,
+            """
+            INSERT INTO callback_events(ip, team, application, access_info, last_seen, received_at)
+            VALUES %s
+            """,
+            events_data,
+            template="(%s, %s, %s, %s, %s, NOW())"
+        )
+
+        # Insert latest callback states
+        if latest_callbacks:
+            execute_values(
+                cur,
+                """
+                INSERT INTO callbacks(ip, application, access_info, last_seen, online, updated_at)
+                VALUES %s
+                ON CONFLICT (ip, application) DO UPDATE SET
+                    access_info = EXCLUDED.access_info,
+                    last_seen = EXCLUDED.last_seen,
+                    online = TRUE,
+                    updated_at = NOW()
+                """,
+                list(latest_callbacks.values()),
+                template="(%s, %s, %s, %s, TRUE, NOW())"
+            )
+
+        # Insert latest host states
+        if latest_hosts:
+            execute_values(
+                cur,
+                """
+                INSERT INTO hosts(ip, application, message, server, last_seen, online, updated_at)
+                VALUES %s
+                ON CONFLICT (ip) DO UPDATE SET
+                    application = EXCLUDED.application,
+                    message = EXCLUDED.message,
+                    server = EXCLUDED.server,
+                    last_seen = EXCLUDED.last_seen,
+                    online = TRUE,
+                    updated_at = NOW()
+                """,
+                list(latest_hosts.values()),
+                template="(%s, %s, %s, %s, %s, TRUE, NOW())"
+            )
+
+def process_creds(batch_json, db):
+    if not batch_json: return
+    
+    latest_creds_by_user = {}
+    latest_creds_by_ip = {}
+
+    for item in batch_json:
+        data = json.loads(item)
+        ip = data['ip']
+        username = data.get('username')
+        password = data.get('password')
+        
+        if not password or len(password) <= 1:
+            continue
+
+        server = data.get('server', 'pwnboard')
+        last_seen = data.get('last_seen', 0)
+        is_admin = data.get('admin', 0)
+        
+        credstring = f"{'* ' if is_admin == 1 else ''}{username}:{password}"
+
+        # Deduplicate
+        latest_creds_by_user[(ip, username)] = (ip, username, password, server, last_seen)
+        latest_creds_by_ip[ip] = (ip, credstring, server, last_seen)
+
+    with db.cursor() as cur:
+        if latest_creds_by_user:
+            execute_values(
+                cur,
+                """
+                INSERT INTO credentials_by_user(ip, username, password, server, last_seen, creds_online, updated_at)
+                VALUES %s
+                ON CONFLICT (ip, username) DO UPDATE SET
+                    password = EXCLUDED.password,
+                    server = EXCLUDED.server,
+                    last_seen = EXCLUDED.last_seen,
+                    creds_online = TRUE,
+                    updated_at = NOW()
+                """,
+                list(latest_creds_by_user.values()),
+                template="(%s, %s, %s, %s, %s, TRUE, NOW())"
+            )
+
+        if latest_creds_by_ip:
+            execute_values(
+                cur,
+                """
+                INSERT INTO credentials_latest(ip, creds, server, last_seen, creds_online, updated_at)
+                VALUES %s
+                ON CONFLICT (ip) DO UPDATE SET
+                    creds = EXCLUDED.creds,
+                    server = EXCLUDED.server,
+                    last_seen = EXCLUDED.last_seen,
+                    creds_online = TRUE,
+                    updated_at = NOW()
+                """,
+                list(latest_creds_by_ip.values()),
+                template="(%s, %s, %s, %s, TRUE, NOW())"
+            )
+
 
 def ingest_thread():
     print("Background worker started. Listening to Redis queues...")
@@ -47,6 +174,7 @@ def ingest_thread():
             print(f"Worker Error: {e}")
             time.sleep(2)
 
+
 def cache_thread():
     print("Cache thread started...")
     while True:
@@ -65,5 +193,14 @@ def cache_thread():
             print(f"Cache Generation Error: {e}")
             time.sleep(2)
 
+
+def main():
+    # Start board cache generation thread on a different thread
+    t_cache = threading.Thread(target=cache_thread, daemon=True)
+    t_cache.start()
+
+    # Start redis queue ingestion thread on this thread
+    ingest_thread()
+
 if (__name__ == '__main__'):
-    pass
+    main()
