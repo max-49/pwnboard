@@ -12,18 +12,14 @@ def _build_dsn():
     database_url = os.environ.get("DATABASE_URL")
     if database_url:
         return database_url
-
-    host = os.environ.get("POSTGRES_HOST", os.environ.get("PGHOST", "localhost"))
-    port = os.environ.get("POSTGRES_PORT", os.environ.get("PGPORT", "5432"))
-    dbname = os.environ.get("POSTGRES_DB", os.environ.get("PGDATABASE", "pwnboard_db"))
-    user = os.environ.get("POSTGRES_USER", os.environ.get("PGUSER", "pwnboard_user"))
-    password = os.environ.get("POSTGRES_PASSWORD", os.environ.get("PGPASSWORD", "password"))
+    
+    password = os.environ.get("POSTGRES_PASSWORD", "password")
 
     return (
-        f"host={host} "
-        f"port={port} "
-        f"dbname={dbname} "
-        f"user={user} "
+        f"host=db "
+        f"port=5432 "
+        f"dbname=pwnboard_db "
+        f"user=pwnboard_user "
         f"password={password} "
         "connect_timeout=5"
     )
@@ -132,7 +128,6 @@ def init_schema(default_user, default_password_hash, default_password):
         application TEXT NOT NULL,
         last_seen DOUBLE PRECISION NOT NULL,
         message TEXT NOT NULL,
-        access_type TEXT NOT NULL DEFAULT 'generic',
         online BOOLEAN NOT NULL DEFAULT TRUE,
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
@@ -186,12 +181,6 @@ def init_schema(default_user, default_password_hash, default_password):
 
     CREATE INDEX IF NOT EXISTS idx_credentials_by_user_ip ON credentials_by_user(ip);
     CREATE INDEX IF NOT EXISTS idx_credentials_by_user_last_seen ON credentials_by_user(last_seen);
-
-    CREATE TABLE IF NOT EXISTS alerts (
-        id SMALLINT PRIMARY KEY CHECK (id = 1),
-        event_time DOUBLE PRECISION,
-        message TEXT
-    );
 
     CREATE TABLE IF NOT EXISTS logs (
         id BIGSERIAL PRIMARY KEY,

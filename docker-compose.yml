@@ -5,10 +5,6 @@ services:
     environment:
       - FLASK_DEBUG=false
       - FLASK_PORT=5000
-      - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=pwnboard_db
-      - POSTGRES_USER=pwnboard_user
       - POSTGRES_PASSWORD=${PWNBOARD_PASSWORD}
       - SECRET_KEY=${SECRET_KEY}
       - PWNBOARD_URL=https://${PWNBOARD_DOMAIN}
@@ -43,6 +39,8 @@ services:
     image: ghcr.io/max-49/pwnboard:latest
     command: /opt/venv/bin/python worker.py
     restart: unless-stopped
+    volumes:
+      - ./board.json:/opt/pwnboard/board.json:ro
     depends_on:
       - db
       - redis

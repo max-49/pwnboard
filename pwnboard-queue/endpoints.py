@@ -4,15 +4,15 @@ from flask import request, session, jsonify, Response
 import re
 import csv
 import io
+import json
 from .authentication import *
-from .data import getEpoch, saveData, saveCredData
-from .routes import mark_board_cache_dirty
+from .data import getEpoch
+# from .routes import mark_board_cache_dirty
 from .db import dict_cursor
 
-from . import app, logger, IP_SET, get_db, login_required, admin_required, USE_ACCESS_TOKENS
+from . import app, logger, IP_SET, get_db, r, login_required, admin_required, USE_ACCESS_TOKENS
 
 @app.route('/checkin', methods=['POST'])
-@app.route('/generic', methods=['POST'])
 @app.route('/pwn', methods=['POST'])
 def callback():
     """Handle when a server registers an callback"""
@@ -23,47 +23,44 @@ def callback():
     data['last_seen'] = getEpoch()
 
     # Make sure 'application' is in the data
-    if 'application' not in data and 'type' not in data:
-        return "Invalid: Missing 'application' or 'type' in the request", 400
-
-    if 'type' in data: data['application'] = data['type']
+    if 'application' not in data:
+        return "Invalid: Missing 'application' field in the request", 400
 
     if USE_ACCESS_TOKENS:
         auth_header = request.headers.get('Authorization')
 
         if not auth_header:
-            return "Not authorized\n", 401
-
+            return "Not authorized. This server uses Access Tokens to authenticate requests!\n", 401
         
         auth_header_split = auth_header.split(' ')
         if auth_header_split[0].strip().lower() != "bearer":
-            return "Please use Bearer Token\n", 401
+            return "Please use Bearer Token (and Bearer keyword)\n", 401
         
         token = auth_header_split[1].strip()
 
         verification = verifyAccessToken(token, data['application'])
 
         if (verification == False):
-            return "Not authorized\n", 401
+            return "Not authorized! Ensure 'application' field matches PWNBoard app name.\n", 401
 
     if 'ips' in data and isinstance(data['ips'], list):
         for ip in data['ips']:
-            d = dict(data)
-            d['ip'] = ip
             if ip in IP_SET:
-                saveData(d)
+                # Create a copy for the specific IP and push to Redis
+                d = dict(data)
+                d['ip'] = ip
+                r.lpush('callback_queue', json.dumps(d))
             else:
                 return 'invalid IP\n', 400
     elif 'ip' in data:
         if data['ip'] in IP_SET:
-            saveData(data)
+            r.lpush('callback_queue', json.dumps(data))
         else:
             return 'invalid IP\n', 400
     else:
         return 'invalid POST\n', 400
-    # Tell routes cache that new data has come in
-    mark_board_cache_dirty()
-    return "valid\n"
+    return "valid\n", 200
+
 
 @app.route('/creds', methods=['POST'])
 def creds_callback():
@@ -86,37 +83,38 @@ def creds_callback():
         auth_header = request.headers.get('Authorization')
 
         if not auth_header:
-            return "Not authorized\n", 401
-
+            return "Not authorized. This server uses Access Tokens to authenticate requests!\n", 401
+        
         auth_header_split = auth_header.split(' ')
         if auth_header_split[0].strip().lower() != "bearer":
-            return "Please use Bearer Token\n", 401
-
+            return "Please use Bearer Token (and Bearer keyword)\n", 401
+        
         token = auth_header_split[1].strip()
 
         verification = verifyAccessToken(token, data['application'])
 
         if (verification == False):
-            return "Not authorized\n", 401
+            return "Not authorized! Ensure 'application' field matches PWNBoard app name.\n", 401
 
     if 'ips' in data and isinstance(data['ips'], list):
         for ip in data['ips']:
-            d = dict(data)
-            d['ip'] = ip
             if ip in IP_SET:
-                saveCredData(d)
+                d = dict(data)
+                d['ip'] = ip
+                r.lpush('cred_queue', json.dumps(d))
             else:
                 return 'invalid IP\n', 400
     elif 'ip' in data:
         if data['ip'] in IP_SET:
-            saveCredData(data)
+            r.lpush('cred_queue', json.dumps(data))
         else:
             return 'invalid IP\n', 400
     else:
         return 'invalid POST\n', 400
     # Tell routes cache that new data has come in
-    mark_board_cache_dirty()
-    return "valid\n"
+    # mark_board_cache_dirty()
+    return "valid\n", 200
+
 
 @app.route('/admin/users', methods=['GET'])
 @login_required

@@ -13,7 +13,7 @@ def getEpoch():
     return time.mktime(datetime.datetime.now().timetuple())
 
 
-def getBoardDict():
+def getBoardDict(db_conn=None):
     '''
     Generate a game board based on the config file
     Get all the DB info for each host
@@ -25,7 +25,7 @@ def getBoardDict():
             _host.update(getHostData(_host['ip']))
     return board
 
-def getActiveCreds(ip):
+def getActiveCreds(ip, db_conn=None):
     db = get_db()
     try:
         total_creds = 0
@@ -76,7 +76,7 @@ def getActiveCreds(ip):
 
     return total_creds, all_valid_creds
 
-def getActiveCallbacks(ip):
+def getActiveCallbacks(ip, db_conn=None):
     db = get_db()
     try:
         num_valid_callbacks = 0
@@ -129,7 +129,7 @@ def getActiveCallbacks(ip):
 
     return num_valid_callbacks, active_callbacks
 
-def getHostData(ip):
+def getHostData(ip, db_conn=None):
     '''
     Get the host data for a single host.
     Returns and array with the following information:
@@ -144,7 +144,7 @@ def getHostData(ip):
     with db.cursor() as cur:
         cur.execute(
             """
-            SELECT server, application, last_seen, message, online, access_type
+            SELECT server, application, last_seen, message, online
             FROM hosts
             WHERE ip = %s
             """,
@@ -153,7 +153,7 @@ def getHostData(ip):
         host_row = cur.fetchone()
 
         if host_row:
-            server, app, last, message, online, access_type = host_row
+            server, app, last, message, online = host_row
 
         cur.execute(
             """
@@ -182,6 +182,7 @@ def getHostData(ip):
         # status['Last Creds Received'] = "{}m".format(creds_last)
         if creds_last and creds_last > int(os.environ.get("CREDS_TIMEOUT", 30)):
             status['creds_online'] = ""
+            status['Valid Creds'] = "No"
         else:
             status['creds_online'] = "True"
         
@@ -250,7 +251,6 @@ def getHostData(ip):
 
     status['Last Seen'] = "{}m".format(last)
     status['Type'] = app
-    status['Access Type'] = access_type
     status['Active Callbacks'] = num_valid_callbacks
 
     status['all_valid_creds'] = all_valid_creds
@@ -262,29 +262,6 @@ def getHostData(ip):
         status['Active Creds'] = total_creds
 
     return status
-
-
-def getAlert():
-    '''
-    Pull the alert message from PostgreSQL if it is recent.
-    Return nothing if it is not recent
-    '''
-    db = get_db()
-    with db.cursor() as cur:
-        cur.execute('SELECT event_time, message FROM alerts WHERE id = 1;')
-        row = cur.fetchone()
-
-    if not row:
-        return ""
-
-    event_time, msg = row
-    time = getTimeDelta(event_time)
-    if time is None or msg is None:
-        return ""
-    # If the time is within X minutes, display the message
-    if time < int(os.environ.get('ALERT_TIMEOUT', 2)):
-        return msg
-    return ""
 
 
 def getTimeDelta(ts):
@@ -315,7 +292,6 @@ def saveData(data):
 
     data['server'] = data['server'] if 'server' in data else "pwnboard"
     data['message'] = data['message'] if 'message' in data else "Callback received to {}".format(data['server'])
-    data['access_type'] = data['access_type'] if 'access_type' in data else "generic"
     data['access_info'] = data['access_info'] if 'access_info' in data else ""
     team = TEAM_MAP[data['ip']]
 
@@ -346,12 +322,11 @@ def saveData(data):
 
             cur.execute(
                 """
-                INSERT INTO hosts(ip, application, access_type, message, server, last_seen, online, updated_at)
+                INSERT INTO hosts(ip, application, message, server, last_seen, online, updated_at)
                 VALUES (%s, %s, %s, %s, %s, %s, TRUE, NOW())
                 ON CONFLICT (ip)
                 DO UPDATE SET
                     application = EXCLUDED.application,
-                    access_type = EXCLUDED.access_type,
                     message = EXCLUDED.message,
                     server = EXCLUDED.server,
                     last_seen = EXCLUDED.last_seen,
@@ -361,7 +336,6 @@ def saveData(data):
                 (
                     data['ip'],
                     data['application'],
-                    data['access_type'],
                     data['message'],
                     data['server'],
                     data['last_seen'],

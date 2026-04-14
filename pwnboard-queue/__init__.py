@@ -6,6 +6,7 @@ from flask import Flask, g, session, redirect, url_for
 import re
 import os
 import json
+import redis
 import logging
 from functools import wraps
 from argon2 import PasswordHasher
@@ -46,6 +47,7 @@ app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret')
 logger = logging.getLogger('pwnboard')
 loadBoard()
 
+r = redis.StrictRedis(host="redis", port=6379, decode_responses=True)
 ph = PasswordHasher()
 
 logfil = ""
@@ -100,7 +102,6 @@ default_user = os.environ.get("DEFAULT_USER", "admin")
 default_password = os.environ.get("DEFAULT_USER_PASSWORD", "password")
 init_schema(default_user=default_user, default_password_hash=ph.hash(default_password), default_password=default_password)
 logger.addHandler(DBHandler())
-
 
 def get_db():
     """Return a per-request PostgreSQL connection stored on flask.g."""
