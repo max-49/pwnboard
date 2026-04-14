@@ -7,7 +7,7 @@ datasources:
     url: db:5432
     user: grafana_user
     secureJsonData:
-      password: 'password'
+      password: 'pwnB0ard-p4ssw0rd1#'
     jsonData:
       database: pwnboard_db
       sslmode: 'disable'
