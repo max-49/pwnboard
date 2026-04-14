@@ -10,8 +10,8 @@ services:
       - POSTGRES_DB=pwnboard_db
       - POSTGRES_USER=pwnboard_user
       - POSTGRES_PASSWORD=${PWNBOARD_PASSWORD}
-      - SECRET_KEY=${SECRET_KEY} # Change this before deploy!
-      - PWNBOARD_URL=https://127.0.0.1
+      - SECRET_KEY=${SECRET_KEY}
+      - PWNBOARD_URL=https://${PWNBOARD_DOMAIN}
       - CACHE_TIME=-1    # Seconds to cache data for. set to -1 to disable
       - REFRESH_SECONDS=10 # Seconds after which to refresh the page
       - HOST_TIMEOUT=5
@@ -25,6 +25,10 @@ services:
     depends_on:
       - db
 
+  redis:
+    image: redis:alpine
+    restart: unless-stopped
+
   db:
     image: postgres:15-alpine
     restart: always
@@ -34,6 +38,14 @@ services:
       POSTGRES_PASSWORD: ${PWNBOARD_PASSWORD}
     volumes:
       - pwnboard-data:/var/lib/postgresql/data
+
+  worker:
+    image: ghcr.io/max-49/pwnboard:latest
+    command: /opt/venv/bin/python worker.py
+    restart: unless-stopped
+    depends_on:
+      - db
+      - redis
 
   data:
     image: grafana/grafana:latest
@@ -51,15 +63,18 @@ services:
       - db
 
   reverse-proxy:
-    image: httpd:alpine
-    restart: always
+    image: caddy:latest
+    restart: unless-stopped
     ports:
+      - "80:80"
       - "443:443"
       - "8443:8443"
     volumes:
-      - ./conf/reverse_proxy/httpd.conf:/usr/local/apache2/conf/httpd.conf:ro
-      - ./conf/cert.pem:/usr/local/apache2/conf/cert.pem
-      - ./conf/key.pem:/usr/local/apache2/conf/key.pem
+      - ./conf/Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      - PWNBOARD_DOMAIN=${PWNBOARD_DOMAIN}
 
 volumes:
   pwnboard-data:

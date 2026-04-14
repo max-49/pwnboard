@@ -1,0 +1,19 @@
+# Global options block
+{
+
+}
+
+
+# PWNBoard Route with request_buffers
+{$PWNBOARD_DOMAIN} {
+    reverse_proxy pwnboard:5000 {
+        # This buffers incoming POST payloads up to 5MB before sending them
+        request_buffers 5MB 
+    }
+}
+
+
+# Grafana Route
+{$PWNBOARD_DOMAIN}:8443 {
+    reverse_proxy data:3000
+}
