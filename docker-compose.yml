@@ -34,11 +34,18 @@ services:
       POSTGRES_PASSWORD: ${PWNBOARD_PASSWORD}
     volumes:
       - pwnboard-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pwnboard_user -d pwnboard_db"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
 
   worker:
     image: ghcr.io/max-49/pwnboard:latest
-    command: /opt/venv/bin/python worker.py
+    command: /opt/venv/bin/python /opt/pwnboard/pwnboard/worker.py
     restart: unless-stopped
+    environment:
+      - PYTHONPATH=/opt/pwnboard
     volumes:
       - ./board.json:/opt/pwnboard/board.json:ro
     depends_on:
@@ -76,3 +83,5 @@ services:
 
 volumes:
   pwnboard-data:
+  caddy_data:
+  caddy_config:

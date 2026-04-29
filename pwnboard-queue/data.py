@@ -278,130 +278,128 @@ def getTimeDelta(ts):
         return None
 
 
-def saveData(data):
-    '''
-    Parse updates that come in via POST to the server.
+# def saveData(data):
+#     '''
+#     Parse updates that come in via POST to the server.
 
-    'ip' and 'application' are required in the data
-    '''
+#     'ip' and 'application' are required in the data
+#     '''
 
-    # Don't accept callback from no IP or loopback
-    if str(data.get('ip', '127.0.0.1')).lower() in ["127.0.0.1", "none", None, "null"]:
-        return
+#     # Don't accept callback from no IP or loopback
+#     if str(data.get('ip', '127.0.0.1')).lower() in ["127.0.0.1", "none", None, "null"]:
+#         return
 
-    logger.debug("updated beacon for {} from {}".format(data['ip'], data['application']))
+#     logger.debug("updated beacon for {} from {}".format(data['ip'], data['application']))
 
-    data['server'] = data['server'] if 'server' in data else "pwnboard"
-    data['message'] = data['message'] if 'message' in data else "Callback received to {}".format(data['server'])
-    data['access_info'] = data['access_info'] if 'access_info' in data else ""
-    team = TEAM_MAP[data['ip']]
+#     data['server'] = data['server'] if 'server' in data else "pwnboard"
+#     data['message'] = data['message'] if 'message' in data else "Callback received to {}".format(data['server'])
+#     data['access_info'] = data['access_info'] if 'access_info' in data else ""
+#     team = TEAM_MAP[data['ip']]
 
-    db = get_db()
-    try:
-        with db.cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO callback_events(ip, team, application, access_info, last_seen, received_at)
-                VALUES (%s, %s, %s, %s, %s, NOW())
-                """,
-                (data['ip'], team, data['application'], data['access_info'], data['last_seen']),
-            )
+#     db = get_db()
+#     try:
+#         with db.cursor() as cur:
+#             cur.execute(
+#                 """
+#                 INSERT INTO callback_events(ip, team, application, access_info, last_seen, received_at)
+#                 VALUES (%s, %s, %s, %s, %s, NOW())
+#                 """,
+#                 (data['ip'], team, data['application'], data['access_info'], data['last_seen']),
+#             )
 
-            cur.execute(
-                """
-                INSERT INTO callbacks(ip, application, access_info, last_seen, online, updated_at)
-                VALUES (%s, %s, %s, %s, TRUE, NOW())
-                ON CONFLICT (ip, application)
-                DO UPDATE SET
-                    access_info = EXCLUDED.access_info,
-                    last_seen = EXCLUDED.last_seen,
-                    online = TRUE,
-                    updated_at = NOW()
-                """,
-                (data['ip'], data['application'], data['access_info'], data['last_seen']),
-            )
+#             cur.execute(
+#                 """
+#                 INSERT INTO callbacks(ip, application, access_info, last_seen, online, updated_at)
+#                 VALUES (%s, %s, %s, %s, TRUE, NOW())
+#                 ON CONFLICT (ip, application)
+#                 DO UPDATE SET
+#                     access_info = EXCLUDED.access_info,
+#                     last_seen = EXCLUDED.last_seen,
+#                     online = TRUE,
+#                     updated_at = NOW()
+#                 """,
+#                 (data['ip'], data['application'], data['access_info'], data['last_seen']),
+#             )
 
-            cur.execute(
-                """
-                INSERT INTO hosts(ip, application, message, server, last_seen, online, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, TRUE, NOW())
-                ON CONFLICT (ip)
-                DO UPDATE SET
-                    application = EXCLUDED.application,
-                    message = EXCLUDED.message,
-                    server = EXCLUDED.server,
-                    last_seen = EXCLUDED.last_seen,
-                    online = TRUE,
-                    updated_at = NOW()
-                """,
-                (
-                    data['ip'],
-                    data['application'],
-                    data['message'],
-                    data['server'],
-                    data['last_seen'],
-                ),
-            )
-        db.commit()
-    except Exception:
-        db.rollback()
-        logger.exception("failed to save callback data")
+#             cur.execute(
+#                 """
+#                 INSERT INTO hosts(ip, application, message, server, last_seen, online, updated_at)
+#                 VALUES (%s, %s, %s, %s, %s, %s, TRUE, NOW())
+#                 ON CONFLICT (ip)
+#                 DO UPDATE SET
+#                     application = EXCLUDED.application,
+#                     message = EXCLUDED.message,
+#                     server = EXCLUDED.server,
+#                     last_seen = EXCLUDED.last_seen,
+#                     online = TRUE,
+#                     updated_at = NOW()
+#                 """,
+#                 (
+#                     data['ip'],
+#                     data['application'],
+#                     data['message'],
+#                     data['server'],
+#                     data['last_seen'],
+#                 ),
+#             )
+#         db.commit()
+#     except Exception:
+#         db.rollback()
+#         logger.exception("failed to save callback data")
 
-def saveCredData(data):
-    '''
-    Parse credential updates that come in via POST to the server.
+# def saveCredData(data):
+#     '''
+#     Parse credential updates that come in via POST to the server.
 
-    'username' and 'password' are required in the data
-    '''
-    # Don't accept callback from no IP or loopback
-    if str(data.get('ip', '127.0.0.1')).lower() in ["127.0.0.1", "none", None, "null"]:
-        return
+#     'username' and 'password' are required in the data
+#     '''
+#     # Don't accept callback from no IP or loopback
+#     if str(data.get('ip', '127.0.0.1')).lower() in ["127.0.0.1", "none", None, "null"]:
+#         return
 
-    # if no password, don't accept
-    if (len(data['password']) <= 1):
-        return
+#     # if no password, don't accept
+#     if (len(data['password']) <= 1):
+#         return
 
-    logger.debug("updated credentials for {}".format(data['ip']))
+#     logger.debug("updated credentials for {}".format(data['ip']))
 
-    data['server'] = data['server'] if 'server' in data else "pwnboard"
-    data['message'] = data['message'] if 'message' in data else "Credentials received to {}".format(data['server'])
+#     data['server'] = data['server'] if 'server' in data else "pwnboard"
+#     data['message'] = data['message'] if 'message' in data else "Credentials received to {}".format(data['server'])
 
-    db = get_db()
-    credstring = f"{'* ' if data['admin'] == 1 else ''}{data['username']}:{data['password']}"
-    try:
-        with db.cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO credentials_latest(ip, creds, server, last_seen, creds_online, updated_at)
-                VALUES (%s, %s, %s, %s, TRUE, NOW())
-                ON CONFLICT (ip)
-                DO UPDATE SET
-                    creds = EXCLUDED.creds,
-                    server = EXCLUDED.server,
-                    last_seen = EXCLUDED.last_seen,
-                    creds_online = TRUE,
-                    updated_at = NOW()
-                """,
-                (data['ip'], credstring, data['server'], data['last_seen']),
-            )
+#     db = get_db()
+#     credstring = f"{'* ' if data['admin'] == 1 else ''}{data['username']}:{data['password']}"
+#     try:
+#         with db.cursor() as cur:
+#             cur.execute(
+#                 """
+#                 INSERT INTO credentials_latest(ip, creds, server, last_seen, creds_online, updated_at)
+#                 VALUES (%s, %s, %s, %s, TRUE, NOW())
+#                 ON CONFLICT (ip)
+#                 DO UPDATE SET
+#                     creds = EXCLUDED.creds,
+#                     server = EXCLUDED.server,
+#                     last_seen = EXCLUDED.last_seen,
+#                     creds_online = TRUE,
+#                     updated_at = NOW()
+#                 """,
+#                 (data['ip'], credstring, data['server'], data['last_seen']),
+#             )
 
-            cur.execute(
-                """
-                INSERT INTO credentials_by_user(ip, username, password, server, last_seen, creds_online, updated_at)
-                VALUES (%s, %s, %s, %s, %s, TRUE, NOW())
-                ON CONFLICT (ip, username)
-                DO UPDATE SET
-                    password = EXCLUDED.password,
-                    server = EXCLUDED.server,
-                    last_seen = EXCLUDED.last_seen,
-                    creds_online = TRUE,
-                    updated_at = NOW()
-                """,
-                (data['ip'], data['username'], data['password'], data['server'], data['last_seen']),
-            )
-        db.commit()
-    except Exception:
-        db.rollback()
-        logger.exception("failed to save credential data")
-
-
+#             cur.execute(
+#                 """
+#                 INSERT INTO credentials_by_user(ip, username, password, server, last_seen, creds_online, updated_at)
+#                 VALUES (%s, %s, %s, %s, %s, TRUE, NOW())
+#                 ON CONFLICT (ip, username)
+#                 DO UPDATE SET
+#                     password = EXCLUDED.password,
+#                     server = EXCLUDED.server,
+#                     last_seen = EXCLUDED.last_seen,
+#                     creds_online = TRUE,
+#                     updated_at = NOW()
+#                 """,
+#                 (data['ip'], data['username'], data['password'], data['server'], data['last_seen']),
+#             )
+#         db.commit()
+#     except Exception:
+#         db.rollback()
+#         logger.exception("failed to save credential data")

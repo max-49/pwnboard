@@ -3,3 +3,4 @@ markupsafe
 argon2-cffi
 gunicorn
 psycopg2-binary
+redis

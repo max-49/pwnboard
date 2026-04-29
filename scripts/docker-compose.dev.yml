@@ -5,3 +5,10 @@ services:
       dockerfile: Dockerfile
     image: pwnboard:dev
     pull_policy: never
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: worker:dev
+    pull_policy: never

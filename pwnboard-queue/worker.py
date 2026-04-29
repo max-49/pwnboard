@@ -4,9 +4,9 @@ import redis
 import threading
 from psycopg2.extras import execute_values
 
-from db import pooled_connection, init_pool
-from data import getBoardDict
-from .board_config import TEAM_MAP
+from pwnboard.db import pooled_connection, init_pool
+from pwnboard.data import getBoardDict
+from board_config import TEAM_MAP
 
 init_pool()
 r = redis.StrictRedis(host="redis", port=6379, decode_responses=True)
@@ -19,6 +19,8 @@ def process_callbacks(batch_json, db):
     events_data = []
     latest_hosts = {}
     latest_callbacks = {}
+
+    print(f"Processing {len(batch_json)} callbacks at once from the redis queue.")
 
     # Since we RPOP, the batch is older -> newer.
     for item in batch_json:
@@ -85,6 +87,7 @@ def process_callbacks(batch_json, db):
                 list(latest_hosts.values()),
                 template="(%s, %s, %s, %s, %s, TRUE, NOW())"
             )
+        print("Saved to Postgres!")
 
 def process_creds(batch_json, db):
     if not batch_json: return

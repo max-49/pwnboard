@@ -12,7 +12,7 @@ RUN /opt/venv/bin/pip install --no-cache-dir -r /tmp/requirements.txt
 
 # Install the code
 COPY pwnboard.py /opt/pwnboard/
-COPY pwnboard/ /opt/pwnboard/pwnboard/
+COPY pwnboard-queue/ /opt/pwnboard/pwnboard/
 
 RUN addgroup -S pwnboard && adduser -S pwnboard -G pwnboard
 USER pwnboard
