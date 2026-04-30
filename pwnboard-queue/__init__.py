@@ -18,7 +18,7 @@ from .db import init_pool, init_schema, get_db_connection, close_db_connection
 BOARD = BOARD
 TEAM_MAP = TEAM_MAP
 IP_SET = IP_SET
-USE_ACCESS_TOKENS = os.environ.get("USE_ACCESS_TOKENS", True)
+USE_ACCESS_TOKENS = bool(os.environ.get("USE_ACCESS_TOKENS", True))
 
 # Create the Flask app
 app = Flask(__name__)
