@@ -4,12 +4,14 @@ import redis
 import threading
 from psycopg2.extras import execute_values
 
-from pwnboard import logger, get_db
+from pwnboard import logger
+from pwnboard.db import init_pool, pooled_connection
 from pwnboard.data import getBoardDict
 from board_config import TEAM_MAP
 
 TIMEOUT_SECONDS = 15
 
+init_pool()
 r = redis.StrictRedis(host="redis", port=6379, decode_responses=True)
 
 cache_update_event = threading.Event()
@@ -164,15 +166,15 @@ def ingest_thread():
             if callbacks_batch or creds_batch:
                 logger.info("Callbacks and/or creds found in redis")
 
-                db = get_db()
-                if callbacks_batch:
-                    logger.debug(f"Processing callbacks: {callbacks_batch}")
-                    process_callbacks(callbacks_batch, db)
-                if creds_batch:
-                    logger.debug(f"Processing creds: {creds_batch}")
-                    process_creds(creds_batch, db)
+                with pooled_connection() as db:
+                    if callbacks_batch:
+                        logger.debug(f"Processing callbacks: {callbacks_batch}")
+                        process_callbacks(callbacks_batch, db)
+                    if creds_batch:
+                        logger.debug(f"Processing creds: {creds_batch}")
+                        process_creds(creds_batch, db)
                 
-                db.commit()
+                    db.commit()
 
                 # Data has changed, notify event so other thread can process data
                 cache_update_event.set()
@@ -195,9 +197,9 @@ def cache_thread():
                 # clear the event so we don't infinitely loop
                 cache_update_event.clear()
             
-            db = get_db()
-            new_board_data = getBoardDict(db_conn=db)
-            r.set('board_cache', json.dumps(new_board_data))
+            with pooled_connection() as db:
+                new_board_data = getBoardDict(db_conn=db)
+                r.set('board_cache', json.dumps(new_board_data))
 
             logger.info("Board cache updated")
                 
