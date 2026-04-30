@@ -18,7 +18,12 @@ from .db import init_pool, init_schema, get_db_connection, close_db_connection
 BOARD = BOARD
 TEAM_MAP = TEAM_MAP
 IP_SET = IP_SET
-USE_ACCESS_TOKENS = bool(os.environ.get("USE_ACCESS_TOKENS", True))
+
+access_token_choice = os.environ.get("USE_ACCESS_TOKENS", "True")
+if (access_token_choice.lower() in ("true", "t")):
+    USE_ACCESS_TOKENS = True
+else:
+    USE_ACCESS_TOKENS = False
 
 # Create the Flask app
 app = Flask(__name__)
