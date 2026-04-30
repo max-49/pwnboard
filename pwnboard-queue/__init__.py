@@ -12,6 +12,7 @@ from functools import wraps
 from argon2 import PasswordHasher
 from markupsafe import Markup, escape
 from .logging_handler import DBHandler
+from .logger import logger
 from .board_config import BOARD, TEAM_MAP, IP_SET
 from .db import init_pool, init_schema, get_db_connection, close_db_connection
 
@@ -30,30 +31,10 @@ app = Flask(__name__)
 app.config['STATIC_FOLDER'] = "lib/static"
 # Basic secret key for session support (override in production)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret')
-logger = logging.getLogger('pwnboard')
-
 r = redis.StrictRedis(host="redis", port=6379, decode_responses=True)
 ph = PasswordHasher()
 
-logfil = ""
-
-# Get the pwnboard logger
-# Create a log formatter
-FMT = logging.Formatter(fmt="[%(asctime)s] %(levelname)s: %(message)s",
-                        datefmt="%x %I:%M:%S")
-
-# Create a file handler
-if logfil != "":
-    FH = logging.FileHandler(logfil)
-    FH.setFormatter(FMT)
-    logger.addHandler(FH)
-
-# Create a console logging handler
-SH = logging.StreamHandler()
-SH.setFormatter(FMT)
-logger.addHandler(SH)
-logger.setLevel(logging.DEBUG)
-
+# Basic pool initialization (safe to call multiple times)
 init_pool()
 
 # Simple linkify filter: convert http(s) URLs inside a string into clickable links
