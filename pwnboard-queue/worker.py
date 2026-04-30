@@ -4,7 +4,7 @@ import redis
 import threading
 from psycopg2.extras import execute_values
 
-from . import logger, get_db
+from pwnboard import logger, get_db
 from pwnboard.data import getBoardDict
 from board_config import TEAM_MAP
 
