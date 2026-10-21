@@ -1,0 +1,24 @@
+# Global options block
+{
+
+}
+
+
+# PWNBoard Route with request_buffers
+{$PWNBOARD_DOMAIN} {
+    # The board HTML is ~4 KB per host cell uncompressed and compresses ~70x
+    encode zstd gzip
+
+    reverse_proxy pwnboard:5000 {
+        # This buffers incoming POST payloads up to 5MB before sending them
+        request_buffers 5MB 
+    }
+}
+
+
+# Grafana Route
+{$PWNBOARD_DOMAIN}:8443 {
+    encode zstd gzip
+
+    reverse_proxy data:3000
+}

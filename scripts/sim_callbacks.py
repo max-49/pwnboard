@@ -12,7 +12,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 def random_callbacks(server, time_interval, hosts, access_token, verify):
     callback_infos = ["https://thisisac2.xyz/<hostinfo>/<shell> - red:letredin", "https://discord.com/channel/<id>", "https://c2domain.com - goop:bob"]
     while True:
-        for i in range(random.randint(0,20)):
+        for i in range(random.randint(0,50)):
             ip = random.choice(hosts)
             data = json.dumps({'ip': ip, "application": f"c2_{random.randint(1,12)}", "access_type": "c2", "access_info": random.choice(callback_infos)})
             headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {access_token}'}

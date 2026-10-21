@@ -14,5 +14,7 @@ jobs:
       - name: Build and push Image
         run: |
           docker login --username max-49 --password ${{ secrets.DOCKER_ACTION_SECRET }} ghcr.io
-          docker build . -t ghcr.io/max-49/pwnboard:latest
+          docker build . --target web -t ghcr.io/max-49/pwnboard:latest
+          docker build . --target worker -t ghcr.io/max-49/pwnboard-worker:latest
           docker push ghcr.io/max-49/pwnboard:latest
+          docker push ghcr.io/max-49/pwnboard-worker:latest

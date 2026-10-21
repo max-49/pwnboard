@@ -7,10 +7,18 @@ Install the Docker engine using the instructions on the Docker website.
 
 Docker makes deployment of the PWNBoard very very simple. See [docker-compose.yml](../docker-compose.yml) for a well-commented example of a docker-compose file with basic configuration options.
 
-You can deploy PWNBoard with the following command:
+1. Create `.env` and `board.json`. The setup script prompts for the domain, admin password and Flask secret key, then launches the board generator:
+```bash
+python3 scripts/setup.py
+```
+You can also edit `.env` and run `scripts/gen_config.py` by hand; see the [README](../README.md#quick-start).
+
+2. Deploy PWNBoard with the following command:
 ```bash
 docker compose up -d
 ```
+
+HTTPS is handled by Caddy (see [conf/reverse-proxy/Caddyfile](../conf/reverse-proxy/Caddyfile)), so you do not need to generate certificates. The dashboard is served at `https://<PWNBOARD_DOMAIN>` and Grafana at `https://<PWNBOARD_DOMAIN>:8443`.
 
 ## Troubleshooting
 
@@ -29,9 +37,14 @@ docker compose up -d
 > - If necessary, tokens with application name `global` will ignore the application name in the POST request, so you can use this token for everything
 
 ### 3) Self-signed certs and failed POST requests
-> **Issue:** POST requests fail when using self-signed certificates.
+> **Issue:** POST requests fail with a certificate error. This happens when `PWNBOARD_DOMAIN` is `localhost` or an IP address, or when `tls internal` is set in the Caddyfile, because Caddy signs the certificate with its own internal CA.
 >
-> **Fix:** Disable certificate validation in your client/tool (for example: `curl -k ...`, `requests.post("...", verify=False)`, etc.).
+> **Fix:** Disable certificate validation in your client/tool (for example: `curl -k ...`, `requests.post("...", verify=False)`, etc.). Alternatively, copy Caddy's root certificate out of the container and trust it:
+
+```bash
+docker compose cp reverse-proxy:/data/caddy/pki/authorities/local/root.crt ./caddy-root.crt
+curl --cacert caddy-root.crt https://<PWNBOARD_DOMAIN>/pwn ...
+```
 
 ### 4) Build hangs while installing packages on PWNBoard container (development deploy, ghcr container should not have this issue)
 
@@ -63,4 +76,11 @@ docker compose up -d
 
 > Try to increase the amount of space on whichever disk partition you are working on
 
+### 5) Caddy cannot get a certificate for my domain
 
+> **Issue:** The browser reports a certificate error or cannot connect, and `docker compose logs reverse-proxy` shows ACME/Let's Encrypt failures.
+>
+> **Check the following:**
+> - `PWNBOARD_DOMAIN` in `.env` is only the hostname (ex. `pwnboard.win`), with no `https://` and no port.
+> - The domain's DNS record points at this host, and ports 80 and 443 are reachable from the internet (Let's Encrypt validates over them).
+> - If the name only resolves on a private network, Let's Encrypt can never validate it. Add `tls internal` inside both site blocks of `conf/reverse-proxy/Caddyfile`, then run `docker compose up -d` again. Clients will then need to skip validation or trust Caddy's root certificate (see issue 3).

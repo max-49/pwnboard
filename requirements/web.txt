@@ -1,0 +1,5 @@
+-r core.txt
+flask
+markupsafe
+argon2-cffi
+gunicorn
