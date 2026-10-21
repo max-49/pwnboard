@@ -2,18 +2,17 @@
 """Interactive quick setup for PWNBoard.
 
 Combines the README Quick Start steps into one workflow:
-1) Configure .env (SECRET_KEY and PWNBOARD_PASSWORD)
+1) Configure .env (PWNBOARD_DOMAIN, PWNBOARD_PASSWORD and SECRET_KEY)
 2) Generate board.json via scripts/gen_config.py
-3) Generate HTTPS certificates (self-signed or Let's Encrypt)
+
+HTTPS certificates are handled by Caddy, so none are generated here.
 
 This script is intentionally interactive and prompts before overwriting files.
 """
 
 from __future__ import annotations
 
-import os
 import re
-import shutil
 import secrets
 import subprocess
 import sys
@@ -24,9 +23,9 @@ ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS_DIR = ROOT / "scripts"
 ENV_PATH = ROOT / ".env"
 BOARD_PATH = ROOT / "board.json"
-DOCKER_COMPOSE_PATH = ROOT / "docker-compose.yml"
-CERT_PATH = ROOT / "conf" / "cert.pem"
-KEY_PATH = ROOT / "conf" / "key.pem"
+
+# Variables docker-compose.yml expects in .env
+ENV_KEYS = {"PWNBOARD_DOMAIN", "PWNBOARD_PASSWORD", "SECRET_KEY"}
 
 
 def prompt_yes_no(message: str, default: bool = True) -> bool:
@@ -59,10 +58,6 @@ def parse_domain_from_url(url: str) -> str:
 	url = (url or "").strip()
 	url = re.sub(r"^https?://", "", url, flags=re.IGNORECASE)
 	return url.split("/")[0].strip()
-
-
-def command_exists(name: str) -> bool:
-	return shutil.which(name) is not None
 
 
 def should_overwrite(path: Path) -> bool:
@@ -110,35 +105,22 @@ def upsert_env_values(path: Path, updates: dict[str, str]) -> None:
 	path.write_text("\n".join(new_lines).rstrip() + "\n", encoding="utf-8")
 
 
-def update_pwnboard_url_in_compose(url: str) -> bool:
-	if not DOCKER_COMPOSE_PATH.exists():
-		print(f"Skipping docker-compose URL update: missing {DOCKER_COMPOSE_PATH}")
-		return False
-
-	text = DOCKER_COMPOSE_PATH.read_text(encoding="utf-8")
-	pattern = re.compile(r"(^\s*-\s*PWNBOARD_URL=).*$", flags=re.MULTILINE)
-	if not pattern.search(text):
-		print("Did not find PWNBOARD_URL line in docker-compose.yml")
-		return False
-
-	updated = pattern.sub(rf"\1{url}", text, count=1)
-	DOCKER_COMPOSE_PATH.write_text(updated, encoding="utf-8")
-	return True
-
-
-def configure_env() -> tuple[str, str]:
+def configure_env() -> None:
 	print("\n=== Environment Setup (.env) ===")
-	if ENV_PATH.exists() and not prompt_yes_no(
-		f"{ENV_PATH} already exists. Update secret/password values",
+	existing = read_env(ENV_PATH)
+	if ENV_KEYS <= existing.keys() and not prompt_yes_no(
+		f"{ENV_PATH} already exists. Update domain/secret/password values",
 		default=True,
 	):
-		existing = read_env(ENV_PATH)
-		password = existing.get("PWNBOARD_PASSWORD", "password")
-		secret_key = existing.get("SECRET_KEY", "change-me-please")
 		print("Keeping existing .env values.")
-		return password, secret_key
+		return
 
-	existing = read_env(ENV_PATH)
+	print("Public domain: Caddy gets a Let's Encrypt certificate automatically (ports 80 and 443 must be reachable).")
+	print("localhost or an IP address: Caddy uses its own internal CA, so clients must skip certificate validation (e.g. curl -k).")
+	domain = parse_domain_from_url(
+		prompt_text("PWNBOARD_DOMAIN", default=existing.get("PWNBOARD_DOMAIN", "localhost"))
+	)
+
 	default_password = existing.get("PWNBOARD_PASSWORD", "password")
 	password = prompt_text("PWNBOARD_PASSWORD", default=default_password)
 
@@ -154,12 +136,12 @@ def configure_env() -> tuple[str, str]:
 	upsert_env_values(
 		ENV_PATH,
 		{
+			"PWNBOARD_DOMAIN": domain,
 			"PWNBOARD_PASSWORD": password,
 			"SECRET_KEY": secret_key,
 		},
 	)
 	print(f"Updated {ENV_PATH}")
-	return password, secret_key
 
 
 def configure_board() -> None:
@@ -180,142 +162,6 @@ def configure_board() -> None:
 	print(f"Generated {BOARD_PATH}")
 
 
-def generate_self_signed_cert(domain: str) -> None:
-	if not command_exists("openssl"):
-		raise RuntimeError("openssl was not found in PATH.")
-
-	CERT_PATH.parent.mkdir(parents=True, exist_ok=True)
-	cmd = [
-		"openssl",
-		"req",
-		"-x509",
-		"-nodes",
-		"-days",
-		"365",
-		"-newkey",
-		"rsa:2048",
-		"-keyout",
-		str(KEY_PATH),
-		"-out",
-		str(CERT_PATH),
-		"-subj",
-		f"/C=US/ST=State/L=Town/O=PWNBoard/OU=Deployment/CN={domain}",
-	]
-	subprocess.run(cmd, check=True)
-
-	if os.name != "nt":
-		try:
-			KEY_PATH.chmod(0o644)
-			CERT_PATH.chmod(0o644)
-		except Exception:
-			pass
-
-
-def generate_letsencrypt_cert(domain: str, email: str) -> None:
-	if not command_exists("certbot"):
-		raise RuntimeError("certbot was not found in PATH.")
-
-	certbot_cmd = [
-		"certbot",
-		"certonly",
-		"--manual",
-		"--preferred-challenges",
-		"dns",
-		"-d",
-		domain,
-		"--agree-tos",
-		"--email",
-		email,
-	]
-	print("Running certbot (interactive DNS challenge)...")
-	subprocess.run(certbot_cmd, check=True)
-
-	live_dir = Path(f"/etc/letsencrypt/live/{domain}")
-	archive_dir = Path(f"/etc/letsencrypt/archive/{domain}")
-
-	cert_source_candidates = [
-		live_dir / "fullchain.pem",
-		archive_dir / "fullchain1.pem",
-	]
-	key_source_candidates = [
-		live_dir / "privkey.pem",
-		archive_dir / "privkey1.pem",
-	]
-
-	cert_source = next((p for p in cert_source_candidates if p.exists()), None)
-	key_source = next((p for p in key_source_candidates if p.exists()), None)
-
-	if not cert_source or not key_source:
-		raise RuntimeError(
-			"Could not locate Let's Encrypt cert/key files after certbot run."
-		)
-
-	CERT_PATH.parent.mkdir(parents=True, exist_ok=True)
-	shutil.copy2(cert_source, CERT_PATH)
-	shutil.copy2(key_source, KEY_PATH)
-
-	if os.name != "nt":
-		try:
-			KEY_PATH.chmod(0o644)
-			CERT_PATH.chmod(0o644)
-		except Exception:
-			pass
-
-
-def configure_certificates(pwnboard_url: str) -> None:
-	print("\n=== Certificate Setup (conf/cert.pem + conf/key.pem) ===")
-	if CERT_PATH.exists() or KEY_PATH.exists():
-		if not prompt_yes_no(
-			"Certificate files already exist. Overwrite cert.pem/key.pem",
-			default=False,
-		):
-			print("Keeping existing certificate files.")
-			return
-
-	mode = prompt_text(
-		"Certificate mode: self-signed / letsencrypt / skip",
-		default="self-signed",
-	).strip().lower()
-
-	if mode in {"skip", "none", "no"}:
-		print("Skipping certificate generation.")
-		return
-
-	domain_default = parse_domain_from_url(pwnboard_url) or "127.0.0.1"
-	domain = prompt_text("Domain/IP for certificate CN", default=domain_default)
-
-	if mode in {"self", "self-signed", "selfsigned"}:
-		generate_self_signed_cert(domain)
-		print(f"Created {CERT_PATH} and {KEY_PATH}")
-		return
-
-	if mode in {"letsencrypt", "le"}:
-		if os.name == "nt":
-			raise RuntimeError("Let's Encrypt automation via certbot is not supported on Windows in this script.")
-		email = prompt_text("Let's Encrypt email", default=f"admin@{domain}")
-		generate_letsencrypt_cert(domain, email)
-		print(f"Created {CERT_PATH} and {KEY_PATH}")
-		return
-
-	print(f"Unknown certificate mode: {mode}. Skipping.")
-
-
-def configure_compose_url() -> str:
-	print("\n=== docker-compose URL Setup ===")
-	current_default = "https://127.0.0.1"
-	if DOCKER_COMPOSE_PATH.exists():
-		text = DOCKER_COMPOSE_PATH.read_text(encoding="utf-8")
-		m = re.search(r"^\s*-\s*PWNBOARD_URL=(.+)$", text, flags=re.MULTILINE)
-		if m:
-			current_default = m.group(1).strip()
-
-	url = prompt_text("PWNBOARD_URL", default=current_default)
-	if prompt_yes_no("Update PWNBOARD_URL in docker-compose.yml", default=True):
-		if update_pwnboard_url_in_compose(url):
-			print("Updated PWNBOARD_URL in docker-compose.yml")
-	return url
-
-
 def main() -> int:
 	print("PWNBoard Quick Setup")
 	print(f"Project root: {ROOT}\n")
@@ -323,8 +169,6 @@ def main() -> int:
 	try:
 		configure_env()
 		configure_board()
-		pwnboard_url = configure_compose_url()
-		configure_certificates(pwnboard_url)
 	except KeyboardInterrupt:
 		print("\nSetup cancelled.")
 		return 130

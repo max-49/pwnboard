@@ -35,7 +35,20 @@ PWNBoard provides a centralized dashboard for tracking compromised hosts, active
 
 - Ensure the Docker Engine is installed on your machine
 - Python 3.x
-- This setup is optimized for UNIX devices. The Docker Compose will work on Windows, but you will have to find a way to generate your own certificates for HTTPS
+- Ports 80, 443 and 8443 free on the host (Caddy serves HTTPS on all three)
+- To use a public domain name: its DNS record must point at the host, and ports 80 and 443 must be reachable from the internet so Caddy can get a Let's Encrypt certificate
+
+### Guided Setup
+
+The setup script walks you through everything below (`.env` and `board.json`) in one go:
+
+```bash
+python3 scripts/setup.py
+```
+
+It prompts for the domain, admin password and Flask secret key (it can generate a random secret for you), then launches the board generator. It asks before overwriting an existing `.env` or `board.json`. When it finishes, skip ahead to [Deploy](#deploy).
+
+If you would rather configure things by hand, follow the next two sections.
 
 ### Board Setup
 
@@ -55,15 +68,14 @@ Follow the steps in the script to define your hosts. This will generate a `board
 Start by changing the values in the `.env` file. You must edit these for a secure configuration, especially if you are exposing PWNBoard to the internet.
 
    ```yaml
+   PWNBOARD_DOMAIN=localhost # Hostname or IP that PWNBoard is served on (ex. pwnboard.win, 10.1.1.10). No https:// and no port
    SECRET_KEY=change-me-please # Flask secret used for signing session cookies
    PWNBOARD_PASSWORD=password # Default password for PWNBoard/Grafana
    ```
 
-Edit optional paramters in the docker-compose.yml file. Here are some variables that you can change to best suit your needs. At minimum, `PWNBOARD_URL` should be changed for certificate generation purposes.
+Edit optional paramters in the docker-compose.yml file. Here are some variables that you can change to best suit your needs.
 
    ```yaml
-   - PWNBOARD_URL=https://pwnboard.win # Change this line to your full PWNBoard URL (https://domain[:port], ex. https://pwnboard.win, https://10.1.1.10:443). This is used in certificate generation
-   - CACHE_TIME=-1 # Change this to a positive value to cache the board JSON for a certain amount of time. Might help with performance
    - REFRESH_SECONDS=10 # Change this to the amount of time (in seconds) after which you want your page to refresh with new data. Setting this to 0 or -1 will disable refreshing
    - HOST_TIMEOUT=5 # Change this to the amount of time (in minutes) after which callbacks should time out if an update is not received
    - CREDS_TIMEOUT=30 # Change this to the amount of time (in minutes) after which credentials should time out if an update is not received
@@ -72,21 +84,13 @@ Edit optional paramters in the docker-compose.yml file. Here are some variables 
    - USE_ACCESS_TOKENS=true # Set this to false to disable the use of access tokens for authenticating POST requests
    ```
 
-2. **Set up HTTPS certificates**:
+2. **HTTPS is automatic**:
 
-If using a domain that you own (ex. pwnboard.win, pwnboard.red.team, etc.), run these commands to generate letsencrypt certificates for your domain.
+[Caddy](https://caddyserver.com) handles certificates, so there is nothing to generate. What you get depends on `PWNBOARD_DOMAIN`:
 
-   ```bash
-   cd scripts
-   sudo ./setup_certs_letsencrypt.sh
-   ```
-
-If using only internally resolvable DNS or just your IP address to access PWNboard, run these commands to generate self signed certificates. Keep in mind that you might have to jump through some extra hoops to POST data "insecurely".
-
-   ```bash
-   cd scripts
-   sudo ./setup_certs_self_signed.sh
-   ```
+   - **A public domain** (ex. pwnboard.win): Caddy requests a Let's Encrypt certificate on first start (see the prerequisites above).
+   - **`localhost` or an IP address**: Caddy signs a certificate with its own internal CA. Browsers will warn, and you will need to skip certificate validation when POSTing data (ex. `curl -k`), or trust Caddy's root certificate. See [doc/setup.md](doc/setup.md#3-self-signed-certs-and-failed-post-requests).
+   - **A private hostname with no public DNS** (ex. pwnboard.red.team): Let's Encrypt cannot validate it, so add `tls internal` inside both site blocks of `conf/reverse-proxy/Caddyfile` to use the internal CA instead.
 
 ### Deploy
 
@@ -96,11 +100,11 @@ If using only internally resolvable DNS or just your IP address to access PWNboa
    ```
 
 2. **Access the PWNBoard dashboard**:
-   - Navigate to `PWNBOARD_URL` in your browser
+   - Navigate to `https://<PWNBOARD_DOMAIN>` in your browser
    - Login with default credentials set up in environment variables!
 
 3. **Access Grafana**:
-   - Navigate to `PWNBOARD_URL:8443` in your browser
+   - Navigate to `https://<PWNBOARD_DOMAIN>:8443` in your browser
    - Login with admin:PWNBOARD_PASSWORD
 
 For detailed setup instructions and troubleshooting, see [doc/setup.md](doc/setup.md).
@@ -139,7 +143,7 @@ python3 scripts/sim_creds.py [/path/to/board/file]
 
 5. Include your `global` Access Token when prompted (if using access tokens)
 
-6. Include the full POST endpoint URL of your PWNBoard (ex. https://www.pwnboard.win/pwn, https://10.1.1.11:8443/pwn, https://www.redteam.win/creds)
+6. Include the full POST endpoint URL of your PWNBoard (ex. https://www.pwnboard.win/pwn, https://10.1.1.11/pwn, https://www.redteam.win/creds)
 
 ## Troubleshooting/Known Issues
 
