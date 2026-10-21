@@ -1,32 +1,21 @@
-# Password of the read-only Postgres role that Grafana connects as. Must match
-# conf/grafana/provisioning/datasources/pwnboard-datasource.yaml.
-GRAFANA_DB_PASSWORD = "pwnB0ard-p4ssw0rd1#"
+import os
+
+from .logger import logger
 
 # Arbitrary constant used to serialize schema setup between the web and worker
 # containers when both start at the same time.
 _SCHEMA_LOCK_ID = 7281001
 
-_DDL = f"""
-    DO $$
-    BEGIN
-        IF NOT EXISTS (
-            SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'grafana_user'
-        ) THEN
-            CREATE USER grafana_user WITH PASSWORD '{GRAFANA_DB_PASSWORD}';
-        ELSE
-            ALTER USER grafana_user WITH PASSWORD '{GRAFANA_DB_PASSWORD}';
-        END IF;
-    END
-    $$;
+# Tables written by beacons and credential reports. Grafana may read these (and nothing else).
+DATA_TABLES = (
+    "hosts",
+    "callbacks",
+    "callback_events",
+    "credentials_latest",
+    "credentials_by_user",
+)
 
-    GRANT CONNECT ON DATABASE pwnboard_db TO grafana_user;
-    GRANT USAGE ON SCHEMA public TO grafana_user;
-    GRANT SELECT ON ALL TABLES IN SCHEMA public TO grafana_user;
-    GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO grafana_user;
-
-    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO grafana_user;
-    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON SEQUENCES TO grafana_user;
-
+_TABLES_DDL = """
     CREATE TABLE IF NOT EXISTS users (
         id BIGSERIAL PRIMARY KEY,
         username TEXT UNIQUE NOT NULL,
@@ -111,16 +100,53 @@ _DDL = f"""
 """
 
 
-def ensure_schema(conn):
-    """Create the tables and Grafana role if they do not exist yet.
+# The password is passed through a transaction-local setting and quoted by Postgres (%L), so
+# it can contain any character.
+_GRAFANA_ROLE_SQL = """
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'grafana_user') THEN
+        EXECUTE format('CREATE USER grafana_user WITH PASSWORD %L', current_setting('pwnboard.grafana_password'));
+    ELSE
+        EXECUTE format('ALTER USER grafana_user WITH PASSWORD %L', current_setting('pwnboard.grafana_password'));
+    END IF;
+END
+$$;
+"""
 
-    Safe to call from several processes at once: the whole setup runs inside one
-    transaction that holds a Postgres advisory lock.
+# Grafana only gets read access to the data tables. The REVOKEs also clear the broader
+# grants (users, access_tokens, default privileges) that older versions created.
+_GRAFANA_GRANTS_SQL = f"""
+GRANT CONNECT ON DATABASE pwnboard_db TO grafana_user;
+GRANT USAGE ON SCHEMA public TO grafana_user;
+
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM grafana_user;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM grafana_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM grafana_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON SEQUENCES FROM grafana_user;
+
+GRANT SELECT ON {", ".join(DATA_TABLES)} TO grafana_user;
+"""
+
+
+def ensure_schema(conn):
+    """Create the tables and the read-only Grafana database user if they do not exist yet.
+
+    The Grafana user's password comes from GRAFANA_DB_PASSWORD; without it that user is
+    not configured. Safe to call from several processes at once: the whole setup runs
+    inside one transaction that holds a Postgres advisory lock.
     """
+    grafana_password = os.environ.get("GRAFANA_DB_PASSWORD")
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT pg_advisory_xact_lock(%s)", (_SCHEMA_LOCK_ID,))
-            cur.execute(_DDL)
+            cur.execute(_TABLES_DDL)
+            if grafana_password:
+                cur.execute("SELECT set_config('pwnboard.grafana_password', %s, true)", (grafana_password,))
+                cur.execute(_GRAFANA_ROLE_SQL)
+                cur.execute(_GRAFANA_GRANTS_SQL)
+            else:
+                logger.warning("GRAFANA_DB_PASSWORD is not set; the Grafana database user was not configured")
         conn.commit()
     except Exception:
         conn.rollback()

@@ -23,4 +23,5 @@ _sh = logging.StreamHandler()
 _sh.setFormatter(FMT)
 logger.addHandler(_sh)
 
-logger.setLevel(logging.DEBUG)
+# INFO by default. Set PWNBOARD_LOG_LEVEL=DEBUG for more detail.
+logger.setLevel(os.environ.get('PWNBOARD_LOG_LEVEL', 'INFO').upper())

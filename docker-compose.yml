@@ -1,11 +1,20 @@
+# Keep container logs from filling the disk
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   pwnboard:
     image: ghcr.io/max-49/pwnboard:latest
     restart: unless-stopped
+    logging: *default-logging
     environment:
       - FLASK_DEBUG=false
       - FLASK_PORT=5000
       - POSTGRES_PASSWORD=${PWNBOARD_PASSWORD}
+      - GRAFANA_DB_PASSWORD=${GRAFANA_DB_PASSWORD:-${PWNBOARD_PASSWORD}}
       - SECRET_KEY=${SECRET_KEY}
       - REFRESH_SECONDS=10 # Seconds after which to refresh the page
       - HOST_TIMEOUT=5
@@ -25,10 +34,12 @@ services:
   redis:
     image: redis:alpine
     restart: unless-stopped
+    logging: *default-logging
 
   db:
     image: postgres:15-alpine
     restart: always
+    logging: *default-logging
     command: postgres -c synchronous_commit=off
     environment:
       POSTGRES_DB: pwnboard_db
@@ -45,8 +56,10 @@ services:
   worker:
     image: ghcr.io/max-49/pwnboard-worker:latest
     restart: unless-stopped
+    logging: *default-logging
     environment:
       - POSTGRES_PASSWORD=${PWNBOARD_PASSWORD}
+      - GRAFANA_DB_PASSWORD=${GRAFANA_DB_PASSWORD:-${PWNBOARD_PASSWORD}}
     volumes:
       - ./board.json:/opt/pwnboard/board.json:ro
     depends_on:
@@ -58,9 +71,11 @@ services:
   data:
     image: grafana/grafana:latest
     restart: unless-stopped
+    logging: *default-logging
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=${PWNBOARD_PASSWORD}
+      - GRAFANA_DB_PASSWORD=${GRAFANA_DB_PASSWORD:-${PWNBOARD_PASSWORD}}
       - GF_PLUGINS_PREINSTALL=magnesium-wordcloud-panel
       - GF_SECURITY_ALLOW_EMBEDDING=true
       - GF_ANALYTICS_CHECK_FOR_UPDATES=false
@@ -78,6 +93,7 @@ services:
   reverse-proxy:
     image: caddy:latest
     restart: unless-stopped
+    logging: *default-logging
     ports:
       - "80:80"
       - "443:443"

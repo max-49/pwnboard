@@ -11,6 +11,7 @@ from ..core.queues import BOARD_CACHE_KEY, CALLBACK_QUEUE, CREDS_QUEUE, redis_cl
 from ..core.schema import ensure_schema
 
 TIMEOUT_SECONDS = 15
+TOKEN_PURGE_INTERVAL_SECONDS = 3600
 
 cache_update_event = threading.Event()
 
@@ -166,10 +167,8 @@ def ingest_thread():
 
                 with pooled_connection() as db:
                     if callbacks_batch:
-                        logger.debug(f"Processing callbacks: {callbacks_batch}")
                         process_callbacks(callbacks_batch, db)
                     if creds_batch:
-                        logger.debug(f"Processing creds: {creds_batch}")
                         process_creds(creds_batch, db)
                 
                     db.commit()
@@ -184,8 +183,23 @@ def ingest_thread():
             time.sleep(2)
 
 
+def purge_expired_tokens(db):
+    """Delete access tokens that expired more than a week ago.
+
+    Expired tokens already stop working. They stay listed for a week so users can see why
+    a token was rejected.
+    """
+    with db.cursor() as cur:
+        cur.execute("DELETE FROM access_tokens WHERE expires_at < NOW() - INTERVAL '7 days'")
+        removed = cur.rowcount
+    db.commit()
+    if removed:
+        logger.info(f"Removed {removed} expired access tokens")
+
+
 def cache_thread():
     logger.info("Cache thread started...")
+    last_purge = 0.0
     while True:
         try:
             # wait until ingest thread sends an update
@@ -200,7 +214,12 @@ def cache_thread():
                 redis_client.set(BOARD_CACHE_KEY, json.dumps(new_board_data))
 
             logger.info("Board cache updated")
-                
+
+            if time.monotonic() - last_purge >= TOKEN_PURGE_INTERVAL_SECONDS:
+                last_purge = time.monotonic()
+                with pooled_connection() as db:
+                    purge_expired_tokens(db)
+
         except Exception as e:
             logger.error(f"Cache Generation Error: {e}")
             time.sleep(2)

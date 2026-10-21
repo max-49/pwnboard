@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import re
 import secrets
 import hashlib
 import time
@@ -7,10 +8,27 @@ from . import ph, get_db
 from ..core.db import dict_cursor
 from ..core.logger import logger
 
+USERNAME_RE = re.compile(r'^[a-zA-Z0-9_.\-]{1,64}$')
+VALID_ROLES = {'user', 'admin', 'guest', 'restricted'}
+MAX_PASSWORD_LENGTH = 128
+# Longer than any password we accept; anything beyond it is rejected without hashing
+MAX_LOGIN_PASSWORD_LENGTH = 1024
+
+# Verified against when a username does not exist, so a failed login does the same
+# amount of hashing work whether or not the account is real
+_DUMMY_HASH = ph.hash("pwnboard-dummy-password")
+
 def _hash_token(raw_token):
     return hashlib.sha256(raw_token.encode('utf-8')).hexdigest()
 
 def createUser(username, password, role):
+    if not USERNAME_RE.match(username):
+        return "Invalid username: only letters, digits, _, ., - are allowed (max 64 characters)"
+    if role not in VALID_ROLES:
+        return "Invalid role"
+    if not 1 <= len(password) <= MAX_PASSWORD_LENGTH:
+        return f"Password must be between 1 and {MAX_PASSWORD_LENGTH} characters"
+
     db = get_db()
 
     # Check if the user already exists
@@ -39,12 +57,18 @@ def createUser(username, password, role):
     return True
 
 def verifyUser(username, password):
+    if len(password) > MAX_LOGIN_PASSWORD_LENGTH:
+        return None
     db = get_db()
     with dict_cursor(db) as cur:
         cur.execute('SELECT password, role FROM users WHERE username = %s;', (username,))
         row = cur.fetchone()
     if row is None:
         # User doesn't exist
+        try:
+            ph.verify(_DUMMY_HASH, password)
+        except Exception:
+            pass
         return None
 
     stored = row['password']

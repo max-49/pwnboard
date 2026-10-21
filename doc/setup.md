@@ -54,6 +54,30 @@ docker compose down && docker volume rm pwnboard_pwnboard-data && docker compose
 
 The volume is named `<project>_pwnboard-data`, where the project defaults to the directory name. Check with `docker volume ls` if yours differs. Do not use `docker compose down -v`: it also deletes the Caddy volumes, which hold your HTTPS certificates.
 
+## Exporting and backing up data
+
+Export what you need before you [reset the test data](#resetting-test-data) or remove the database volume.
+
+Full backup of the database (users, tokens, callbacks, credentials):
+```bash
+docker compose exec -T db pg_dump -U pwnboard_user pwnboard_db > pwnboard-backup.sql
+```
+
+To restore it into an empty database (for example after a [full reset](#full-reset-also-removes-users-and-tokens)):
+```bash
+docker compose exec -T db psql -U pwnboard_user pwnboard_db < pwnboard-backup.sql
+```
+
+Callback history as CSV (one row per callback received, handy for reports):
+```bash
+docker compose exec -T db psql -U pwnboard_user -d pwnboard_db -c "COPY (SELECT received_at, team, ip, application, access_info FROM callback_events ORDER BY received_at) TO STDOUT WITH CSV HEADER" > callbacks.csv
+```
+
+Captured credentials as CSV:
+```bash
+docker compose exec -T db psql -U pwnboard_user -d pwnboard_db -c "COPY (SELECT ip, username, password, server, to_timestamp(last_seen) AS last_seen FROM credentials_by_user ORDER BY ip, username) TO STDOUT WITH CSV HEADER" > credentials.csv
+```
+
 ## Troubleshooting
 
 ### 1) Navbar shows wrong user/options (SHOULD BE FIXED NOW)
@@ -110,7 +134,7 @@ docker compose up -d
 
 > Try to increase the amount of space on whichever disk partition you are working on
 
-### 5) Caddy cannot get a certificate for my domain
+### 6) Caddy cannot get a certificate for my domain
 
 > **Issue:** The browser reports a certificate error or cannot connect, and `docker compose logs reverse-proxy` shows ACME/Let's Encrypt failures.
 >
@@ -118,3 +142,15 @@ docker compose up -d
 > - `PWNBOARD_DOMAIN` in `.env` is only the hostname (ex. `pwnboard.win`), with no `https://` and no port.
 > - The domain's DNS record points at this host, and ports 80 and 443 are reachable from the internet (Let's Encrypt validates over them).
 > - If the name only resolves on a private network, Let's Encrypt can never validate it. Add `tls internal` inside both site blocks of `conf/reverse-proxy/Caddyfile`, then run `docker compose up -d` again. Clients will then need to skip validation or trust Caddy's root certificate (see issue 3).
+
+### 7) "Too many failed login attempts"
+
+> **Issue:** The login page says "Too many failed login attempts. Try again in 15 minutes."
+>
+> **Cause:** After 10 failed logins from one IP address, or 20 for one username, logins from that IP or for that username are blocked for 15 minutes. A successful login clears the username's count.
+>
+> **Fix:** Wait 15 minutes, or clear the counters:
+
+```bash
+docker compose exec redis sh -c "redis-cli --scan --pattern 'login_fail:*' | xargs -r redis-cli del"
+```

@@ -10,16 +10,10 @@ import sys
 
 from ..core.db import direct_connection
 from ..core.queues import BOARD_CACHE_KEY, CALLBACK_QUEUE, CREDS_QUEUE, redis_client
+from ..core.schema import DATA_TABLES
 
-# Everything beacons and credential reports write. The users and access_tokens tables are kept.
-DATA_TABLES = (
-    "hosts",
-    "callbacks",
-    "callback_events",
-    "credentials_latest",
-    "credentials_by_user",
-)
-
+# DATA_TABLES is everything beacons and credential reports write. The users and
+# access_tokens tables are kept.
 REDIS_KEYS = (CALLBACK_QUEUE, CREDS_QUEUE, BOARD_CACHE_KEY)
 
 
