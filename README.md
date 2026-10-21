@@ -145,6 +145,8 @@ python3 scripts/sim_creds.py [/path/to/board/file]
 
 6. Include the full POST endpoint URL of your PWNBoard (ex. https://www.pwnboard.win/pwn, https://10.1.1.11/pwn, https://www.redteam.win/creds)
 
+7. Before the real deployment, clear the test data. See [Resetting test data](doc/setup.md#resetting-test-data) to do this while keeping your users and access tokens.
+
 ## Troubleshooting/Known Issues
 
 For troubleshooting tips, check the bottom of the [setup guide](doc/setup.md).

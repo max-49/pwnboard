@@ -20,6 +20,40 @@ docker compose up -d
 
 HTTPS is handled by Caddy (see [conf/reverse-proxy/Caddyfile](../conf/reverse-proxy/Caddyfile)), so you do not need to generate certificates. The dashboard is served at `https://<PWNBOARD_DOMAIN>` and Grafana at `https://<PWNBOARD_DOMAIN>:8443`.
 
+## Resetting test data
+
+Testing with `sim_callbacks.py` and `sim_creds.py` leaves fake callbacks and credentials in the database. Clear them before the real deployment using one of the options below.
+
+### Keep users and access tokens
+
+The worker image includes a reset command that deletes all callbacks, credentials, callback history (what Grafana graphs) and the queued/cached board data in Redis, but keeps user accounts and access tokens:
+
+```bash
+docker compose stop pwnboard worker
+```
+
+```bash
+docker compose run --rm --no-deps worker python -m pwnboard.worker.reset --yes
+```
+
+```bash
+docker compose start pwnboard worker
+```
+
+- Stop `pwnboard` and `worker` first so nothing writes new data while the reset runs. The database and Redis containers must still be running (`--no-deps` does not start them).
+- Without `--yes` the command prints a warning and deletes nothing.
+- If Redis cannot be reached, the command stops before deleting anything.
+
+### Full reset (also removes users and tokens)
+
+To start from an empty database, remove the Postgres volume. The default admin account is recreated from `.env` on startup, so create your real users and tokens after resetting:
+
+```bash
+docker compose down && docker volume rm pwnboard_pwnboard-data && docker compose up -d
+```
+
+The volume is named `<project>_pwnboard-data`, where the project defaults to the directory name. Check with `docker volume ls` if yours differs. Do not use `docker compose down -v`: it also deletes the Caddy volumes, which hold your HTTPS certificates.
+
 ## Troubleshooting
 
 ### 1) Navbar shows wrong user/options (SHOULD BE FIXED NOW)
