@@ -1,21 +1,38 @@
-FROM python:3.12-alpine
+FROM python:3.12-alpine AS base
 
 WORKDIR /opt/pwnboard
-EXPOSE 5000
 
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Install package dependencies
-COPY requirements.txt /tmp/requirements.txt
-RUN /opt/venv/bin/pip install --no-cache-dir -r /tmp/requirements.txt
-
-# Install the code
-COPY pwnboard.py /opt/pwnboard/
-COPY pwnboard-queue/ /opt/pwnboard/pwnboard/
-
 RUN addgroup -S pwnboard && adduser -S pwnboard -G pwnboard
+
+# Worker: ingests queued callbacks into Postgres and keeps the board cache fresh
+FROM base AS worker
+
+COPY requirements/ /tmp/requirements/
+RUN /opt/venv/bin/pip install --no-cache-dir -r /tmp/requirements/worker.txt
+
+COPY pwnboard/__init__.py /opt/pwnboard/pwnboard/
+COPY pwnboard/core/ /opt/pwnboard/pwnboard/core/
+COPY pwnboard/worker/ /opt/pwnboard/pwnboard/worker/
+
 USER pwnboard
 
-# CMD ["python", "pwnboard.py"] # uncomment for non gunicorn deploy
-CMD /opt/venv/bin/gunicorn --bind 0.0.0.0:$FLASK_PORT --workers 3 --threads 4 pwnboard:app
+CMD ["python", "-m", "pwnboard.worker"]
+
+# Web: dashboard and beacon endpoints (last stage, so a plain `docker build .` produces this one)
+FROM base AS web
+
+EXPOSE 5000
+
+COPY requirements/ /tmp/requirements/
+RUN /opt/venv/bin/pip install --no-cache-dir -r /tmp/requirements/web.txt
+
+COPY pwnboard/__init__.py /opt/pwnboard/pwnboard/
+COPY pwnboard/core/ /opt/pwnboard/pwnboard/core/
+COPY pwnboard/web/ /opt/pwnboard/pwnboard/web/
+
+USER pwnboard
+
+CMD ["gunicorn", "-c", "python:pwnboard.web.gunicorn_conf", "pwnboard.web:app"]

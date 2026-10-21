@@ -3,8 +3,9 @@ import secrets
 import hashlib
 import time
 
-from . import logger, ph, get_db
-from .db import dict_cursor
+from . import ph, get_db
+from ..core.db import dict_cursor
+from ..core.logger import logger
 
 def _hash_token(raw_token):
     return hashlib.sha256(raw_token.encode('utf-8')).hexdigest()

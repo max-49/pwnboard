@@ -1,6 +1,1 @@
-flask
-markupsafe
-argon2-cffi
-gunicorn
-psycopg2-binary
-redis
+-r requirements/web.txt

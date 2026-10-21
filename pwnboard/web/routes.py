@@ -3,12 +3,13 @@ from flask import request, session, render_template, make_response, url_for, red
 
 import os
 import logging
-import copy
 import json
 
 from .authentication import verifyUser
-from .data import getBoardDict, getEpoch
-from . import app, BOARD, r, login_required, admin_required, USE_ACCESS_TOKENS
+from ..core.board import BOARD
+from ..core.data import getBoardDict
+from ..core.queues import BOARD_CACHE_KEY, redis_client
+from . import app, get_db, login_required, admin_required, USE_ACCESS_TOKENS
 
 LOGIN_PAGE_MESSAGE = os.environ.get("LOGIN_PAGE_MESSAGE", "Contact an admin to make an account!")
 REFRESH_SECONDS = os.environ.get("REFRESH_SECONDS", 10)
@@ -42,13 +43,13 @@ def index():
     board = None
     error = None
 
-    cached_board_str = r.get('board_cache')
+    cached_board_str = redis_client.get(BOARD_CACHE_KEY)
     if cached_board_str:
         log.info("Pulling board data from Redis cache")
         board = json.loads(cached_board_str)
     else:
         log.info("Redis cache empty, generating board from database")
-        board = getBoardDict()
+        board = getBoardDict(get_db())
     
     # Always render HTML per-request so session-specific navbar data stays accurate
     theme = os.environ.get('PWN_THEME', "blue")

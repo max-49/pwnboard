@@ -21,5 +21,7 @@ environment variables and their default settings.
 | `POSTGRES_USER` | `pwnboard_user` | PostgreSQL username |
 | `POSTGRES_PASSWORD` | `password` | PostgreSQL password |
 | `DATABASE_URL` | — | Optional full DSN override (`postgres://user:pass@host:5432/dbname`) |
+| `REDIS_HOST` | `redis` | Redis host (used by both the web app and the worker) |
+| `REDIS_PORT` | `6379` | Redis port |
 
 this is an easter egg

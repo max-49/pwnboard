@@ -1,93 +1,20 @@
-import os
-from contextlib import contextmanager
+# Password of the read-only Postgres role that Grafana connects as. Must match
+# conf/grafana/provisioning/datasources/pwnboard-datasource.yaml.
+GRAFANA_DB_PASSWORD = "pwnB0ard-p4ssw0rd1#"
 
-from psycopg2.pool import ThreadedConnectionPool
-from psycopg2.extras import RealDictCursor
-from flask import g
+# Arbitrary constant used to serialize schema setup between the web and worker
+# containers when both start at the same time.
+_SCHEMA_LOCK_ID = 7281001
 
-_pool = None
-
-
-def _build_dsn():
-    database_url = os.environ.get("DATABASE_URL")
-    if database_url:
-        return database_url
-    
-    password = os.environ.get("POSTGRES_PASSWORD", "password")
-
-    return (
-        f"host=db "
-        f"port=5432 "
-        f"dbname=pwnboard_db "
-        f"user=pwnboard_user "
-        f"password={password} "
-        "connect_timeout=5"
-    )
-
-
-def init_pool():
-    global _pool
-    if _pool is not None:
-        return _pool
-
-    minconn = int(os.environ.get("POSTGRES_POOL_MIN", "1"))
-    maxconn = int(os.environ.get("POSTGRES_POOL_MAX", "20"))
-    dsn = _build_dsn()
-    _pool = ThreadedConnectionPool(minconn, maxconn, dsn=dsn)
-    return _pool
-
-
-def get_pool():
-    return init_pool()
-
-
-@contextmanager
-def pooled_connection():
-    pool = get_pool()
-    conn = pool.getconn()
-    try:
-        yield conn
-    finally:
-        try:
-            conn.rollback()
-        except Exception:
-            pass
-        pool.putconn(conn)
-
-
-def get_db_connection():
-    """Return request-scoped PostgreSQL connection on flask.g."""
-    if getattr(g, "db", None) is None:
-        pool = get_pool()
-        g.db = pool.getconn()
-    return g.db
-
-
-def close_db_connection():
-    conn = getattr(g, "db", None)
-    if conn is not None:
-        try:
-            try:
-                conn.rollback()
-            except Exception:
-                pass
-            get_pool().putconn(conn)
-        finally:
-            delattr(g, "db")
-
-
-def init_schema(default_user, default_password_hash, default_password):
-    escaped_default_password = "pwnB0ard-p4ssw0rd1#"
-    # escaped_default_password = default_password.replace("'", "''")
-    ddl = f"""
+_DDL = f"""
     DO $$
     BEGIN
         IF NOT EXISTS (
             SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'grafana_user'
         ) THEN
-            CREATE USER grafana_user WITH PASSWORD '{escaped_default_password}';
+            CREATE USER grafana_user WITH PASSWORD '{GRAFANA_DB_PASSWORD}';
         ELSE
-            ALTER USER grafana_user WITH PASSWORD '{escaped_default_password}';
+            ALTER USER grafana_user WITH PASSWORD '{GRAFANA_DB_PASSWORD}';
         END IF;
     END
     $$;
@@ -181,56 +108,20 @@ def init_schema(default_user, default_password_hash, default_password):
 
     CREATE INDEX IF NOT EXISTS idx_credentials_by_user_ip ON credentials_by_user(ip);
     CREATE INDEX IF NOT EXISTS idx_credentials_by_user_last_seen ON credentials_by_user(last_seen);
+"""
 
-    CREATE TABLE IF NOT EXISTS logs (
-        id BIGSERIAL PRIMARY KEY,
-        timestamp TIMESTAMPTZ NOT NULL,
-        level TEXT NOT NULL,
-        ip INET,
-        app TEXT,
-        message TEXT NOT NULL
-    );
 
-    CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp);
-    CREATE INDEX IF NOT EXISTS idx_logs_app_timestamp ON logs(app, timestamp);
+def ensure_schema(conn):
+    """Create the tables and Grafana role if they do not exist yet.
+
+    Safe to call from several processes at once: the whole setup runs inside one
+    transaction that holds a Postgres advisory lock.
     """
-
-    with pooled_connection() as conn:
-        conn.autocommit = False
-        try:
-            with conn.cursor() as cur:
-                cur.execute(ddl)
-                cur.execute(
-                    """
-                    INSERT INTO users(username, password, role)
-                    VALUES (%s, %s, 'admin')
-                    ON CONFLICT (username) DO NOTHING
-                    """,
-                    (default_user, default_password_hash),
-                )
-            conn.commit()
-        except Exception:
-            conn.rollback()
-            raise
-
-def clear_callbacks():
-    ddl = """
-    TRUNCATE TABLE hosts;
-    TRUNCATE TABLE callbacks;
-    TRUNCATE TABLE callback_events;
-    TRUNCATE TABLE credentials_latest;
-    TRUNCATE TABLE credentials_by_user;
-    """
-
-    with pooled_connection() as conn:
-        conn.autocommit = False
-        try:
-            with conn.cursor() as cur:
-                cur.execute(ddl)
-            conn.commit()
-        except Exception:
-            conn.rollback()
-            raise
-
-def dict_cursor(conn):
-    return conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT pg_advisory_xact_lock(%s)", (_SCHEMA_LOCK_ID,))
+            cur.execute(_DDL)
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise

@@ -1,18 +1,16 @@
 import time
 import json
-import redis
 import threading
 from psycopg2.extras import execute_values
 
-from logger import logger
-from pwnboard.db import init_pool, pooled_connection
-from pwnboard.data import getBoardDict
-from board_config import TEAM_MAP
+from ..core.board import TEAM_MAP
+from ..core.data import getBoardDict
+from ..core.db import init_pool, pooled_connection, direct_connection
+from ..core.logger import logger
+from ..core.queues import BOARD_CACHE_KEY, CALLBACK_QUEUE, CREDS_QUEUE, redis_client
+from ..core.schema import ensure_schema
 
 TIMEOUT_SECONDS = 15
-
-init_pool()
-r = redis.StrictRedis(host="redis", port=6379, decode_responses=True)
 
 cache_update_event = threading.Event()
 
@@ -23,7 +21,7 @@ def process_callbacks(batch_json, db):
     latest_hosts = {}
     latest_callbacks = {}
 
-    print(f"Processing {len(batch_json)} callbacks at once from the redis queue.")
+    logger.info(f"Processing {len(batch_json)} callbacks at once from the redis queue.")
 
     # Since we RPOP, the batch is older -> newer.
     for item in batch_json:
@@ -90,7 +88,7 @@ def process_callbacks(batch_json, db):
                 list(latest_hosts.values()),
                 template="(%s, %s, %s, %s, %s, TRUE, NOW())"
             )
-        print("Saved to Postgres!")
+        logger.info("Saved to Postgres!")
 
 
 def process_creds(batch_json, db):
@@ -159,8 +157,8 @@ def ingest_thread():
     while True:
         try:
             # RPOP up to 500 items chronologically
-            callbacks_batch = r.rpop('callback_queue', 500)
-            creds_batch = r.rpop('creds_queue', 500)
+            callbacks_batch = redis_client.rpop(CALLBACK_QUEUE, 500)
+            creds_batch = redis_client.rpop(CREDS_QUEUE, 500)
 
             # If there is data in either queue, process it
             if callbacks_batch or creds_batch:
@@ -198,8 +196,8 @@ def cache_thread():
                 cache_update_event.clear()
             
             with pooled_connection() as db:
-                new_board_data = getBoardDict(db_conn=db)
-                r.set('board_cache', json.dumps(new_board_data))
+                new_board_data = getBoardDict(db)
+                redis_client.set(BOARD_CACHE_KEY, json.dumps(new_board_data))
 
             logger.info("Board cache updated")
                 
@@ -209,6 +207,11 @@ def cache_thread():
 
 
 def main():
+    # The web container normally creates the schema; this only matters if the worker wins the race
+    with direct_connection() as conn:
+        ensure_schema(conn)
+    init_pool()
+
     # Start board cache generation thread on a different thread
     t_cache = threading.Thread(target=cache_thread, daemon=True)
     t_cache.start()

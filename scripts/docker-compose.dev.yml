@@ -3,6 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: web
     image: pwnboard:dev
     pull_policy: never
 
@@ -10,5 +11,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: worker:dev
+      target: worker
+    image: pwnboard-worker:dev
     pull_policy: never

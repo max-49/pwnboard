@@ -1,24 +1,14 @@
 #!/usr/bin/env python3
 '''
-Initialize all the data and the config info
+Flask web app: dashboard, login, token and user management, and the beacon/creds endpoints
 '''
 from flask import Flask, g, session, redirect, url_for
 import re
 import os
-import json
-import redis
-import logging
 from functools import wraps
 from argon2 import PasswordHasher
 from markupsafe import Markup, escape
-from .logging_handler import DBHandler
-from .logger import logger
-from .board_config import BOARD, TEAM_MAP, IP_SET
-from .db import init_pool, init_schema, get_db_connection, close_db_connection
-
-BOARD = BOARD
-TEAM_MAP = TEAM_MAP
-IP_SET = IP_SET
+from ..core.db import get_pool
 
 access_token_choice = os.environ.get("USE_ACCESS_TOKENS", "True")
 if (access_token_choice.lower() in ("true", "t")):
@@ -28,14 +18,9 @@ else:
 
 # Create the Flask app
 app = Flask(__name__)
-app.config['STATIC_FOLDER'] = "lib/static"
 # Basic secret key for session support (override in production)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret')
-r = redis.StrictRedis(host="redis", port=6379, decode_responses=True)
 ph = PasswordHasher()
-
-# Basic pool initialization (safe to call multiple times)
-init_pool()
 
 # Simple linkify filter: convert http(s) URLs inside a string into clickable links
 # Returns Markup so it's safe to render in templates
@@ -64,23 +49,24 @@ def linkify(text):
 # Register the filter with Jinja environment
 app.jinja_env.filters['linkify'] = linkify
 
-default_user = os.environ.get("DEFAULT_USER", "admin")
-default_password = os.environ.get("DEFAULT_USER_PASSWORD", "password")
-init_schema(default_user=default_user, default_password_hash=ph.hash(default_password), default_password=default_password)
-logger.addHandler(DBHandler())
-
 def get_db():
     """Return a per-request PostgreSQL connection stored on flask.g."""
-    return get_db_connection()
-
-
-def get_logs_db():
-    """Return a PostgreSQL connection for logs queries."""
-    return get_db_connection()
+    if getattr(g, "db", None) is None:
+        g.db = get_pool().getconn()
+    return g.db
 
 
 def close_db(e=None):
-    close_db_connection()
+    conn = getattr(g, "db", None)
+    if conn is not None:
+        try:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            get_pool().putconn(conn)
+        finally:
+            delattr(g, "db")
 
 # Close DB when app is ended
 app.teardown_appcontext(close_db)
@@ -106,6 +92,6 @@ def admin_required(f):
         return f(*args, **kwargs)
     return wrapper
 
-# Import routes from routes file
-from . import routes
-from . import endpoints
+# Import routes from routes file (imported for their route registrations)
+from . import routes  # noqa: E402,F401
+from . import endpoints  # noqa: E402,F401

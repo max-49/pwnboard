@@ -46,11 +46,9 @@ services:
       retries: 10
 
   worker:
-    image: ghcr.io/max-49/pwnboard:latest
-    command: /opt/venv/bin/python /opt/pwnboard/pwnboard/worker.py
+    image: ghcr.io/max-49/pwnboard-worker:latest
     restart: unless-stopped
     environment:
-      - PYTHONPATH=/opt/pwnboard
       - POSTGRES_PASSWORD=${PWNBOARD_PASSWORD}
     volumes:
       - ./board.json:/opt/pwnboard/board.json:ro
