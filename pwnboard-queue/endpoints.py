@@ -101,12 +101,12 @@ def creds_callback():
             if ip in IP_SET:
                 d = dict(data)
                 d['ip'] = ip
-                r.lpush('cred_queue', json.dumps(d))
+                r.lpush('creds_queue', json.dumps(d))
             else:
                 return 'invalid IP\n', 400
     elif 'ip' in data:
         if data['ip'] in IP_SET:
-            r.lpush('cred_queue', json.dumps(data))
+            r.lpush('creds_queue', json.dumps(data))
         else:
             return 'invalid IP\n', 400
     else:

@@ -19,7 +19,10 @@ services:
     volumes:
       - ./board.json:/opt/pwnboard/board.json:ro
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
   redis:
     image: redis:alpine
@@ -28,6 +31,8 @@ services:
   db:
     image: postgres:15-alpine
     restart: always
+    # Skip the fsync wait on commit; a crash can lose the last few ms of beacon data
+    command: postgres -c synchronous_commit=off
     environment:
       POSTGRES_DB: pwnboard_db
       POSTGRES_USER: pwnboard_user
@@ -46,11 +51,14 @@ services:
     restart: unless-stopped
     environment:
       - PYTHONPATH=/opt/pwnboard
+      - POSTGRES_PASSWORD=${PWNBOARD_PASSWORD}
     volumes:
       - ./board.json:/opt/pwnboard/board.json:ro
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
   data:
     image: grafana/grafana:latest
@@ -59,7 +67,13 @@ services:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=${PWNBOARD_PASSWORD}
       - GF_PLUGINS_PREINSTALL=magnesium-wordcloud-panel
-      - GF_SECURITY_ALLOW_EMBEDDING=true 
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+      # Don't phone home to grafana.com / gravatar; on a filtered network these hang until timeout
+      - GF_ANALYTICS_CHECK_FOR_UPDATES=false
+      - GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES=false
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+      - GF_NEWS_NEWS_FEED_ENABLED=false
+      - GF_SECURITY_DISABLE_GRAVATAR=true
     volumes:
       - ./conf/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
       - ./conf/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
