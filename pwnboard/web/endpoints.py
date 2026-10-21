@@ -8,6 +8,9 @@ import json
 from .authentication import (
     changeUserPassword,
     createAccessToken,
+    MAX_PASSWORD_LENGTH,
+    USERNAME_RE,
+    VALID_ROLES,
     createUser,
     list_user_tokens,
     removeAccessToken,
@@ -21,66 +24,115 @@ from ..core.queues import CALLBACK_QUEUE, CREDS_QUEUE, redis_client
 
 from . import app, get_db, login_required, admin_required, USE_ACCESS_TOKENS
 
+MAX_TOKEN_NAME_LENGTH = 64
+MAX_APPLICATION_LENGTH = 64
+MAX_DESCRIPTION_LENGTH = 256
+
+# Longest accepted value for each string field in beacon and credential payloads
+PAYLOAD_STRING_LIMITS = {
+    'ip': 45,
+    'application': MAX_APPLICATION_LENGTH,
+    'access_info': 2000,
+    'username': 256,
+    'password': 256,
+}
+MAX_IPS_PER_REQUEST = 1000
+
+
+def _read_payload():
+    """Parse the request body as a JSON object. Returns (data, error_response)."""
+    data = request.get_json(force=True, silent=True)
+    if not isinstance(data, dict):
+        return None, ("Invalid: the request body must be a JSON object\n", 400)
+    return data, None
+
+
+def _check_payload_types(data):
+    """Return an error response if a field has the wrong type or is too long, else None."""
+    for field, limit in PAYLOAD_STRING_LIMITS.items():
+        if field in data and (not isinstance(data[field], str) or len(data[field]) > limit):
+            return f"Invalid: '{field}' must be a string of at most {limit} characters\n", 400
+    ips = data.get('ips')
+    if isinstance(ips, list):
+        if len(ips) > MAX_IPS_PER_REQUEST:
+            return f"Invalid: 'ips' can contain at most {MAX_IPS_PER_REQUEST} addresses\n", 400
+        if not all(isinstance(ip, str) and len(ip) <= PAYLOAD_STRING_LIMITS['ip'] for ip in ips):
+            return "Invalid: 'ips' must be a list of strings\n", 400
+    return None
+
+
+def _authorize(application):
+    """Check the access token when tokens are enabled. Returns an error response, or None if allowed."""
+    if not USE_ACCESS_TOKENS:
+        return None
+
+    auth_header = request.headers.get('Authorization')
+    if not auth_header:
+        return "Not authorized. This server uses Access Tokens to authenticate requests!\n", 401
+
+    parts = auth_header.split(' ')
+    if parts[0].strip().lower() != "bearer" or len(parts) < 2 or not parts[1].strip():
+        return "Please use Bearer Token (and Bearer keyword)\n", 401
+
+    if not verifyAccessToken(parts[1].strip(), application):
+        return "Not authorized! Ensure 'application' field matches PWNBoard app name.\n", 401
+    return None
+
+
+def _enqueue(queue, data):
+    """Push the payload onto a Redis queue once per IP. Returns an error response, or None on success."""
+    if 'ips' in data and isinstance(data['ips'], list):
+        for ip in data['ips']:
+            if ip not in IP_SET:
+                return 'invalid IP\n', 400
+            # Queue a copy for this IP without the full list of addresses
+            item = {k: v for k, v in data.items() if k != 'ips'}
+            item['ip'] = ip
+            redis_client.lpush(queue, json.dumps(item))
+    elif 'ip' in data:
+        if data['ip'] not in IP_SET:
+            return 'invalid IP\n', 400
+        redis_client.lpush(queue, json.dumps(data))
+    else:
+        return 'invalid POST\n', 400
+    return None
+
+
 @app.route('/checkin', methods=['POST'])
 @app.route('/pwn', methods=['POST'])
 def callback():
     """Handle when a server registers an callback"""
-    data = request.get_json(force=True) or {}
+    data, error = _read_payload()
+    if error:
+        return error
 
     if 'challenge' in data:
-        return data['challenge']
+        # Plain text, so the echoed value is never rendered as HTML
+        return Response(str(data['challenge']), mimetype='text/plain')
     data['last_seen'] = getEpoch()
 
     # Make sure 'application' is in the data
     if 'application' not in data:
         return "Invalid: Missing 'application' field in the request", 400
 
-    if USE_ACCESS_TOKENS:
-        auth_header = request.headers.get('Authorization')
-
-        if not auth_header:
-            return "Not authorized. This server uses Access Tokens to authenticate requests!\n", 401
-        
-        auth_header_split = auth_header.split(' ')
-        if auth_header_split[0].strip().lower() != "bearer":
-            return "Please use Bearer Token (and Bearer keyword)\n", 401
-        
-        token = auth_header_split[1].strip()
-
-        verification = verifyAccessToken(token, data['application'])
-
-        if (verification == False):
-            return "Not authorized! Ensure 'application' field matches PWNBoard app name.\n", 401
-
-    if 'ips' in data and isinstance(data['ips'], list):
-        for ip in data['ips']:
-            if ip in IP_SET:
-                # Create a copy for the specific IP and push to Redis
-                d = dict(data)
-                d['ip'] = ip
-                redis_client.lpush(CALLBACK_QUEUE, json.dumps(d))
-            else:
-                return 'invalid IP\n', 400
-    elif 'ip' in data:
-        if data['ip'] in IP_SET:
-            redis_client.lpush(CALLBACK_QUEUE, json.dumps(data))
-        else:
-            return 'invalid IP\n', 400
-    else:
-        return 'invalid POST\n', 400
+    error = _check_payload_types(data) or _authorize(data['application']) or _enqueue(CALLBACK_QUEUE, data)
+    if error:
+        return error
     return "valid\n", 200
 
 
 @app.route('/creds', methods=['POST'])
 def creds_callback():
     """Handle when a server registers a credential update"""
-    data = request.get_json(force=True) or {}
+    data, error = _read_payload()
+    if error:
+        return error
     # data = {"ip": <ip>, "username": <username>, "password": <password>, "admin": 0/1} --> callback
     data['last_seen'] = getEpoch()
     # Make sure username and password are in the data
     if 'username' not in data or 'password' not in data or 'application' not in data:
         return "Invalid: Missing 'username', 'password', or 'application' in the request\n", 400
-    
+
     if 'admin' in data:
         if data['admin'] not in [0,1]:
             return "Invalid: admin must be set to either 0 (not admin) or 1 (admin)\n", 400
@@ -88,40 +140,9 @@ def creds_callback():
         # -1 = unknown
         data['admin'] = -1
 
-    if USE_ACCESS_TOKENS:
-        auth_header = request.headers.get('Authorization')
-
-        if not auth_header:
-            return "Not authorized. This server uses Access Tokens to authenticate requests!\n", 401
-        
-        auth_header_split = auth_header.split(' ')
-        if auth_header_split[0].strip().lower() != "bearer":
-            return "Please use Bearer Token (and Bearer keyword)\n", 401
-        
-        token = auth_header_split[1].strip()
-
-        verification = verifyAccessToken(token, data['application'])
-
-        if (verification == False):
-            return "Not authorized! Ensure 'application' field matches PWNBoard app name.\n", 401
-
-    if 'ips' in data and isinstance(data['ips'], list):
-        for ip in data['ips']:
-            if ip in IP_SET:
-                d = dict(data)
-                d['ip'] = ip
-                redis_client.lpush(CREDS_QUEUE, json.dumps(d))
-            else:
-                return 'invalid IP\n', 400
-    elif 'ip' in data:
-        if data['ip'] in IP_SET:
-            redis_client.lpush(CREDS_QUEUE, json.dumps(data))
-        else:
-            return 'invalid IP\n', 400
-    else:
-        return 'invalid POST\n', 400
-    # Tell routes cache that new data has come in
-    # mark_board_cache_dirty()
+    error = _check_payload_types(data) or _authorize(data['application']) or _enqueue(CREDS_QUEUE, data)
+    if error:
+        return error
     return "valid\n", 200
 
 
@@ -213,6 +234,12 @@ def create_token():
         return ("Forbidden", 403)
     application = request.form.get('application', '').strip()
     description = request.form.get('description', '')
+    if not token_name or len(token_name) > MAX_TOKEN_NAME_LENGTH:
+        return (f"Token name is required (max {MAX_TOKEN_NAME_LENGTH} characters)", 400)
+    if not application or len(application) > MAX_APPLICATION_LENGTH:
+        return (f"Application is required (max {MAX_APPLICATION_LENGTH} characters)", 400)
+    if len(description) > MAX_DESCRIPTION_LENGTH:
+        return (f"Description must be at most {MAX_DESCRIPTION_LENGTH} characters", 400)
     expiry = request.form.get('expiry', '7d')
     # parse expiry like '30m', '5d', '1h', '6mo' into seconds; default 7 days
     seconds_map = {'m': 60, 'h': 3600, 'd': 86400, 'w': 604800, 'mo': 2592000, 'y': 31536000}
@@ -295,11 +322,9 @@ def admin_bulk_create_users():
     if not usernames_raw or not password:
         return ("Missing fields", 400)
 
-    valid_roles = {'user', 'admin', 'guest', 'restricted'}
-    if role not in valid_roles:
+    if role not in VALID_ROLES:
         return ("Invalid role", 400)
 
-    USERNAME_RE = re.compile(r'^[a-zA-Z0-9_.\-]+$')
     usernames = [u.strip() for u in usernames_raw.split(',')]
     usernames = [u for u in usernames if u]
 
@@ -309,7 +334,7 @@ def admin_bulk_create_users():
     errors = []
     for uname in usernames:
         if not USERNAME_RE.match(uname):
-            errors.append(f"Invalid username {uname!r}: only letters, digits, _, ., - are allowed")
+            errors.append(f"Invalid username {uname!r}: only letters, digits, _, ., - are allowed (max 64 characters)")
 
     if errors:
         return ("\n".join(errors), 400)
@@ -342,10 +367,6 @@ def admin_bulk_create_users_csv():
     except Exception:
         return ("Could not decode file as UTF-8", 400)
 
-    USERNAME_RE = re.compile(r'^[a-zA-Z0-9_.\-]+$')
-    PASSWORD_RE = re.compile(r'^.{1,128}$')
-    VALID_ROLES = {'user', 'admin', 'guest', 'restricted'}
-
     try:
         reader = csv.reader(io.StringIO(content))
         rows = list(reader)
@@ -371,11 +392,11 @@ def admin_bulk_create_users_csv():
         if not uname:
             errors.append(f"Row {i}: username is empty")
         elif not USERNAME_RE.match(uname):
-            errors.append(f"Row {i}: invalid username {uname!r} (only letters, digits, _, ., - allowed)")
+            errors.append(f"Row {i}: invalid username {uname!r} (only letters, digits, _, ., - allowed, max 64 characters)")
         if not passwd:
             errors.append(f"Row {i}: password is empty")
-        elif not PASSWORD_RE.match(passwd):
-            errors.append(f"Row {i}: password must be between 1 and 128 characters")
+        elif len(passwd) > MAX_PASSWORD_LENGTH:
+            errors.append(f"Row {i}: password must be between 1 and {MAX_PASSWORD_LENGTH} characters")
         if role not in VALID_ROLES:
             errors.append(f"Row {i}: invalid role {role!r} (must be one of: {', '.join(sorted(VALID_ROLES))})")
 
@@ -402,6 +423,8 @@ def account_change_password():
     new_pass = request.form.get('new_pass', '')
     if not old_pass or not new_pass:
         return ("Missing fields", 400)
+    if len(new_pass) > MAX_PASSWORD_LENGTH:
+        return (f"Password must be at most {MAX_PASSWORD_LENGTH} characters", 400)
     ok = changeUserPassword(username, old_pass, new_pass)
     if ok:
         # invalidate the session so the user must re-authenticate after password change

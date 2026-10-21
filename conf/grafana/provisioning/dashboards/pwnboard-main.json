@@ -600,7 +600,7 @@
           "dataset": "pwnboard_db",
           "editorMode": "builder",
           "format": "table",
-          "rawSql": "SELECT password AS \"word\", COUNT(*) AS \"count\" FROM credentials_by_user GROUP BY password ORDER BY COUNT(*) LIMIT 100 ",
+          "rawSql": "SELECT password AS \"word\", COUNT(*) AS \"count\" FROM credentials_by_user GROUP BY password ORDER BY COUNT(*) DESC LIMIT 100 ",
           "refId": "A",
           "sql": {
             "columns": [

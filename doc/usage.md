@@ -20,6 +20,7 @@
 - The body is JSON, sent with `Content-Type: application/json`.
 - If access tokens are enabled (the default), add the header `Authorization: Bearer <token>`.
 - The `ip` must be one of the hosts on the PWNBoard, otherwise the request is rejected.
+- Requests larger than 1 MB are rejected, and fields have length limits (see [Responses](#responses)).
 
 ## Generate an Access Token for your tool
 To create an access token for your application:
@@ -73,9 +74,13 @@ Passwords that are one character or shorter are ignored. Credentials stay on the
 | `400` | `invalid IP` | The `ip` is not on this PWNBoard (a wrong or unexpected address is the usual cause) |
 | `400` | `invalid POST` | The body has neither `ip` nor `ips` |
 | `400` | `Invalid: Missing ...` | A required field is missing |
+| `400` | `Invalid: the request body must be a JSON object` | The body is not valid JSON, or is JSON but not an object (for example a list) |
+| `400` | `Invalid: '<field>' must be a string of at most N characters` | A field is not a string or is too long. Limits: `ip` 45, `application` 64, `access_info` 2000, `username` and `password` 256 characters |
+| `400` | `Invalid: 'ips' ...` | `ips` is not a list of strings, or has more than 1000 addresses |
 | `400` | `Invalid: admin must be ...` | `admin` was something other than `0` or `1` |
 | `401` | `Not authorized...` | Missing, wrong, or expired token, or the token's application does not match the `application` field |
 | `401` | `Please use Bearer Token...` | The `Authorization` header is not in the form `Bearer <token>` |
+| `413` | (HTML error page) | The request body is larger than 1 MB |
 
 If your data is not showing up, see [Troubleshooting](setup.md#troubleshooting).
 

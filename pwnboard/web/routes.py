@@ -8,8 +8,9 @@ import json
 from .authentication import verifyUser
 from ..core.board import BOARD
 from ..core.data import getBoardDict
+from ..core.logger import logger
 from ..core.queues import BOARD_CACHE_KEY, redis_client
-from . import app, get_db, login_required, admin_required, USE_ACCESS_TOKENS
+from . import app, get_db, login_required, admin_required, login_throttle, USE_ACCESS_TOKENS
 
 LOGIN_PAGE_MESSAGE = os.environ.get("LOGIN_PAGE_MESSAGE", "Contact an admin to make an account!")
 REFRESH_SECONDS = os.environ.get("REFRESH_SECONDS", 10)
@@ -28,12 +29,21 @@ def login_post():
     if not username or not password:
         return render_template('login.html', LOGIN_PAGE_MESSAGE=LOGIN_PAGE_MESSAGE, error='Username and password required')
     
+    client_ip = request.remote_addr or 'unknown'
+    if login_throttle.is_blocked(client_ip, username):
+        logger.warning("Blocked login attempt for %r from %s: too many recent failures", username, client_ip)
+        return render_template('login.html', LOGIN_PAGE_MESSAGE=LOGIN_PAGE_MESSAGE,
+                               error='Too many failed login attempts. Try again in 15 minutes.'), 429
+
     login_res = verifyUser(username, password)
     if login_res:
+        login_throttle.clear_username_failures(username)
+        session.permanent = True
         session['user'] = login_res[0]
         session['role'] = login_res[1]
         return redirect(url_for('index'))
     else:
+        login_throttle.record_failure(client_ip, username)
         return render_template('login.html', LOGIN_PAGE_MESSAGE=LOGIN_PAGE_MESSAGE, error='Invalid username or password')
 
 @app.route('/pwnboard', methods=['GET'])

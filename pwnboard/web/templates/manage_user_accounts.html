@@ -4,9 +4,9 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Manage User Accounts - PWNboard</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
-    <link href='https://fonts.googleapis.com/css?family=Titillium+Web:600,400' rel='stylesheet' type='text/css' />
-    <link href='https://fonts.googleapis.com/css?family=Jura:400,600' rel='stylesheet' type='text/css' />
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}">
+    <link href='https://fonts.googleapis.com/css?family=Titillium+Web:600,400&display=swap' rel='stylesheet' type='text/css' />
+    <link href='https://fonts.googleapis.com/css?family=Jura:400,600&display=swap' rel='stylesheet' type='text/css' />
     <link rel='stylesheet' href="{{ url_for('static', filename='pwnboard.css') }}" type='text/css' />
     <style>
     /* small helpers consistent with other templates */
@@ -167,9 +167,10 @@
         </div>
     </div>
 
-    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.14.7/dist/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+    <script src="{{ url_for('static', filename='vendor/jquery.slim.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/popper.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/bootstrap.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='escape.js') }}"></script>
     <script>
     (function(){
         const usersTable = document.getElementById('users-table');
@@ -193,7 +194,7 @@
                     noUsers.style.display='none'; usersTable.style.display='';
                     data.forEach(u=>{
                         const tr = document.createElement('tr');
-                        tr.innerHTML = `<td class="align-middle">${u.username}</td><td class="align-middle">${u.role||''}</td><td class="align-middle">${u.created?fmt(u.created):''}</td><td class="align-middle"><button class="btn btn-sm btn-danger btn-delete" data-user="${u.username}">Delete</button> <button class="btn btn-sm btn-outline-secondary btn-view-tokens" data-user="${u.username}">Tokens</button></td>`;
+                        tr.innerHTML = `<td class="align-middle">${escHtml(u.username)}</td><td class="align-middle">${escHtml(u.role||'')}</td><td class="align-middle">${u.created?fmt(u.created):''}</td><td class="align-middle"><button class="btn btn-sm btn-danger btn-delete" data-user="${escHtml(u.username)}">Delete</button> <button class="btn btn-sm btn-outline-secondary btn-view-tokens" data-user="${escHtml(u.username)}">Tokens</button></td>`;
                         usersTbody.appendChild(tr);
                     });
                 }
@@ -261,7 +262,7 @@
                         const tr = document.createElement('tr');
                         const dot = '\u00B7';
                         const prefix = t.prefix || (t.token ? t.token.slice(0,3) : '');
-                        tr.innerHTML = `<td>${t.token_name||''}</td><td class="mono">${prefix+dot.repeat(8)}</td><td>${t.application||''}</td><td>${fmt(t.created)}</td><td>${fmt(t.expires)}</td><td><button class="btn btn-sm btn-danger btn-delete-token" data-hash="${t.hash}">Delete</button></td>`;
+                        tr.innerHTML = `<td>${escHtml(t.token_name||'')}</td><td class="mono">${escHtml(prefix+dot.repeat(8))}</td><td>${escHtml(t.application||'')}</td><td>${fmt(t.created)}</td><td>${fmt(t.expires)}</td><td><button class="btn btn-sm btn-danger btn-delete-token" data-hash="${escHtml(t.hash)}">Delete</button></td>`;
                         tokensTbody.appendChild(tr);
                     });
                 }
@@ -388,8 +389,6 @@
                 }
             } catch(e){ feedback.innerHTML='<span class="text-danger">Request failed</span>'; }
         }
-
-        function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
         // initial load
         loadUsers();

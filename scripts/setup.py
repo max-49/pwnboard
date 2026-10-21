@@ -139,6 +139,8 @@ def configure_env() -> None:
 			"PWNBOARD_DOMAIN": domain,
 			"PWNBOARD_PASSWORD": password,
 			"SECRET_KEY": secret_key,
+			# Password of the read-only database user Grafana connects with. Keep an existing one.
+			"GRAFANA_DB_PASSWORD": existing.get("GRAFANA_DB_PASSWORD") or secrets.token_urlsafe(24),
 		},
 	)
 	print(f"Updated {ENV_PATH}")

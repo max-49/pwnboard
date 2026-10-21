@@ -9,6 +9,21 @@
     # The board HTML is ~4 KB per host cell uncompressed and compresses ~70x
     encode zstd gzip
 
+    # Beacon and credential payloads are tiny, so reject large request bodies
+    request_body {
+        max_size 1MB
+    }
+
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy strict-origin-when-cross-origin
+    }
+
+    # The vendored Bootstrap/jQuery files rarely change, so let browsers cache them
+    @vendor path /static/vendor/*
+    header @vendor Cache-Control "public, max-age=86400"
+
     reverse_proxy pwnboard:5000 {
         # This buffers incoming POST payloads up to 5MB before sending them
         request_buffers 5MB 

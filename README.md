@@ -71,6 +71,7 @@ Start by changing the values in the `.env` file. You must edit these for a secur
    PWNBOARD_DOMAIN=localhost # Hostname or IP that PWNBoard is served on (ex. pwnboard.win, 10.1.1.10). No https:// and no port
    SECRET_KEY=change-me-please # Flask secret used for signing session cookies
    PWNBOARD_PASSWORD=password # Default password for PWNBoard/Grafana
+   GRAFANA_DB_PASSWORD=... # Optional: password of the read-only database user Grafana uses (defaults to PWNBOARD_PASSWORD). scripts/setup.py generates one
    ```
 
 Edit optional paramters in the docker-compose.yml file. Here are some variables that you can change to best suit your needs.

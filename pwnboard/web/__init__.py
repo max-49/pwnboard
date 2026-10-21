@@ -5,9 +5,11 @@ Flask web app: dashboard, login, token and user management, and the beacon/creds
 from flask import Flask, g, session, redirect, url_for
 import re
 import os
+from datetime import timedelta
 from functools import wraps
 from argon2 import PasswordHasher
 from markupsafe import Markup, escape
+from werkzeug.middleware.proxy_fix import ProxyFix
 from ..core.db import get_pool
 
 access_token_choice = os.environ.get("USE_ACCESS_TOKENS", "True")
@@ -20,6 +22,16 @@ else:
 app = Flask(__name__)
 # Basic secret key for session support (override in production)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret')
+# Reject request bodies over 1 MB (beacon payloads are tiny; this also bounds CSV uploads)
+app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024
+# Caddy is the only thing that talks to this app, so trust its X-Forwarded-For header for the client IP
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1)
+
+# Session cookies: HTTPS only (except in debug mode, for http://localhost), not sent on cross-site POSTs
+app.config['SESSION_COOKIE_SECURE'] = os.environ.get("FLASK_DEBUG", "false").lower().strip() not in ("true", "yes", "1", "t")
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+# Logins expire after 12 hours without activity
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=12)
 ph = PasswordHasher()
 
 # Simple linkify filter: convert http(s) URLs inside a string into clickable links

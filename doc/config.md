@@ -12,6 +12,8 @@ environment variables and their default settings.
 | `HOST_TIMEOUT` | `2` | Minutes before host marked offline |
 | `CREDS_TIMEOUT` | `30` | Minutes before credentials marked stale |
 | `PWN_THEME` | `blue` | Color theme: `blue` (red=active) or `green` (green=active) |
+| `PWNBOARD_LOG_LEVEL` | `INFO` | Log level for the web app and worker (`DEBUG`, `INFO`, `WARNING`, ...) |
+| `GRAFANA_DB_PASSWORD` | `PWNBOARD_PASSWORD` | Password of the read-only database user Grafana connects with (set in `.env`; `scripts/setup.py` generates one). Avoid single quotes in it |
 | `LOGIN_PAGE_MESSAGE` | `Contact an admin to get an account!` | Message that shows on the login page by default
 | `USE_ACCESS_TOKENS` | `true` | Use access tokens for POST authentication
 | `POSTGRES_HOST` | `db` | PostgreSQL host |
