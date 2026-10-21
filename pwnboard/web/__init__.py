@@ -49,6 +49,9 @@ def linkify(text):
 # Register the filter with Jinja environment
 app.jinja_env.filters['linkify'] = linkify
 
+# Linked from the dashboard menu and the Manage Apps page
+app.jinja_env.globals['USAGE_GUIDE_URL'] = "https://github.com/max-49/pwnboard/blob/main/doc/usage.md"
+
 def get_db():
     """Return a per-request PostgreSQL connection stored on flask.g."""
     if getattr(g, "db", None) is None:

@@ -27,6 +27,9 @@
                     <div style="flex:1">
                         <strong>New token</strong>
                         <div id="ephemeral-token-value" class="mono bg-light p-2 mt-2" style="word-break:break-all;"></div>
+                        <div class="small mt-2">
+                            Next, see the <a href="{{ USAGE_GUIDE_URL }}" target="_blank" rel="noopener noreferrer">usage guide</a> for copy-paste examples in curl, Python, Go, PowerShell and C#.
+                        </div>
                     </div>
                     <div class="ml-3 text-right">
                         <button id="ephemeral-copy" class="btn btn-sm btn-outline-primary mb-2">Copy</button>
@@ -42,7 +45,7 @@
             <div class="card-body">
                 <div class="mb-3 d-flex align-items-center">
                     <button id="btn-add-token" class="btn btn-success mr-3" type="button">+ Add Token</button>
-                    <small class="form-text text-muted">Created tokens are shown once. Keep them secure.</small>
+                    <small class="form-text text-muted">Created tokens are shown once. Keep them secure. See the <a href="{{ USAGE_GUIDE_URL }}" target="_blank" rel="noopener noreferrer">usage guide</a> for how to use them.</small>
                 </div>
 
                 <div id="tokens-loading" class="text-muted">Loading tokens...</div>

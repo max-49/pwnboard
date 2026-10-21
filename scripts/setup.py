@@ -170,7 +170,7 @@ def main() -> int:
 		configure_env()
 		configure_board()
 	except KeyboardInterrupt:
-		print("\nSetup cancelled.")
+		print("\nSetup canceled.")
 		return 130
 	except subprocess.CalledProcessError as exc:
 		print(f"\nCommand failed with exit code {exc.returncode}: {exc.cmd}")
