@@ -7,6 +7,18 @@ import copy
 from .logger import logger
 from .board import BOARD
 
+# How long after the last callback a host counts as online, and how long credentials count
+# as current, in minutes. Set HOST_TIMEOUT / CREDS_TIMEOUT to change them. The web app and
+# the worker must use the same values, because the worker builds the board the web app shows.
+DEFAULT_HOST_TIMEOUT = 5
+DEFAULT_CREDS_TIMEOUT = 30
+
+def getHostTimeout():
+    return int(os.environ.get("HOST_TIMEOUT", DEFAULT_HOST_TIMEOUT))
+
+def getCredsTimeout():
+    return int(os.environ.get("CREDS_TIMEOUT", DEFAULT_CREDS_TIMEOUT))
+
 def getEpoch():
     '''
     Return the current Epoch time
@@ -30,7 +42,7 @@ def getActiveCreds(ip, db):
     try:
         total_creds = 0
         all_valid_creds = []
-        creds_timeout = int(os.environ.get("CREDS_TIMEOUT", 30))
+        creds_timeout = getCredsTimeout()
         stale_usernames = []
 
         with db.cursor() as cur:
@@ -80,7 +92,7 @@ def getActiveCallbacks(ip, db):
     try:
         num_valid_callbacks = 0
         active_callbacks = []
-        host_timeout = int(os.environ.get("HOST_TIMEOUT", 5))
+        host_timeout = getHostTimeout()
         stale_apps = []
 
         with db.cursor() as cur:
@@ -178,7 +190,7 @@ def getHostData(ip, db):
         # Handle creds but no callbacks
         status['Valid Creds'] = "Yes"
         # status['Last Creds Received'] = "{}m".format(creds_last)
-        if creds_last and creds_last > int(os.environ.get("CREDS_TIMEOUT", 30)):
+        if creds_last and creds_last > getCredsTimeout():
             status['creds_online'] = ""
             status['Valid Creds'] = "No"
         else:
@@ -206,14 +218,14 @@ def getHostData(ip, db):
 
     # Set the last seen time based on time calculations
     last = getTimeDelta(last)
-    if last and last > int(os.environ.get("HOST_TIMEOUT", 2)):
+    if last and last > getHostTimeout():
         if online:
             logger.warning("{} offline".format(ip))
         status['online'] = ''
     else:
         status['online'] = "True"
 
-    if creds_last and creds_last > int(os.environ.get("CREDS_TIMEOUT", 30)):
+    if creds_last and creds_last > getCredsTimeout():
         status['creds_online'] = ''
     elif creds:
         status['creds_online'] = "True"
