@@ -72,14 +72,14 @@ Start by changing the values in the `.env` file. You must edit these for a secur
    SECRET_KEY=change-me-please # Flask secret used for signing session cookies
    PWNBOARD_PASSWORD=password # Default password for PWNBoard/Grafana
    GRAFANA_DB_PASSWORD=... # Optional: password of the read-only database user Grafana uses (defaults to PWNBOARD_PASSWORD). scripts/setup.py generates one
+   HOST_TIMEOUT=5 # Optional: amount of time (in minutes) after which a host with no new callback is shown as offline. The web app and the worker both use it
+   CREDS_TIMEOUT=30 # Optional: amount of time (in minutes) after which credentials are shown as stale. The web app and the worker both use it
    ```
 
 Edit optional paramters in the docker-compose.yml file. Here are some variables that you can change to best suit your needs.
 
    ```yaml
    - REFRESH_SECONDS=10 # Change this to the amount of time (in seconds) after which you want your page to refresh with new data. Setting this to 0 or -1 will disable refreshing
-   - HOST_TIMEOUT=5 # Change this to the amount of time (in minutes) after which callbacks should time out if an update is not received
-   - CREDS_TIMEOUT=30 # Change this to the amount of time (in minutes) after which credentials should time out if an update is not received
    - DEFAULT_USER=admin # This will be your default user
    - LOGIN_PAGE_MESSAGE=Contact an admin to get an account! # Change this if you want your welcome message on the home page to be different
    - USE_ACCESS_TOKENS=true # Set this to false to disable the use of access tokens for authenticating POST requests

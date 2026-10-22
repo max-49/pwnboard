@@ -5,6 +5,12 @@ x-logging: &default-logging
     max-size: "10m"
     max-file: "3"
 
+# Timeouts, in minutes. The worker builds the board that the web app displays, so both
+# services need the same values. Change them by setting HOST_TIMEOUT / CREDS_TIMEOUT in .env.
+x-timeouts:
+  host: &host-timeout HOST_TIMEOUT=${HOST_TIMEOUT:-5}
+  creds: &creds-timeout CREDS_TIMEOUT=${CREDS_TIMEOUT:-30}
+
 services:
   pwnboard:
     image: ghcr.io/max-49/pwnboard:latest
@@ -17,8 +23,8 @@ services:
       - GRAFANA_DB_PASSWORD=${GRAFANA_DB_PASSWORD:-${PWNBOARD_PASSWORD}}
       - SECRET_KEY=${SECRET_KEY}
       - REFRESH_SECONDS=10 # Seconds after which to refresh the page
-      - HOST_TIMEOUT=5
-      - CREDS_TIMEOUT=30
+      - *host-timeout
+      - *creds-timeout
       - DEFAULT_USER=admin
       - DEFAULT_USER_PASSWORD=${PWNBOARD_PASSWORD}
       - LOGIN_PAGE_MESSAGE=Contact an admin to get an account!
@@ -60,6 +66,8 @@ services:
     environment:
       - POSTGRES_PASSWORD=${PWNBOARD_PASSWORD}
       - GRAFANA_DB_PASSWORD=${GRAFANA_DB_PASSWORD:-${PWNBOARD_PASSWORD}}
+      - *host-timeout
+      - *creds-timeout
     volumes:
       - ./board.json:/opt/pwnboard/board.json:ro
     depends_on:

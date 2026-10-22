@@ -9,8 +9,8 @@ environment variables and their default settings.
 | `DEFAULT_USER` | `admin` | Default admin username |
 | `DEFAULT_USER_PASSWORD` | `password` | Default admin password |
 | `PWNBOARD_DOMAIN` | `localhost` | Hostname or IP PWNBoard is served on, without `https://` or a port (set in `.env`; read by `docker-compose.yml` and the Caddyfile, not by the app) |
-| `HOST_TIMEOUT` | `2` | Minutes before host marked offline |
-| `CREDS_TIMEOUT` | `30` | Minutes before credentials marked stale |
+| `HOST_TIMEOUT` | `5` | Minutes without a callback before a host is shown as offline. Set it in `.env`; `docker-compose.yml` passes it to both the web app and the worker, which must agree |
+| `CREDS_TIMEOUT` | `30` | Minutes before credentials are shown as stale. Set it in `.env`; passed to both the web app and the worker |
 | `PWN_THEME` | `blue` | Color theme: `blue` (red=active) or `green` (green=active) |
 | `PWNBOARD_LOG_LEVEL` | `INFO` | Log level for the web app and worker (`DEBUG`, `INFO`, `WARNING`, ...) |
 | `GRAFANA_DB_PASSWORD` | `PWNBOARD_PASSWORD` | Password of the read-only database user Grafana connects with (set in `.env`; `scripts/setup.py` generates one). Avoid single quotes in it |
