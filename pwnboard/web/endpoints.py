@@ -9,6 +9,8 @@ from .authentication import (
     changeUserPassword,
     createAccessToken,
     MAX_PASSWORD_LENGTH,
+    USER_EXISTS,
+    USER_SERVER_ERRORS,
     USERNAME_RE,
     VALID_ROLES,
     createUser,
@@ -22,7 +24,11 @@ from ..core.db import dict_cursor
 from ..core.logger import logger
 from ..core.queues import CALLBACK_QUEUE, CREDS_QUEUE, redis_client
 
-from . import app, get_db, login_required, admin_required, USE_ACCESS_TOKENS
+from .api_errors import api_error
+from . import (
+    app, get_db, api_admin_required, api_forbid_roles,
+    PASSWORD_BLOCKED_ROLES, TOKEN_BLOCKED_ROLES, USE_ACCESS_TOKENS,
+)
 
 MAX_TOKEN_NAME_LENGTH = 64
 MAX_APPLICATION_LENGTH = 64
@@ -146,61 +152,61 @@ def creds_callback():
     return "valid\n", 200
 
 
+def _user_error(message):
+    """Turn a message from createUser into the matching error response."""
+    if message == USER_EXISTS:
+        return api_error(409, 'user_exists', message)
+    if message in USER_SERVER_ERRORS:
+        return api_error(500, 'internal_error', message)
+    return api_error(400, 'invalid_request', message)
+
+
 @app.route('/admin/users', methods=['GET'])
-@login_required
-@admin_required
+@api_admin_required
 def admin_list_users():
     """Return JSON list of users for admin UI."""
     db = get_db()
     with dict_cursor(db) as cur:
-        cur.execute('SELECT username, role FROM users ORDER BY lower(username);')
+        cur.execute('SELECT username, role, extract(epoch from created_at)::bigint AS created '
+                    'FROM users ORDER BY lower(username);')
         rows = cur.fetchall()
-    out = []
-    for r in rows:
-        out.append({
-            'username': r['username'],
-            'role': r['role']
-        })
-    return jsonify(out)
+    return jsonify([{'username': r['username'], 'role': r['role'], 'created': r['created']} for r in rows])
 
 
 @app.route('/admin/users', methods=['POST'])
-@login_required
-@admin_required
+@api_admin_required
 def admin_create_user():
     """Create a new user. Expects form data: username, password, role."""
     username = request.form.get('username', '').strip()
     password = request.form.get('password', '')
     role = request.form.get('role', 'user')
     if not username or not password:
-        return ("Missing fields", 400)
+        return api_error(400, 'invalid_request', 'Missing fields')
     # reuse authentication.createUser
     res = createUser(username, password, role)
     if res is True:
-        return ("", 201)
-    else:
-        # createUser returns an error string on failure
-        return (res or 'Create failed', 400)
+        return jsonify({'username': username, 'role': role}), 201
+    # createUser returns an error string on failure
+    return _user_error(res or 'Create failed')
 
 
 @app.route('/admin/users/<username>', methods=['DELETE'])
-@login_required
-@admin_required
+@api_admin_required
 def admin_delete_user(username):
     """Delete a user from PostgreSQL. Admin-only. Prevent deleting self."""
     username = username or ''
     username = username.strip()
     if not username:
-        return ("Missing username", 400)
+        return api_error(400, 'invalid_request', 'Missing username')
     # prevent deleting yourself
     if session.get('user') == username:
-        return ("Cannot delete current user", 400)
+        return api_error(400, 'invalid_request', 'Cannot delete current user')
     db = get_db()
     with db.cursor() as cur:
         cur.execute('SELECT 1 FROM users WHERE username = %s;', (username,))
         row = cur.fetchone()
     if row is None:
-        return ("Not found", 404)
+        return api_error(404, 'not_found', 'Not found')
     try:
         with db.cursor() as cur:
             cur.execute('DELETE FROM users WHERE username = %s;', (username,))
@@ -209,37 +215,37 @@ def admin_delete_user(username):
     except Exception:
         db.rollback()
         logger.exception('Failed to delete user %s', username)
-        return ("Error", 500)
+        return api_error(500, 'internal_error', 'Error')
 
 
 @app.route('/admin/users/<username>/tokens', methods=['GET'])
-@login_required
-@admin_required
+@api_admin_required
 def admin_list_user_tokens(username):
     """Return token metadata for a specific user. Admin-only."""
     username = username or ''
     username = username.strip()
     if not username:
-        return ("Missing username", 400)
+        return api_error(400, 'invalid_request', 'Missing username')
+    with get_db().cursor() as cur:
+        cur.execute('SELECT 1 FROM users WHERE username = %s;', (username,))
+        if cur.fetchone() is None:
+            return api_error(404, 'not_found', 'Not found')
     tokens = list_user_tokens(username)
     return jsonify(tokens)
 
 @app.route('/tokens/create', methods=['POST'])
-@login_required
+@api_forbid_roles(TOKEN_BLOCKED_ROLES, 'Your account cannot create access tokens.')
 def create_token():
     token_name = request.form.get('token_name', '').strip()
     username = session.get('user')
-    # Guests may not create access tokens
-    if session.get('role') == 'guest':
-        return ("Forbidden", 403)
     application = request.form.get('application', '').strip()
     description = request.form.get('description', '')
     if not token_name or len(token_name) > MAX_TOKEN_NAME_LENGTH:
-        return (f"Token name is required (max {MAX_TOKEN_NAME_LENGTH} characters)", 400)
+        return api_error(400, 'invalid_request', f"Token name is required (max {MAX_TOKEN_NAME_LENGTH} characters)")
     if not application or len(application) > MAX_APPLICATION_LENGTH:
-        return (f"Application is required (max {MAX_APPLICATION_LENGTH} characters)", 400)
+        return api_error(400, 'invalid_request', f"Application is required (max {MAX_APPLICATION_LENGTH} characters)")
     if len(description) > MAX_DESCRIPTION_LENGTH:
-        return (f"Description must be at most {MAX_DESCRIPTION_LENGTH} characters", 400)
+        return api_error(400, 'invalid_request', f"Description must be at most {MAX_DESCRIPTION_LENGTH} characters")
     expiry = request.form.get('expiry', '7d')
     # parse expiry like '30m', '5d', '1h', '6mo' into seconds; default 7 days
     seconds_map = {'m': 60, 'h': 3600, 'd': 86400, 'w': 604800, 'mo': 2592000, 'y': 31536000}
@@ -263,13 +269,12 @@ def create_token():
 
     token = createAccessToken(token_name, username, application, description, expires_after=expire_after)
     if token:
-        return jsonify({'token': token})
-    else:
-        return ("", 500)
+        return jsonify({'token': token}), 201
+    return api_error(500, 'internal_error', 'Could not create the token')
 
 
 @app.route('/tokens', methods=['GET'])
-@login_required
+@api_forbid_roles(TOKEN_BLOCKED_ROLES, 'Your account cannot use access tokens.')
 def list_tokens():
     username = session.get('user')
     tokens = list_user_tokens(username)
@@ -277,7 +282,7 @@ def list_tokens():
 
 
 @app.route('/tokens/<token_hash>', methods=['DELETE'])
-@login_required
+@api_forbid_roles(TOKEN_BLOCKED_ROLES, 'Your account cannot use access tokens.')
 def delete_token_route(token_hash):
     # owner or admin may delete
     username = session.get('user')
@@ -286,20 +291,19 @@ def delete_token_route(token_hash):
         cur.execute('SELECT username FROM access_tokens WHERE token_hash = %s;', (token_hash,))
         meta = cur.fetchone()
     if not meta:
-        return ("Not found", 404)
+        return api_error(404, 'not_found', 'Not found')
 
     owner = meta.get('username')
     if owner != username and session.get('role') != 'admin':
-        return ("Forbidden", 403)
+        return api_error(403, 'forbidden', 'You can only delete your own tokens.')
     ok = removeAccessToken(token_hash)
     if ok:
         return ("", 204)
-    return ("Error", 500)
+    return api_error(500, 'internal_error', 'Error')
 
 
 @app.route('/admin/users/bulk_csv_template', methods=['GET'])
-@login_required
-@admin_required
+@api_admin_required
 def admin_bulk_csv_template():
     """Return a CSV template file for bulk user creation."""
     template = "username,password,role\nexample_user,securepassword,user\n"
@@ -311,8 +315,7 @@ def admin_bulk_csv_template():
 
 
 @app.route('/admin/users/bulk', methods=['POST'])
-@login_required
-@admin_required
+@api_admin_required
 def admin_bulk_create_users():
     """Bulk create users from comma-separated usernames with a shared password and role."""
     usernames_raw = request.form.get('usernames', '').strip()
@@ -320,16 +323,16 @@ def admin_bulk_create_users():
     role = request.form.get('role', 'user')
 
     if not usernames_raw or not password:
-        return ("Missing fields", 400)
+        return api_error(400, 'invalid_request', 'Missing fields')
 
     if role not in VALID_ROLES:
-        return ("Invalid role", 400)
+        return api_error(400, 'invalid_request', 'Invalid role')
 
     usernames = [u.strip() for u in usernames_raw.split(',')]
     usernames = [u for u in usernames if u]
 
     if not usernames:
-        return ("No valid usernames provided", 400)
+        return api_error(400, 'invalid_request', 'No valid usernames provided')
 
     errors = []
     for uname in usernames:
@@ -337,7 +340,7 @@ def admin_bulk_create_users():
             errors.append(f"Invalid username {uname!r}: only letters, digits, _, ., - are allowed (max 64 characters)")
 
     if errors:
-        return ("\n".join(errors), 400)
+        return api_error(400, 'validation_failed', 'Some usernames are invalid. No users were created.', errors)
 
     results = {'created': [], 'failed': []}
     for uname in usernames:
@@ -351,37 +354,37 @@ def admin_bulk_create_users():
 
 
 @app.route('/admin/users/bulk_csv', methods=['POST'])
-@login_required
-@admin_required
+@api_admin_required
 def admin_bulk_create_users_csv():
     """Bulk create users from a CSV file upload. Validates entire file before creating any users."""
     if 'file' not in request.files:
-        return ("No file uploaded", 400)
+        return api_error(400, 'invalid_request', 'No file uploaded')
 
     f = request.files['file']
     if not f.filename:
-        return ("No file selected", 400)
+        return api_error(400, 'invalid_request', 'No file selected')
 
     try:
         content = f.read().decode('utf-8')
     except Exception:
-        return ("Could not decode file as UTF-8", 400)
+        return api_error(400, 'invalid_request', 'Could not decode file as UTF-8')
 
     try:
         reader = csv.reader(io.StringIO(content))
         rows = list(reader)
     except Exception as e:
-        return (f"Failed to parse CSV: {e}", 400)
+        return api_error(400, 'invalid_request', f"Failed to parse CSV: {e}")
 
     if not rows:
-        return ("CSV file is empty", 400)
+        return api_error(400, 'invalid_request', 'CSV file is empty')
 
     header = [h.strip().lower() for h in rows[0]]
     if header != ['username', 'password', 'role']:
-        return ("Invalid header. The CSV must have exactly these columns in order: username,password,role", 400)
+        return api_error(400, 'invalid_request',
+                         'Invalid header. The CSV must have exactly these columns in order: username,password,role')
 
     if len(rows) < 2:
-        return ("CSV contains no data rows", 400)
+        return api_error(400, 'invalid_request', 'CSV contains no data rows')
 
     errors = []
     for i, row in enumerate(rows[1:], start=2):
@@ -401,7 +404,7 @@ def admin_bulk_create_users_csv():
             errors.append(f"Row {i}: invalid role {role!r} (must be one of: {', '.join(sorted(VALID_ROLES))})")
 
     if errors:
-        return jsonify({'errors': errors}), 400
+        return api_error(400, 'validation_failed', 'The CSV file has errors. No users were created.', errors)
 
     results = {'created': [], 'failed': []}
     for row in rows[1:]:
@@ -416,15 +419,15 @@ def admin_bulk_create_users_csv():
 
 
 @app.route('/account/change_password', methods=['POST'])
-@login_required
+@api_forbid_roles(PASSWORD_BLOCKED_ROLES, 'Your account cannot change its password.')
 def account_change_password():
     username = session.get('user')
     old_pass = request.form.get('old_pass', '')
     new_pass = request.form.get('new_pass', '')
     if not old_pass or not new_pass:
-        return ("Missing fields", 400)
+        return api_error(400, 'invalid_request', 'Missing fields')
     if len(new_pass) > MAX_PASSWORD_LENGTH:
-        return (f"Password must be at most {MAX_PASSWORD_LENGTH} characters", 400)
+        return api_error(400, 'invalid_request', f"Password must be at most {MAX_PASSWORD_LENGTH} characters")
     ok = changeUserPassword(username, old_pass, new_pass)
     if ok:
         # invalidate the session so the user must re-authenticate after password change
@@ -432,6 +435,5 @@ def account_change_password():
             session.clear()
         except Exception:
             pass
-        return ("Password changed", 200)
-    return ("Password change failed", 400)
-
+        return jsonify({'message': 'Password changed'})
+    return api_error(400, 'invalid_request', 'Password change failed')

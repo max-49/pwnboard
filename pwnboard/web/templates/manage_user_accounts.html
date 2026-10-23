@@ -171,6 +171,7 @@
     <script src="{{ url_for('static', filename='vendor/popper.min.js') }}"></script>
     <script src="{{ url_for('static', filename='vendor/bootstrap.min.js') }}"></script>
     <script src="{{ url_for('static', filename='escape.js') }}"></script>
+    <script src="{{ url_for('static', filename='api.js') }}"></script>
     <script>
     (function(){
         const usersTable = document.getElementById('users-table');
@@ -184,6 +185,7 @@
             usersLoading.style.display='';
             try{
                 const res = await fetch('/admin/users');
+                if(redirectIfSessionExpired(res)) return;
                 if(!res.ok) throw new Error('no endpoint');
                 const ct = (res.headers.get('content-type')||'');
                 let data = [];
@@ -215,8 +217,8 @@
                 const form = document.getElementById('create-user-form');
                 const body = new URLSearchParams(new FormData(form));
                 const res = await fetch('/admin/users', { method: 'POST', body });
-                const text = await res.text();
-                if(!res.ok){ document.getElementById('create-user-feedback').textContent = text || 'Create failed'; }
+                if(redirectIfSessionExpired(res)) return;
+                if(!res.ok){ document.getElementById('create-user-feedback').textContent = await apiErrorMessage(res, 'Create failed'); }
                 else{ $('#createUserModal').modal('hide'); }
                 await loadUsers();
             }catch(e){ document.getElementById('create-user-feedback').textContent = 'Request failed'; }
@@ -230,7 +232,8 @@
                 if(!confirm('Delete user '+user+'?')) return;
                 try{
                     const res = await fetch('/admin/users/'+encodeURIComponent(user), { method: 'DELETE' });
-                    if(res.ok) await loadUsers(); else alert('Delete failed');
+                    if(redirectIfSessionExpired(res)) return;
+                    if(res.ok) await loadUsers(); else alert(await apiErrorMessage(res, 'Delete failed'));
                 }catch(e){ alert('Delete failed'); }
             }
             if(ev.target.classList.contains('btn-view-tokens')){
@@ -250,6 +253,7 @@
             tokensLoading.style.display=''; tokensTable.style.display='none'; noTokens.style.display='none';
             try{
                 const res = await fetch('/admin/users/'+encodeURIComponent(user)+'/tokens');
+                if(redirectIfSessionExpired(res)) return;
                 if(!res.ok) throw new Error('no endpoint');
                 const ct = (res.headers.get('content-type')||'');
                 let data = [];
@@ -277,12 +281,13 @@
                 if(!confirm('Delete token?')) return;
                 try{
                     const res = await fetch('/tokens/'+encodeURIComponent(h), { method: 'DELETE' });
+                    if(redirectIfSessionExpired(res)) return;
                     if(res.ok){
                         // refresh tokens list
                         const modalTitle = document.querySelector('#userTokensModal .modal-title');
                         const user = modalTitle && modalTitle.dataset && modalTitle.dataset.user;
                         if(user) await loadUserTokens(user);
-                    } else alert('Delete failed');
+                    } else alert(await apiErrorMessage(res, 'Delete failed'));
                 }catch(e){ alert('Delete failed'); }
             }
         });
@@ -337,12 +342,12 @@
             try{
                 const body = new URLSearchParams({ usernames: usernamesRaw, password, role });
                 const res = await fetch('/admin/users/bulk', { method: 'POST', body });
-                const text = await res.text();
+                if(redirectIfSessionExpired(res)) return;
                 if(!res.ok){
-                    feedback.innerHTML='<span class="text-danger">'+escHtml(text)+'</span>';
+                    feedback.innerHTML = await errorHtml(res);
                 } else {
                     let data;
-                    try{ data = JSON.parse(text); } catch(e){ data = {created:[], failed:[]}; }
+                    try{ data = await res.json(); } catch(e){ data = {created:[], failed:[]}; }
                     let msg = '<span class="text-success"><strong>Created (' + data.created.length + '):</strong> '+(data.created.length ? data.created.map(escHtml).join(', ') : 'none')+'</span>';
                     if(data.failed && data.failed.length > 0){
                         msg += '<br><span class="text-danger"><strong>Failed (' + data.failed.length + '):</strong> '+data.failed.map(f=>escHtml(f.username)+' ('+escHtml(f.error||'')+')').join(', ')+'</span>';
@@ -351,6 +356,13 @@
                     await loadUsers();
                 }
             } catch(e){ feedback.innerHTML='<span class="text-danger">Request failed</span>'; }
+        }
+
+        // The error message of a failed response, followed by its individual problems (if any)
+        async function errorHtml(res){
+            const problems = await apiErrorDetails(res);
+            const list = problems.length ? '<ul class="mb-0 mt-1">' + problems.map(p => '<li>' + escHtml(p) + '</li>').join('') + '</ul>' : '';
+            return '<span class="text-danger">' + escHtml(await apiErrorMessage(res, 'Request failed')) + list + '</span>';
         }
 
         async function submitBulkCsv(){
@@ -365,19 +377,9 @@
                 const formData = new FormData();
                 formData.append('file', fileInput.files[0]);
                 const res = await fetch('/admin/users/bulk_csv', { method: 'POST', body: formData });
-                const ct = res.headers.get('content-type') || '';
+                if(redirectIfSessionExpired(res)) return;
                 if(!res.ok){
-                    if(ct.indexOf('application/json') !== -1){
-                        const data = await res.json();
-                        if(data.errors && data.errors.length){
-                            feedback.innerHTML='<span class="text-danger"><strong>Validation errors &mdash; no users were created:</strong><ul class="mb-0 mt-1">'+ data.errors.map(e=>'<li>'+escHtml(e)+'</li>').join('') +'</ul></span>';
-                        } else {
-                            feedback.innerHTML='<span class="text-danger">'+escHtml(JSON.stringify(data))+'</span>';
-                        }
-                    } else {
-                        const text = await res.text();
-                        feedback.innerHTML='<span class="text-danger">'+escHtml(text)+'</span>';
-                    }
+                    feedback.innerHTML = await errorHtml(res);
                 } else {
                     const data = await res.json();
                     let msg = '<span class="text-success"><strong>Created (' + data.created.length + '):</strong> '+(data.created.length ? data.created.map(escHtml).join(', ') : 'none')+'</span>';
