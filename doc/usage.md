@@ -64,7 +64,7 @@ POST data in this format to https://pwnboard.win/creds :
 
 `admin` must be `0` or `1` if it is included. `ips` works here as well.
 
-Passwords that are one character or shorter are ignored. Credentials stay on the dashboard for `CREDS_TIMEOUT` minutes (30 by default) after they were last received.
+Passwords that are one character or shorter are ignored. Credentials count as active for `CREDS_TIMEOUT` minutes (30 by default) after they were last received. After that they stay in the host's popup, marked **stale**, since the password may still work.
 
 ## Responses
 

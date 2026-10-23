@@ -39,9 +39,15 @@ def getBoardDict(db):
     return board
 
 def getActiveCreds(ip, db):
+    """Return (number of active credentials, every credential for the host).
+
+    Each credential is (creds, age, is_stale). Credentials not seen for CREDS_TIMEOUT minutes
+    are stale: they stay in the list, because the password may well still work, but they are
+    not counted as active. Active credentials come first, newest first.
+    """
     try:
         total_creds = 0
-        all_valid_creds = []
+        entries = []
         creds_timeout = getCredsTimeout()
         stale_usernames = []
 
@@ -63,10 +69,11 @@ def getActiveCreds(ip, db):
             if time_delta is None:
                 continue
 
-            if time_delta < creds_timeout:
-                all_valid_creds.append((creds, "{}m".format(time_delta)))
+            is_stale = time_delta >= creds_timeout
+            entries.append((is_stale, time_delta, creds))
+            if not is_stale:
                 total_creds += 1
-            elif time_delta >= creds_timeout and creds_online:
+            elif creds_online:
                 stale_usernames.append(username)
 
         if stale_usernames:
@@ -81,12 +88,15 @@ def getActiveCreds(ip, db):
                 )
             db.commit()
 
+        entries.sort(key=lambda entry: (entry[0], entry[1]))
+        all_creds = [(creds, "{}m".format(age), is_stale) for is_stale, age, creds in entries]
+
     except Exception:
         db.rollback()
         total_creds = 0
-        all_valid_creds = []
+        all_creds = []
 
-    return total_creds, all_valid_creds
+    return total_creds, all_creds
 
 def getActiveCallbacks(ip, db):
     try:
@@ -188,11 +198,9 @@ def getHostData(ip, db):
             return status
 
         # Handle creds but no callbacks
-        status['Valid Creds'] = "Yes"
         # status['Last Creds Received'] = "{}m".format(creds_last)
         if creds_last and creds_last > getCredsTimeout():
             status['creds_online'] = ""
-            status['Valid Creds'] = "No"
         else:
             status['creds_online'] = "True"
         
@@ -210,9 +218,13 @@ def getHostData(ip, db):
         except Exception:
             db.rollback()
 
-        total_creds, all_valid_creds = getActiveCreds(ip, db)
+        total_creds, all_creds = getActiveCreds(ip, db)
+        status['Valid Creds'] = "Yes" if total_creds else "Stale"
         status['Active Creds'] = total_creds
-        status['all_valid_creds'] = all_valid_creds
+        # Despite the name, this holds stale credentials too (flagged in each entry). The key is
+        # kept so that the cached board stays readable by pages from before stale credentials
+        # were shown.
+        status['all_valid_creds'] = all_creds
 
         return status
 
@@ -234,7 +246,7 @@ def getHostData(ip, db):
 
     # get num valid callbacks
     num_valid_callbacks, active_callbacks = getActiveCallbacks(ip, db)
-    total_creds, all_valid_creds = getActiveCreds(ip, db)
+    total_creds, all_creds = getActiveCreds(ip, db)
     
     # Write status booleans to the database
     try:
@@ -263,11 +275,12 @@ def getHostData(ip, db):
     status['Type'] = app
     status['Active Callbacks'] = num_valid_callbacks
 
-    status['all_valid_creds'] = all_valid_creds
+    # See the note on 'all_valid_creds' above: it includes stale credentials
+    status['all_valid_creds'] = all_creds
     status['all_valid_callbacks'] = active_callbacks
     
     if (creds is not None):
-        status['Valid Creds'] = "Yes"
+        status['Valid Creds'] = "Yes" if total_creds else "Stale"
         # status['Last Creds Received'] = "{}m".format(creds_last)
         status['Active Creds'] = total_creds
 

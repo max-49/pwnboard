@@ -105,13 +105,19 @@
 
                                             <h4>Credentials</h4>
                                             {% if creds_list and creds_list|length > 0 %}
+                                                {% set ns = namespace(has_stale=false) %}
                                                 <ul class="list-unstyled mb-3">
                                                 {% for cred in creds_list %}
-                                                    <li><code>{{ cred[0] }}</code> - Last Seen: {{ cred[1] }}</li>
+                                                    {# cred[2] is true for stale credentials (missing in boards cached by an older worker) #}
+                                                    {% if cred[2] %}{% set ns.has_stale = true %}{% endif %}
+                                                    <li{% if cred[2] %} class="text-muted"{% endif %}><code>{{ cred[0] }}</code> - Last Seen: {{ cred[1] }}{% if cred[2] %} <span class="badge badge-secondary">stale</span>{% endif %}</li>
                                                 {% endfor %}
                                                 </ul>
+                                                {% if ns.has_stale %}
+                                                    <p class="small text-muted">Stale credentials have not been seen for a while. They may still work.</p>
+                                                {% endif %}
                                             {% else %}
-                                                <p class="text-muted">No active credentials for this host!</p>
+                                                <p class="text-muted">No credentials for this host!</p>
                                             {% endif %}
 
                                             <h4>Callbacks</h4>
