@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-from flask import request, session, render_template, make_response, url_for, redirect, abort
+from flask import request, session, render_template, make_response, send_file, url_for, redirect, abort
 
 import os
 import logging
 import json
+from pathlib import Path
 
 from .authentication import verifyUser
 from ..core.board import BOARD
@@ -11,6 +12,8 @@ from ..core.data import getBoardDict
 from ..core.logger import logger
 from ..core.queues import BOARD_CACHE_KEY, redis_client
 from . import app, get_db, login_required, admin_required, login_throttle, USE_ACCESS_TOKENS
+
+OPENAPI_SPEC = Path(__file__).parent / "openapi.yaml"
 
 LOGIN_PAGE_MESSAGE = os.environ.get("LOGIN_PAGE_MESSAGE", "Contact an admin to make an account!")
 REFRESH_SECONDS = os.environ.get("REFRESH_SECONDS", 10)
@@ -66,6 +69,11 @@ def index():
     html = render_template('index.html', error=error, theme=theme,
                            board=board, teams=BOARD['teams'], refresh_seconds=REFRESH_SECONDS)
     return make_response(html)
+
+@app.route('/openapi.yaml', methods=['GET'])
+def openapi_spec():
+    """The OpenAPI description of the API. Public, like the usage guide."""
+    return send_file(OPENAPI_SPEC, mimetype='application/yaml')
 
 @app.route('/manage_apps')
 @login_required

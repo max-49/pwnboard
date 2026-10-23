@@ -156,6 +156,21 @@ Defined in `pwnboard/core/queues.py`.
 
 ## Testing
 
+### Automated tests
+
+The tests need no running services: Postgres and Redis are replaced with fakes.
+
+```bash
+pip install -r requirements/dev.txt
+python3 -m pytest
+```
+
+- `tests/test_ingest.py` and `tests/test_session_api.py` record how every API endpoint behaves today (status codes, response bodies, who is allowed in). If you change the API on purpose, update the matching test in the same change.
+- Tests marked `xfail` describe known gaps. They assert the behavior we want, so they fail today by design. When you fix a gap, the test starts passing, and pytest then reports it as an error until you remove the `xfail` marker.
+- `tests/test_openapi_spec.py` checks that `pwnboard/web/openapi.yaml` is valid OpenAPI and lists exactly the endpoints the app serves. Every request the other tests make is also checked against it: the response's status code and content type must be declared, JSON bodies must match their schema, and a request body the server accepts must be valid according to the spec. So add or change an endpoint in `openapi.yaml` and in the code together.
+
+The API description is served by the app at `/openapi.yaml`. It documents the API as it behaves today, quirks included.
+
 ### Manual Testing
 
 **Test beacon submission:**

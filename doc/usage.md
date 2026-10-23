@@ -10,6 +10,8 @@
 - [Examples](#examples-of-posting-data-to-pwnboard) (curl, Bash beacon loop, Python, Go, PowerShell, C#)
 - [Self-signed certificates](#self-signed-certificates)
 
+This API is also described as an OpenAPI file, served at `https://pwnboard.win/openapi.yaml`.
+
 ## Quick reference
 
 | What | Method and URL | Required fields |

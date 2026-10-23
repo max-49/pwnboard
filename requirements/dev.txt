@@ -1,0 +1,6 @@
+-r web.txt
+pytest
+fakeredis
+pyyaml
+jsonschema
+openapi-spec-validator
