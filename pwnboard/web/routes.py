@@ -11,7 +11,10 @@ from ..core.board import BOARD
 from ..core.data import getBoardDict
 from ..core.logger import logger
 from ..core.queues import BOARD_CACHE_KEY, redis_client
-from . import app, get_db, login_required, admin_required, login_throttle, USE_ACCESS_TOKENS
+from . import (
+    app, get_db, login_required, admin_required, login_throttle,
+    PASSWORD_BLOCKED_ROLES, TOKEN_BLOCKED_ROLES, USE_ACCESS_TOKENS,
+)
 
 OPENAPI_SPEC = Path(__file__).parent / "openapi.yaml"
 
@@ -78,8 +81,8 @@ def openapi_spec():
 @app.route('/manage_apps')
 @login_required
 def manage_apps():
-    # Guests are not allowed to manage apps or create tokens
-    if session.get('role') == 'guest' or session.get('role') == 'restricted':
+    # The same rule the token API endpoints enforce
+    if session.get('role') in TOKEN_BLOCKED_ROLES:
         abort(403)
     return render_template('manage_apps.html', USE_ACCESS_TOKENS=str(USE_ACCESS_TOKENS).upper())
 
@@ -87,7 +90,8 @@ def manage_apps():
 @app.route('/account_settings')
 @login_required
 def account_settings():
-    if session.get('role') == 'restricted':
+    # The same rule the change-password API endpoint enforces
+    if session.get('role') in PASSWORD_BLOCKED_ROLES:
         abort(403)
     return render_template('account_settings.html')
 

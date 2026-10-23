@@ -14,6 +14,10 @@ MAX_PASSWORD_LENGTH = 128
 # Longer than any password we accept; anything beyond it is rejected without hashing
 MAX_LOGIN_PASSWORD_LENGTH = 1024
 
+# Messages createUser returns, which the endpoints turn into status codes
+USER_EXISTS = "User already exists"
+USER_SERVER_ERRORS = ("Password hashing failed", "Create failed")
+
 # Verified against when a username does not exist, so a failed login does the same
 # amount of hashing work whether or not the account is real
 _DUMMY_HASH = ph.hash("pwnboard-dummy-password")
@@ -36,7 +40,7 @@ def createUser(username, password, role):
         cur.execute('SELECT 1 FROM users WHERE username = %s;', (username,))
         row = cur.fetchone()
     if row is not None:
-        return "User already exists"
+        return USER_EXISTS
 
     # Hash the password before storing
     try:

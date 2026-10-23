@@ -19,12 +19,15 @@ info:
 
     Quirks worth knowing:
 
-    * Text answers are sent with a `text/html` content type even though they are plain text.
+    * The ingest endpoints answer in plain text, sent with a `text/html` content type. They
+      keep this format because existing tools depend on it.
     * The server reads the ingest body as JSON whatever the `Content-Type` header says, so
       `curl -d '{...}'` works without `-H "Content-Type: application/json"`.
     * Fields that are not listed in a request schema are accepted and ignored.
-    * Calls that need a login but have none get a `302` redirect to the HTML login page
-      instead of a `401`.
+    * Every other endpoint answers errors as JSON: `{"error": {"code": ..., "message": ...,
+      "details": [...]}}`. Calls that need a login but have none get `401`.
+    * Framework errors (unknown path, wrong method, oversized body, crashes) are JSON for
+      API clients too. Browsers, which ask for `text/html`, get the normal HTML error page.
 servers:
   - url: /
 tags:
@@ -76,6 +79,8 @@ paths:
           $ref: '#/components/responses/IngestUnauthorized'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
   /checkin:
     post:
       operationId: postCallbackCheckin
@@ -101,6 +106,8 @@ paths:
           $ref: '#/components/responses/IngestUnauthorized'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
   /creds:
     post:
       operationId: postCredentials
@@ -127,11 +134,14 @@ paths:
           $ref: '#/components/responses/IngestUnauthorized'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
   /tokens:
     get:
       operationId: listTokens
       tags: [Tokens]
       summary: List the logged-in user's access tokens
+      description: Not available to the `guest` and `restricted` roles.
       security:
         - sessionCookie: []
       responses:
@@ -143,17 +153,20 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Token'
-        '302':
-          $ref: '#/components/responses/LoginRedirect'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
   /tokens/create:
     post:
       operationId: createToken
       tags: [Tokens]
       summary: Create an access token
       description: |
-        The token is returned once and only a hash of it is stored. Guests cannot create
-        tokens. (The `restricted` role is blocked from the Manage Apps page but not from
-        this endpoint.)
+        The token is returned once and only a hash of it is stored. Users with the `guest` or
+        `restricted` role cannot create tokens.
       security:
         - sessionCookie: []
       requestBody:
@@ -163,24 +176,28 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateTokenForm'
       responses:
-        '200':
+        '201':
           description: The new token.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/TokenCreated'
-        '302':
-          $ref: '#/components/responses/LoginRedirect'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '400':
-          $ref: '#/components/responses/TextError'
+          $ref: '#/components/responses/ApiError'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
   /tokens/{token_hash}:
     delete:
       operationId: deleteToken
       tags: [Tokens]
       summary: Delete an access token
-      description: Users can delete their own tokens. Admins can delete any token.
+      description: |
+        Users can delete their own tokens. Admins can delete any token. Not available to the
+        `guest` and `restricted` roles.
       security:
         - sessionCookie: []
       parameters:
@@ -193,14 +210,14 @@ paths:
       responses:
         '204':
           description: Deleted.
-        '302':
-          $ref: '#/components/responses/LoginRedirect'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
-          $ref: '#/components/responses/TextError'
+          $ref: '#/components/responses/ApiError'
         '500':
-          $ref: '#/components/responses/TextError'
+          $ref: '#/components/responses/ApiError'
   /admin/users:
     get:
       operationId: listUsers
@@ -217,10 +234,12 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/User'
-        '302':
-          $ref: '#/components/responses/LoginRedirect'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
     post:
       operationId: createUser
       tags: [Users]
@@ -235,13 +254,21 @@ paths:
               $ref: '#/components/schemas/CreateUserForm'
       responses:
         '201':
-          description: Created. The body is empty.
-        '302':
-          $ref: '#/components/responses/LoginRedirect'
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '400':
-          $ref: '#/components/responses/TextError'
+          $ref: '#/components/responses/ApiError'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/ApiError'
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
   /admin/users/{username}:
     delete:
       operationId: deleteUser
@@ -255,22 +282,21 @@ paths:
       responses:
         '204':
           description: Deleted.
-        '302':
-          $ref: '#/components/responses/LoginRedirect'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '400':
-          $ref: '#/components/responses/TextError'
+          $ref: '#/components/responses/ApiError'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
-          $ref: '#/components/responses/TextError'
+          $ref: '#/components/responses/ApiError'
         '500':
-          $ref: '#/components/responses/TextError'
+          $ref: '#/components/responses/ApiError'
   /admin/users/{username}/tokens:
     get:
       operationId: listUserTokens
       tags: [Users]
       summary: List another user's access tokens
-      description: Returns an empty list when the user does not exist.
       security:
         - sessionCookie: []
       parameters:
@@ -284,12 +310,16 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Token'
-        '302':
-          $ref: '#/components/responses/LoginRedirect'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '400':
-          $ref: '#/components/responses/TextError'
+          $ref: '#/components/responses/ApiError'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ApiError'
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
   /admin/users/bulk:
     post:
       operationId: bulkCreateUsers
@@ -313,20 +343,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BulkResult'
-        '302':
-          $ref: '#/components/responses/LoginRedirect'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '400':
-          $ref: '#/components/responses/TextError'
+          $ref: '#/components/responses/ApiError'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
   /admin/users/bulk_csv:
     post:
       operationId: bulkCreateUsersCsv
       tags: [Users]
       summary: Create users from a CSV file
       description: |
-        The whole file is validated before anyone is created. Row-level problems come back
-        as JSON in `errors`. Problems with the file itself come back as plain text.
+        The whole file is validated before anyone is created. Problems with the file itself,
+        or with its rows (listed in `details`), come back as a `400` error.
       security:
         - sessionCookie: []
       requestBody:
@@ -342,19 +374,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BulkResult'
-        '302':
-          $ref: '#/components/responses/LoginRedirect'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '400':
-          description: A problem with the file (plain text) or with its rows (JSON).
-          content:
-            text/html:
-              schema:
-                type: string
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CsvErrors'
+          $ref: '#/components/responses/ApiError'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
   /admin/users/bulk_csv_template:
     get:
       operationId: getUsersCsvTemplate
@@ -369,16 +396,20 @@ paths:
             text/csv:
               schema:
                 type: string
-        '302':
-          $ref: '#/components/responses/LoginRedirect'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
   /account/change_password:
     post:
       operationId: changePassword
       tags: [Account]
       summary: Change the logged-in user's password
-      description: On success the session is ended, so the user has to log in again.
+      description: |
+        On success the session is ended, so the user has to log in again. Not available to the
+        `restricted` role.
       security:
         - sessionCookie: []
       requestBody:
@@ -391,13 +422,17 @@ paths:
         '200':
           description: Changed. The session has been cleared.
           content:
-            text/html:
+            application/json:
               schema:
-                type: string
-        '302':
-          $ref: '#/components/responses/LoginRedirect'
+                $ref: '#/components/schemas/Message'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '400':
-          $ref: '#/components/responses/TextError'
+          $ref: '#/components/responses/ApiError'
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
   /openapi.yaml:
     get:
       operationId: getOpenApiDocument
@@ -411,6 +446,8 @@ paths:
             application/yaml:
               schema:
                 type: string
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
 components:
   securitySchemes:
     bearerAuth:
@@ -465,32 +502,42 @@ components:
           schema:
             type: string
     PayloadTooLarge:
-      description: The request body is larger than 1 MB. The body is an HTML error page.
+      description: |
+        The request body is larger than 1 MB. API clients get a JSON error, browsers get an
+        HTML error page.
       content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
         text/html:
           schema:
             type: string
-    LoginRedirect:
-      description: Not logged in. Redirects to the HTML login page, with a short HTML body that links to it.
-      headers:
-        Location:
-          schema:
-            type: string
-          description: Always `/`.
+    Unauthorized:
+      description: Not logged in, or the session has ended.
       content:
-        text/html:
+        application/json:
           schema:
-            type: string
+            $ref: '#/components/schemas/Error'
     Forbidden:
       description: The logged-in user's role is not allowed to do this.
       content:
-        text/html:
+        application/json:
           schema:
-            type: string
-          example: Forbidden
-    TextError:
-      description: The request was rejected. The body is a plain text explanation.
+            $ref: '#/components/schemas/Error'
+    ApiError:
+      description: |
+        The request was rejected. `error.message` explains why, and `error.details` lists the
+        individual problems when there are several.
       content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    UnexpectedError:
+      description: Something went wrong on the server.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
         text/html:
           schema:
             type: string
@@ -567,12 +614,47 @@ components:
           type: string
     User:
       type: object
+      required: [username, role, created]
+      properties:
+        username:
+          type: string
+        role:
+          $ref: '#/components/schemas/Role'
+        created:
+          type: integer
+          description: Unix time in seconds.
+    NewUser:
+      type: object
       required: [username, role]
       properties:
         username:
           type: string
         role:
           $ref: '#/components/schemas/Role'
+    Message:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: A short identifier to match on, such as `invalid_request` or `not_found`.
+            message:
+              type: string
+            details:
+              type: array
+              description: The individual problems, when there are several.
+              items:
+                type: string
     Role:
       type: string
       enum: [user, admin, guest, restricted]
@@ -625,14 +707,6 @@ components:
                 type: string
               error:
                 type: string
-    CsvErrors:
-      type: object
-      required: [errors]
-      properties:
-        errors:
-          type: array
-          items:
-            type: string
     CreateTokenForm:
       type: object
       required: [token_name, application]

@@ -27,6 +27,19 @@ def test_operation_ids_are_unique(spec):
     assert len(ids) == len(set(ids))
 
 
+def test_every_operation_declares_a_server_error(spec):
+    for path, item in spec["paths"].items():
+        for method, operation in item.items():
+            assert "500" in operation["responses"], f"{method.upper()} {path} does not declare a 500"
+
+
+def test_endpoints_that_need_a_login_declare_401(spec):
+    for path, item in spec["paths"].items():
+        for method, operation in item.items():
+            if {"sessionCookie": []} in operation.get("security", []):
+                assert "401" in operation["responses"], f"{method.upper()} {path} does not declare a 401"
+
+
 def test_the_app_serves_the_spec_file(client):
     response = client.get("/openapi.yaml")
     assert response.status_code == 200
