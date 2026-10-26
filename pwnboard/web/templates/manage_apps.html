@@ -9,6 +9,7 @@
     <script src="{{ url_for('static', filename='vendor/popper.min.js') }}"></script>
     <script src="{{ url_for('static', filename='vendor/bootstrap.min.js') }}"></script>
     <script src="{{ url_for('static', filename='escape.js') }}"></script>
+    <script src="{{ url_for('static', filename='api.js') }}"></script>
     <style>.mono{font-family:Menlo,monospace}</style>
     <link href='https://fonts.googleapis.com/css?family=Titillium+Web:600,400&display=swap' rel='stylesheet' type='text/css' />
     <link href='https://fonts.googleapis.com/css?family=Jura:400,600&display=swap' rel='stylesheet' type='text/css' />
@@ -117,6 +118,7 @@
             loading.style.display='';
             try{
                 const res = await fetch('/tokens');
+                if(redirectIfSessionExpired(res)) return;
                 if(!res.ok) throw new Error('no endpoint');
                 // only attempt to parse JSON responses
                 const ct = (res.headers.get('content-type')||'');
@@ -160,17 +162,14 @@
             try{
                 const body = new URLSearchParams(new FormData(form));
                 const res = await fetch('/tokens/create', { method:'POST', body });
-                const ct = (res.headers.get('content-type')||'');
+                if(redirectIfSessionExpired(res)) return;
                 let tokenText = '';
-                if(ct.indexOf('application/json') !== -1){
-                    try{ const json = await res.json(); tokenText = json && json.token ? json.token : ''; }catch(e){ tokenText = ''; }
-                } else {
-                    try{ tokenText = await res.text(); }catch(e){ tokenText = ''; }
+                if(res.ok){
+                    try{ tokenText = (await res.json()).token || ''; }catch(e){ tokenText = ''; }
                 }
 
                 if(!res.ok || !tokenText){
-                    const msg = tokenText || 'Create failed';
-                    document.getElementById('create-feedback').textContent = msg;
+                    document.getElementById('create-feedback').textContent = await apiErrorMessage(res, 'Create failed');
                 } else {
                     // show ephemeral box and copy controls, then close modal
                     document.getElementById('ephemeral-token-value').textContent = tokenText;
@@ -189,7 +188,8 @@
                 if(!confirm('Delete token?')) return;
                 try{
                     const res = await fetch('/tokens/'+encodeURIComponent(h), { method: 'DELETE' });
-                    if(res.ok) await load(); else alert('Delete failed');
+                    if(redirectIfSessionExpired(res)) return;
+                    if(res.ok) await load(); else alert(await apiErrorMessage(res, 'Delete failed'));
                 }catch(e){ alert('Delete failed'); }
             }
         });

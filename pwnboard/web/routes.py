@@ -1,16 +1,22 @@
 #!/usr/bin/env python3
-from flask import request, session, render_template, make_response, url_for, redirect, abort
+from flask import request, session, render_template, make_response, send_file, url_for, redirect, abort
 
 import os
 import logging
 import json
+from pathlib import Path
 
 from .authentication import verifyUser
 from ..core.board import BOARD
 from ..core.data import getBoardDict
 from ..core.logger import logger
 from ..core.queues import BOARD_CACHE_KEY, redis_client
-from . import app, get_db, login_required, admin_required, login_throttle, USE_ACCESS_TOKENS
+from . import (
+    app, get_db, login_required, admin_required, login_throttle,
+    PASSWORD_BLOCKED_ROLES, TOKEN_BLOCKED_ROLES, USE_ACCESS_TOKENS,
+)
+
+OPENAPI_SPEC = Path(__file__).parent / "openapi.yaml"
 
 LOGIN_PAGE_MESSAGE = os.environ.get("LOGIN_PAGE_MESSAGE", "Contact an admin to make an account!")
 REFRESH_SECONDS = os.environ.get("REFRESH_SECONDS", 10)
@@ -67,11 +73,16 @@ def index():
                            board=board, teams=BOARD['teams'], refresh_seconds=REFRESH_SECONDS)
     return make_response(html)
 
+@app.route('/openapi.yaml', methods=['GET'])
+def openapi_spec():
+    """The OpenAPI description of the API. Public, like the usage guide."""
+    return send_file(OPENAPI_SPEC, mimetype='application/yaml')
+
 @app.route('/manage_apps')
 @login_required
 def manage_apps():
-    # Guests are not allowed to manage apps or create tokens
-    if session.get('role') == 'guest' or session.get('role') == 'restricted':
+    # The same rule the token API endpoints enforce
+    if session.get('role') in TOKEN_BLOCKED_ROLES:
         abort(403)
     return render_template('manage_apps.html', USE_ACCESS_TOKENS=str(USE_ACCESS_TOKENS).upper())
 
@@ -79,7 +90,8 @@ def manage_apps():
 @app.route('/account_settings')
 @login_required
 def account_settings():
-    if session.get('role') == 'restricted':
+    # The same rule the change-password API endpoint enforces
+    if session.get('role') in PASSWORD_BLOCKED_ROLES:
         abort(403)
     return render_template('account_settings.html')
 

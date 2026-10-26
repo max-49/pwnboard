@@ -1,0 +1,771 @@
+openapi: 3.1.0
+info:
+  title: PWNBoard API
+  version: 0.1.0
+  description: |
+    The PWNBoard HTTP API **as it behaves today**. This file describes the current
+    behavior, including its quirks, so that later changes can be checked against it.
+    It is not a statement of how the API should look.
+
+    There are two groups of endpoints:
+
+    * **Ingest** (`/pwn`, `/checkin`, `/creds`) is called by red team tools. It takes JSON
+      and an optional bearer token, and answers in plain text.
+    * **Everything else** is called by the PWNBoard web pages with the browser's login
+      session cookie. These endpoints take form-encoded bodies.
+
+    The HTML pages (`/`, `/pwnboard`, `/manage_apps`, `/account_settings`,
+    `/manage_user_accounts`, `/logout`) are not part of this API and are not described here.
+
+    Quirks worth knowing:
+
+    * The ingest endpoints answer in plain text, sent with a `text/html` content type. They
+      keep this format because existing tools depend on it.
+    * The server reads the ingest body as JSON whatever the `Content-Type` header says, so
+      `curl -d '{...}'` works without `-H "Content-Type: application/json"`.
+    * Fields that are not listed in a request schema are accepted and ignored.
+    * Every other endpoint answers errors as JSON: `{"error": {"code": ..., "message": ...,
+      "details": [...]}}`. Calls that need a login but have none get `401`.
+    * Framework errors (unknown path, wrong method, oversized body, crashes) are JSON for
+      API clients too. Browsers, which ask for `text/html`, get the normal HTML error page.
+servers:
+  - url: /
+tags:
+  - name: Ingest
+    description: Endpoints that red team tools post callbacks and credentials to.
+  - name: Tokens
+    description: Access tokens for tools. Requires a login.
+  - name: Users
+    description: User administration. Requires the admin role.
+  - name: Account
+    description: The logged-in user's own account.
+  - name: Meta
+    description: Information about the API itself.
+paths:
+  /pwn:
+    post:
+      operationId: postCallback
+      tags: [Ingest]
+      summary: Record a callback (beacon)
+      description: |
+        Queues a callback for each address given in `ip` or `ips`. The worker stores it a
+        moment later, so a `200` means the callback was accepted, not yet stored.
+
+        With `ips`, addresses are queued one by one. If one of them is not on the board the
+        request returns `400`, and the addresses before it have already been queued.
+
+        A body containing only `challenge` is echoed back as plain text without any
+        authentication.
+
+        A bearer token is required unless the server runs with `USE_ACCESS_TOKENS=false`.
+        The token's application must match the request's `application`, unless the token's
+        application is `global`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              anyOf:
+                - $ref: '#/components/schemas/CallbackRequest'
+                - $ref: '#/components/schemas/ChallengeRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Accepted'
+        '400':
+          $ref: '#/components/responses/IngestBadRequest'
+        '401':
+          $ref: '#/components/responses/IngestUnauthorized'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
+  /checkin:
+    post:
+      operationId: postCallbackCheckin
+      tags: [Ingest]
+      summary: Record a callback (alias of /pwn)
+      description: Identical to `POST /pwn`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              anyOf:
+                - $ref: '#/components/schemas/CallbackRequest'
+                - $ref: '#/components/schemas/ChallengeRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Accepted'
+        '400':
+          $ref: '#/components/responses/IngestBadRequest'
+        '401':
+          $ref: '#/components/responses/IngestUnauthorized'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
+  /creds:
+    post:
+      operationId: postCredentials
+      tags: [Ingest]
+      summary: Record captured credentials
+      description: |
+        Queues a credential report for each address given in `ip` or `ips`. Passwords that
+        are one character or shorter are accepted here and then dropped by the worker.
+        Authentication and the `ips` behavior are the same as for `POST /pwn`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CredentialRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Accepted'
+        '400':
+          $ref: '#/components/responses/IngestBadRequest'
+        '401':
+          $ref: '#/components/responses/IngestUnauthorized'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
+  /tokens:
+    get:
+      operationId: listTokens
+      tags: [Tokens]
+      summary: List the logged-in user's access tokens
+      description: Not available to the `guest` and `restricted` roles.
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: The user's tokens. The token values themselves are never returned.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Token'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
+  /tokens/create:
+    post:
+      operationId: createToken
+      tags: [Tokens]
+      summary: Create an access token
+      description: |
+        The token is returned once and only a hash of it is stored. Users with the `guest` or
+        `restricted` role cannot create tokens.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateTokenForm'
+      responses:
+        '201':
+          description: The new token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenCreated'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
+  /tokens/{token_hash}:
+    delete:
+      operationId: deleteToken
+      tags: [Tokens]
+      summary: Delete an access token
+      description: |
+        Users can delete their own tokens. Admins can delete any token. Not available to the
+        `guest` and `restricted` roles.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: token_hash
+          in: path
+          required: true
+          description: The `hash` field from the token list.
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ApiError'
+        '500':
+          $ref: '#/components/responses/ApiError'
+  /admin/users:
+    get:
+      operationId: listUsers
+      tags: [Users]
+      summary: List users
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: All users, sorted by name.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
+    post:
+      operationId: createUser
+      tags: [Users]
+      summary: Create a user
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateUserForm'
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/ApiError'
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
+  /admin/users/{username}:
+    delete:
+      operationId: deleteUser
+      tags: [Users]
+      summary: Delete a user
+      description: Also deletes the user's access tokens. Admins cannot delete themselves.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/Username'
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ApiError'
+        '500':
+          $ref: '#/components/responses/ApiError'
+  /admin/users/{username}/tokens:
+    get:
+      operationId: listUserTokens
+      tags: [Users]
+      summary: List another user's access tokens
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/Username'
+      responses:
+        '200':
+          description: The user's tokens.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Token'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ApiError'
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
+  /admin/users/bulk:
+    post:
+      operationId: bulkCreateUsers
+      tags: [Users]
+      summary: Create several users with one shared password
+      description: |
+        Usernames are checked first and nothing is created if one is invalid. Users that
+        already exist are reported in `failed`, and the status is still `200`.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BulkUsersForm'
+      responses:
+        '200':
+          description: Which users were created and which were not.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
+  /admin/users/bulk_csv:
+    post:
+      operationId: bulkCreateUsersCsv
+      tags: [Users]
+      summary: Create users from a CSV file
+      description: |
+        The whole file is validated before anyone is created. Problems with the file itself,
+        or with its rows (listed in `details`), come back as a `400` error.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CsvUpload'
+      responses:
+        '200':
+          description: Which users were created and which were not.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
+  /admin/users/bulk_csv_template:
+    get:
+      operationId: getUsersCsvTemplate
+      tags: [Users]
+      summary: Download an example CSV file for bulk user creation
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: A CSV file with the header row and one example row.
+          content:
+            text/csv:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
+  /account/change_password:
+    post:
+      operationId: changePassword
+      tags: [Account]
+      summary: Change the logged-in user's password
+      description: |
+        On success the session is ended, so the user has to log in again. Not available to the
+        `restricted` role.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordForm'
+      responses:
+        '200':
+          description: Changed. The session has been cleared.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
+  /openapi.yaml:
+    get:
+      operationId: getOpenApiDocument
+      tags: [Meta]
+      summary: This document
+      security: []
+      responses:
+        '200':
+          description: The OpenAPI description of this API.
+          content:
+            application/yaml:
+              schema:
+                type: string
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: |
+        An access token from the Manage Apps page. Not needed when the server runs with
+        `USE_ACCESS_TOKENS=false`.
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: session
+      description: |
+        The login session cookie set by the HTML login form. There is no API call that
+        logs in, so a script has to submit that form first.
+  parameters:
+    Username:
+      name: username
+      in: path
+      required: true
+      schema:
+        type: string
+  responses:
+    Accepted:
+      description: |
+        The request was accepted and queued, so the body is `valid` (sent as `text/html`).
+        When only a `challenge` was posted, it is echoed back instead, as `text/plain`.
+      content:
+        text/html:
+          schema:
+            type: string
+          example: "valid\n"
+        text/plain:
+          schema:
+            type: string
+    IngestBadRequest:
+      description: |
+        The body is invalid. The text says which part: not a JSON object, a missing
+        or wrongly typed field, a value that is too long, an address that is not on the
+        board (`invalid IP`) or neither `ip` nor `ips` (`invalid POST`).
+      content:
+        text/html:
+          schema:
+            type: string
+          example: "invalid IP\n"
+    IngestUnauthorized:
+      description: |
+        No `Authorization` header, a header that is not `Bearer <token>`, or a token that
+        is unknown, expired or not valid for the request's `application`.
+      content:
+        text/html:
+          schema:
+            type: string
+    PayloadTooLarge:
+      description: |
+        The request body is larger than 1 MB. API clients get a JSON error, browsers get an
+        HTML error page.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+        text/html:
+          schema:
+            type: string
+    Unauthorized:
+      description: Not logged in, or the session has ended.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: The logged-in user's role is not allowed to do this.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ApiError:
+      description: |
+        The request was rejected. `error.message` explains why, and `error.details` lists the
+        individual problems when there are several.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    UnexpectedError:
+      description: Something went wrong on the server.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+        text/html:
+          schema:
+            type: string
+  schemas:
+    CallbackRequest:
+      type: object
+      description: Unlisted fields are accepted and ignored.
+      required: [application]
+      anyOf:
+        - required: [ip]
+        - required: [ips]
+      properties:
+        ip:
+          type: string
+          maxLength: 45
+          example: 10.1.1.10
+        ips:
+          type: array
+          description: Report the same callback for several addresses. Used instead of `ip`.
+          maxItems: 1000
+          items:
+            type: string
+            maxLength: 45
+        application:
+          type: string
+          maxLength: 64
+          description: The tool the callback came from. Must match the token's application.
+          example: Javalanche
+        access_info:
+          type: string
+          maxLength: 2000
+          description: How to reach the tool (URL, credentials). URLs become links in the UI.
+        server:
+          type: string
+        message:
+          type: string
+    ChallengeRequest:
+      type: object
+      description: A handshake. The value is echoed back as text.
+      required: [challenge]
+      properties:
+        challenge: {}
+    CredentialRequest:
+      type: object
+      description: Unlisted fields are accepted and ignored.
+      required: [application, username, password]
+      anyOf:
+        - required: [ip]
+        - required: [ips]
+      properties:
+        ip:
+          type: string
+          maxLength: 45
+        ips:
+          type: array
+          maxItems: 1000
+          items:
+            type: string
+            maxLength: 45
+        application:
+          type: string
+          maxLength: 64
+        username:
+          type: string
+          maxLength: 256
+        password:
+          type: string
+          maxLength: 256
+        admin:
+          type: integer
+          enum: [0, 1]
+          description: Whether the account is an administrator. Unknown when left out.
+        server:
+          type: string
+    User:
+      type: object
+      required: [username, role, created]
+      properties:
+        username:
+          type: string
+        role:
+          $ref: '#/components/schemas/Role'
+        created:
+          type: integer
+          description: Unix time in seconds.
+    NewUser:
+      type: object
+      required: [username, role]
+      properties:
+        username:
+          type: string
+        role:
+          $ref: '#/components/schemas/Role'
+    Message:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: A short identifier to match on, such as `invalid_request` or `not_found`.
+            message:
+              type: string
+            details:
+              type: array
+              description: The individual problems, when there are several.
+              items:
+                type: string
+    Role:
+      type: string
+      enum: [user, admin, guest, restricted]
+    Token:
+      type: object
+      required: [hash, token_name, application, username, created, expires, prefix]
+      properties:
+        hash:
+          type: string
+          description: Identifies the token in `DELETE /tokens/{token_hash}`.
+        token_name:
+          type: string
+        application:
+          type: string
+        description:
+          type: [string, 'null']
+        username:
+          type: string
+        created:
+          type: integer
+          description: Unix time in seconds.
+        expires:
+          type: [integer, 'null']
+          description: Unix time in seconds, or null if the token never expires.
+        prefix:
+          type: string
+          description: The first characters of the token, for recognizing it in the list.
+    TokenCreated:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+          description: The token. It cannot be retrieved again.
+    BulkResult:
+      type: object
+      required: [created, failed]
+      properties:
+        created:
+          type: array
+          items:
+            type: string
+        failed:
+          type: array
+          items:
+            type: object
+            required: [username, error]
+            properties:
+              username:
+                type: string
+              error:
+                type: string
+    CreateTokenForm:
+      type: object
+      required: [token_name, application]
+      properties:
+        token_name:
+          type: string
+          maxLength: 64
+        application:
+          type: string
+          maxLength: 64
+        description:
+          type: string
+          maxLength: 256
+        expiry:
+          type: string
+          default: 7d
+          description: |
+            A number followed by `m`, `h`, `d`, `w`, `mo` or `y` (`30m`, `7d`, `1y`), or a
+            plain number of seconds. `0` means no expiry. Anything else means 7 days.
+    CreateUserForm:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          maxLength: 64
+          pattern: '^[a-zA-Z0-9_.\-]+$'
+        password:
+          type: string
+          minLength: 1
+          maxLength: 128
+        role:
+          $ref: '#/components/schemas/Role'
+    BulkUsersForm:
+      type: object
+      required: [usernames, password]
+      properties:
+        usernames:
+          type: string
+          description: Comma-separated usernames.
+        password:
+          type: string
+          description: The password given to every new user.
+        role:
+          $ref: '#/components/schemas/Role'
+    CsvUpload:
+      type: object
+      required: [file]
+      properties:
+        file:
+          type: string
+          contentMediaType: text/csv
+          description: 'A UTF-8 CSV file with the header `username,password,role`.'
+    ChangePasswordForm:
+      type: object
+      required: [old_pass, new_pass]
+      properties:
+        old_pass:
+          type: string
+        new_pass:
+          type: string
+          maxLength: 128

@@ -156,6 +156,30 @@ Defined in `pwnboard/core/queues.py`.
 
 ## Testing
 
+### API conventions
+
+- **Ingest endpoints** (`/pwn`, `/checkin`, `/creds`) answer in plain text and keep doing so, because existing tools depend on it. Do not change their response bodies.
+- **Every other endpoint** answers errors as JSON, `{"error": {"code": ..., "message": ..., "details": [...]}}`, built with `api_error()` from `pwnboard/web/api_errors.py`. `details` lists the individual problems when there are several.
+- Protect these endpoints with `api_login_required`, `api_admin_required` or `api_forbid_roles(...)` (not `login_required`, which redirects to the login page and is for HTML pages). They answer `401` and `403` as JSON.
+- Role rules that apply to both a page and its API (`TOKEN_BLOCKED_ROLES`, `PASSWORD_BLOCKED_ROLES` in `pwnboard/web/__init__.py`) are defined once and used by both, so they cannot disagree.
+- Unknown paths, wrong methods, oversized bodies and crashes are JSON for API clients and the normal HTML page for browsers (clients that list `text/html` in `Accept`).
+- The pages' JavaScript uses `static/api.js` to show these errors and to return to the login page on `401`.
+
+### Automated tests
+
+The tests need no running services: Postgres and Redis are replaced with fakes.
+
+```bash
+pip install -r requirements/dev.txt
+python3 -m pytest
+```
+
+- `tests/test_ingest.py` and `tests/test_session_api.py` record how every API endpoint behaves today (status codes, response bodies, who is allowed in). If you change the API on purpose, update the matching test in the same change.
+- If you add a test for a gap you have not fixed yet, mark it `xfail(strict=True)`. It asserts the behavior you want and fails by design. Once the gap is fixed it starts passing, and pytest then reports an error until you remove the marker.
+- `tests/test_openapi_spec.py` checks that `pwnboard/web/openapi.yaml` is valid OpenAPI and lists exactly the endpoints the app serves. Every request the other tests make is also checked against it: the response's status code and content type must be declared, JSON bodies must match their schema, and a request body the server accepts must be valid according to the spec. So add or change an endpoint in `openapi.yaml` and in the code together.
+
+The API description is served by the app at `/openapi.yaml`. It documents the API as it behaves today, quirks included.
+
 ### Manual Testing
 
 **Test beacon submission:**
