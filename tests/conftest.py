@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest import mock
 
 # Both are read when the pwnboard package is imported, so set them first
-os.environ["BOARD"] = str(Path(__file__).parent / "fixtures" / "board.json")
+os.environ["BOARD"] = str(Path(__file__).parent / "fixtures" / "sample_board.json")
 os.environ.setdefault("SECRET_KEY", "test-secret-key")
 
 import fakeredis  # noqa: E402
