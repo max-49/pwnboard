@@ -5,6 +5,8 @@
         <script src="{{ url_for('static', filename='vendor/jquery.slim.min.js') }}"></script>
         <script src="{{ url_for('static', filename='vendor/popper.min.js') }}"></script>
         <script src="{{ url_for('static', filename='vendor/bootstrap.min.js') }}"></script>
+        <script src="{{ url_for('static', filename='escape.js') }}"></script>
+        <script src="{{ url_for('static', filename='api.js') }}"></script>
         <link href='https://fonts.googleapis.com/css?family=Titillium+Web:600,400&display=swap' rel='stylesheet' type='text/css' />
         <link href='https://fonts.googleapis.com/css?family=Jura:400,600&display=swap' rel='stylesheet' type='text/css' />
         <link rel='stylesheet' href="{{ url_for('static', filename='pwnboard.css') }}" type='text/css' />
@@ -130,6 +132,12 @@
                                             {% else %}
                                                 <p class="text-muted">No active callbacks for host!</p>
                                             {% endif %}
+
+                                            {# 'Info' is set when tools have attached notes. The notes are loaded when the popup opens. #}
+                                            {% if host.get('Info') %}
+                                                <h4 class="mt-3">Information</h4>
+                                                <div class="host-info" data-ip="{{ ip }}"><p class="text-muted">Loading...</p></div>
+                                            {% endif %}
                                         </div>
                                         <div class="modal-footer">
                                             <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
@@ -197,6 +205,44 @@
                     }, reloadMs);
                 }
 
+                // Show a link for each URL in a note. The text is escaped first, so notes cannot inject HTML.
+                function linkifyText(text) {
+                    return escHtml(text).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+                }
+
+                function renderHostInfo(items) {
+                    if (!items.length) return '<p class="text-muted">No information for this host.</p>';
+                    return '<table class="table table-sm"><tbody>' + items.map(function(item){
+                        return '<tr><th class="w-25 align-top">' + escHtml(item.key) + '</th>' +
+                               '<td style="white-space: pre-wrap; word-break: break-word;">' + linkifyText(item.value) +
+                               '<div class="small text-muted">' + escHtml(item.application) + ' &middot; ' +
+                               escHtml(new Date(item.updated * 1000).toLocaleString()) + '</div></td></tr>';
+                    }).join('') + '</tbody></table>';
+                }
+
+                // Fill the Information section of a host popup when it is opened. A failed load is retried on the next open.
+                function loadHostInfo(modal) {
+                    var box = modal.querySelector('.host-info');
+                    if (!box || box.dataset.loaded) return;
+                    fetch('/hosts/' + encodeURIComponent(box.dataset.ip) + '/info')
+                        .then(function(res){
+                            if (redirectIfSessionExpired(res)) return null;
+                            if (!res.ok) {
+                                return apiErrorMessage(res, 'Could not load the information').then(function(message){
+                                    box.innerHTML = '<p class="text-danger">' + escHtml(message) + '</p>';
+                                    return null;
+                                });
+                            }
+                            return res.json();
+                        })
+                        .then(function(items){
+                            if (!items) return;
+                            box.dataset.loaded = '1';
+                            box.innerHTML = renderHostInfo(items);
+                        })
+                        .catch(function(){ box.innerHTML = '<p class="text-danger">Could not load the information</p>'; });
+                }
+
                 // Track which modal is open using sessionStorage so we can re-open after a refresh
                 // Also move the modal element to the document body when shown to avoid stacking/overflow issues
                 $(document).on('show.bs.modal', '.modal', function(){
@@ -205,6 +251,7 @@
                         $(this).appendTo(document.body);
                         sessionStorage.setItem(openModalKey, this.id);
                     } catch(e){}
+                    loadHostInfo(this);
                 });
 
                 $(document).on('hide.bs.modal', '.modal', function(){

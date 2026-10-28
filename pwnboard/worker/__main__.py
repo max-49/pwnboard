@@ -6,8 +6,9 @@ from psycopg2.extras import execute_values
 from ..core.board import TEAM_MAP
 from ..core.data import getBoardDict
 from ..core.db import init_pool, pooled_connection, direct_connection
+from ..core.info import REJECTED, apply_info_item
 from ..core.logger import logger
-from ..core.queues import BOARD_CACHE_KEY, CALLBACK_QUEUE, CREDS_QUEUE, redis_client
+from ..core.queues import BOARD_CACHE_KEY, CALLBACK_QUEUE, CREDS_QUEUE, INFO_QUEUE, redis_client
 from ..core.schema import ensure_schema
 
 TIMEOUT_SECONDS = 15
@@ -153,6 +154,28 @@ def process_creds(batch_json, db):
             )
 
 
+def process_info(batch_json, db):
+    """Apply host info items in the order they were sent, so the last write for a key wins."""
+    if not batch_json: return
+
+    applied = 0
+    with db.cursor() as cur:
+        for item in batch_json:
+            try:
+                data = json.loads(item)
+                if not all(isinstance(data[field], str) for field in ('ip', 'key', 'value', 'application')):
+                    raise TypeError("every field must be a string")
+                result = apply_info_item(cur, data['ip'], data['key'], data['value'], data['application'])
+            except (ValueError, KeyError, TypeError):
+                logger.warning("Skipping a malformed host info item")
+                continue
+            if result == REJECTED:
+                logger.warning(f"Host {data['ip']} already has the maximum number of info keys; dropped {data['key']!r}")
+            else:
+                applied += 1
+    logger.info(f"Processed {applied} of {len(batch_json)} host info items")
+
+
 def ingest_thread():
     logger.info("Background worker started. Listening to Redis queues...")
     while True:
@@ -160,16 +183,19 @@ def ingest_thread():
             # RPOP up to 500 items chronologically
             callbacks_batch = redis_client.rpop(CALLBACK_QUEUE, 500)
             creds_batch = redis_client.rpop(CREDS_QUEUE, 500)
+            info_batch = redis_client.rpop(INFO_QUEUE, 500)
 
-            # If there is data in either queue, process it
-            if callbacks_batch or creds_batch:
-                logger.info("Callbacks and/or creds found in redis")
+            # If there is data in any queue, process it
+            if callbacks_batch or creds_batch or info_batch:
+                logger.info("Callbacks, creds and/or host info found in redis")
 
                 with pooled_connection() as db:
                     if callbacks_batch:
                         process_callbacks(callbacks_batch, db)
                     if creds_batch:
                         process_creds(creds_batch, db)
+                    if info_batch:
+                        process_info(info_batch, db)
                 
                     db.commit()
 

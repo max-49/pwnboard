@@ -9,12 +9,12 @@ import argparse
 import sys
 
 from ..core.db import direct_connection
-from ..core.queues import BOARD_CACHE_KEY, CALLBACK_QUEUE, CREDS_QUEUE, redis_client
+from ..core.queues import BOARD_CACHE_KEY, CALLBACK_QUEUE, CREDS_QUEUE, INFO_QUEUE, redis_client
 from ..core.schema import DATA_TABLES
 
 # DATA_TABLES is everything beacons and credential reports write. The users and
 # access_tokens tables are kept.
-REDIS_KEYS = (CALLBACK_QUEUE, CREDS_QUEUE, BOARD_CACHE_KEY)
+REDIS_KEYS = (CALLBACK_QUEUE, CREDS_QUEUE, INFO_QUEUE, BOARD_CACHE_KEY)
 
 
 def clear_tables(conn):
