@@ -949,7 +949,7 @@
         "type": "grafana-postgresql-datasource",
         "uid": "PF37523F25C86FB03"
       },
-      "description": "Each team's chance of winning, drawn like a prediction market: 100 cents is a sure thing, and the odds of all teams add up to 100. A team's odds fall as red team holds more of its hosts (hosts that called back in the last 5 minutes) and rise as it gets them back. It is a joke model: lost callbacks can also mean a team's own scorechecks are down. Change the market sharpness above: higher means a few compromised hosts move the odds more.",
+      "description": "Each team's chance of winning, drawn like a prediction market: the chances of all teams add up to 100%. A team's chance falls as red team holds more of its hosts (hosts that called back in the last 5 minutes) and rises as it gets them back. Only the teams with the best chances now are drawn (Teams shown). Market sharpness sets how strongly one compromised host moves the odds. It is a joke model: lost callbacks can also mean a team's own scorechecks are down.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -960,7 +960,7 @@
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
-            "axisPlacement": "auto",
+            "axisPlacement": "right",
             "barAlignment": 0,
             "barWidthFactor": 0.6,
             "drawStyle": "line",
@@ -991,7 +991,6 @@
           },
           "decimals": 1,
           "mappings": [],
-          "max": 100,
           "min": 0,
           "thresholds": {
             "mode": "absolute",
@@ -1002,7 +1001,7 @@
               }
             ]
           },
-          "unit": "suffix:\u00a2"
+          "unit": "percent"
         },
         "overrides": []
       },
@@ -1018,11 +1017,9 @@
           "calcs": [
             "lastNotNull"
           ],
-          "displayMode": "table",
-          "placement": "right",
-          "showLegend": true,
-          "sortBy": "Last *",
-          "sortDesc": true
+          "displayMode": "list",
+          "placement": "top",
+          "showLegend": true
         },
         "tooltip": {
           "hideZeros": false,
@@ -1039,7 +1036,7 @@
           "editorMode": "code",
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "WITH buckets AS (\n  SELECT generate_series(\n    $__timeFrom()::timestamptz,\n    $__timeTo()::timestamptz,\n    make_interval(secs => GREATEST($__interval_ms / 1000.0, 60))\n  ) AS t\n),\nteams AS (\n  SELECT DISTINCT team FROM callback_events WHERE team IS NOT NULL\n),\npresence AS (\n  -- which hosts called back in which minute (5 minutes of lookback before the range)\n  SELECT DISTINCT team, ip, date_trunc('minute', received_at) AS m\n  FROM callback_events\n  WHERE team IS NOT NULL\n    AND received_at >= $__timeFrom()::timestamptz - INTERVAL '5 minutes'\n    AND received_at <= $__timeTo()::timestamptz\n),\nonline AS (\n  -- hosts of each team that called back during the 5 minutes up to each bucket\n  SELECT b.t, tm.team, COUNT(DISTINCT p.ip) AS hosts\n  FROM buckets b\n  CROSS JOIN teams tm\n  LEFT JOIN presence p\n    ON p.team = tm.team\n   AND p.m > b.t - INTERVAL '5 minutes'\n   AND p.m <= b.t\n  GROUP BY b.t, tm.team\n),\nweights AS (\n  -- fewer compromised hosts means a bigger weight\n  SELECT t, team, EXP(-${odds_sharpness} * hosts) AS w FROM online\n)\nSELECT\n  t AS \"time\",\n  team AS metric,\n  (100.0 * w / SUM(w) OVER (PARTITION BY t))::float8 AS \"Odds\"\nFROM weights\nORDER BY t, team",
+          "rawSql": "WITH buckets AS (\n  SELECT generate_series(\n    $__timeFrom()::timestamptz,\n    $__timeTo()::timestamptz,\n    make_interval(secs => GREATEST($__interval_ms / 1000.0, 60))\n  ) AS t\n),\nteams AS (\n  SELECT DISTINCT team FROM callback_events WHERE team IS NOT NULL\n),\npresence AS (\n  -- which hosts called back in which minute (5 minutes of lookback before the range)\n  SELECT DISTINCT team, ip, date_trunc('minute', received_at) AS m\n  FROM callback_events\n  WHERE team IS NOT NULL\n    AND received_at >= $__timeFrom()::timestamptz - INTERVAL '5 minutes'\n    AND received_at <= $__timeTo()::timestamptz\n),\nonline AS (\n  -- hosts of each team that called back during the 5 minutes up to each bucket\n  SELECT b.t, tm.team, COUNT(DISTINCT p.ip) AS hosts\n  FROM buckets b\n  CROSS JOIN teams tm\n  LEFT JOIN presence p\n    ON p.team = tm.team\n   AND p.m > b.t - INTERVAL '5 minutes'\n   AND p.m <= b.t\n  GROUP BY b.t, tm.team\n),\nweights AS (\n  -- fewer compromised hosts means a bigger weight\n  SELECT t, team, EXP(-${odds_sharpness} * hosts) AS w FROM online\n),\nodds AS (\n  -- each team's share of the total weight in each bucket, as a percentage\n  SELECT t, team, 100.0 * w / SUM(w) OVER (PARTITION BY t) AS pct FROM weights\n),\nleaders AS (\n  -- the teams with the best odds now; only these are drawn\n  SELECT team FROM odds WHERE t = (SELECT MAX(t) FROM odds) ORDER BY pct DESC LIMIT ${odds_top}\n)\nSELECT\n  t AS \"time\",\n  team AS metric,\n  pct::float8 AS \"Odds\"\nFROM odds\nWHERE team IN (SELECT team FROM leaders)\nORDER BY t, team",
           "refId": "A"
         }
       ],
@@ -1051,7 +1048,7 @@
         "type": "grafana-postgresql-datasource",
         "uid": "PF37523F25C86FB03"
       },
-      "description": "The latest odds from the chart on the left, highest first.",
+      "description": "The latest chances from the chart on the left, best first (the same teams as in the chart).",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1059,7 +1056,6 @@
           },
           "decimals": 1,
           "mappings": [],
-          "max": 100,
           "min": 0,
           "thresholds": {
             "mode": "absolute",
@@ -1070,7 +1066,7 @@
               }
             ]
           },
-          "unit": "suffix:\u00a2"
+          "unit": "percent"
         },
         "overrides": []
       },
@@ -1114,7 +1110,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH buckets AS (\n  SELECT generate_series(\n    $__timeFrom()::timestamptz,\n    $__timeTo()::timestamptz,\n    make_interval(secs => GREATEST($__interval_ms / 1000.0, 60))\n  ) AS t\n),\nteams AS (\n  SELECT DISTINCT team FROM callback_events WHERE team IS NOT NULL\n),\npresence AS (\n  -- which hosts called back in which minute (5 minutes of lookback before the range)\n  SELECT DISTINCT team, ip, date_trunc('minute', received_at) AS m\n  FROM callback_events\n  WHERE team IS NOT NULL\n    AND received_at >= $__timeFrom()::timestamptz - INTERVAL '5 minutes'\n    AND received_at <= $__timeTo()::timestamptz\n),\nonline AS (\n  -- hosts of each team that called back during the 5 minutes up to each bucket\n  SELECT b.t, tm.team, COUNT(DISTINCT p.ip) AS hosts\n  FROM buckets b\n  CROSS JOIN teams tm\n  LEFT JOIN presence p\n    ON p.team = tm.team\n   AND p.m > b.t - INTERVAL '5 minutes'\n   AND p.m <= b.t\n  GROUP BY b.t, tm.team\n),\nweights AS (\n  -- fewer compromised hosts means a bigger weight\n  SELECT t, team, EXP(-${odds_sharpness} * hosts) AS w FROM online\n)\nSELECT\n  team AS metric,\n  (100.0 * w / SUM(w) OVER ())::float8 AS \"Odds\"\nFROM weights\nWHERE t = (SELECT MAX(t) FROM weights)\nORDER BY 2 DESC",
+          "rawSql": "WITH buckets AS (\n  SELECT generate_series(\n    $__timeFrom()::timestamptz,\n    $__timeTo()::timestamptz,\n    make_interval(secs => GREATEST($__interval_ms / 1000.0, 60))\n  ) AS t\n),\nteams AS (\n  SELECT DISTINCT team FROM callback_events WHERE team IS NOT NULL\n),\npresence AS (\n  -- which hosts called back in which minute (5 minutes of lookback before the range)\n  SELECT DISTINCT team, ip, date_trunc('minute', received_at) AS m\n  FROM callback_events\n  WHERE team IS NOT NULL\n    AND received_at >= $__timeFrom()::timestamptz - INTERVAL '5 minutes'\n    AND received_at <= $__timeTo()::timestamptz\n),\nonline AS (\n  -- hosts of each team that called back during the 5 minutes up to each bucket\n  SELECT b.t, tm.team, COUNT(DISTINCT p.ip) AS hosts\n  FROM buckets b\n  CROSS JOIN teams tm\n  LEFT JOIN presence p\n    ON p.team = tm.team\n   AND p.m > b.t - INTERVAL '5 minutes'\n   AND p.m <= b.t\n  GROUP BY b.t, tm.team\n),\nweights AS (\n  -- fewer compromised hosts means a bigger weight\n  SELECT t, team, EXP(-${odds_sharpness} * hosts) AS w FROM online\n),\nodds AS (\n  -- each team's share of the total weight in each bucket, as a percentage\n  SELECT t, team, 100.0 * w / SUM(w) OVER (PARTITION BY t) AS pct FROM weights\n)\nSELECT\n  team AS metric,\n  pct::float8 AS \"Odds\"\nFROM odds\nWHERE t = (SELECT MAX(t) FROM odds)\nORDER BY pct DESC\nLIMIT ${odds_top}",
           "refId": "A"
         }
       ],
@@ -1132,14 +1128,14 @@
         "name": "odds_sharpness",
         "label": "Market sharpness",
         "hide": 0,
-        "description": "How strongly one compromised host moves a team's odds.",
-        "query": "0.2,0.35,0.5,0.75,1",
+        "description": "How strongly one compromised host moves a team's odds. Turn it up when the teams are all close.",
+        "query": "0.2,0.35,0.5,0.75,1,1.5,2",
         "multi": false,
         "includeAll": false,
         "current": {
           "selected": true,
-          "text": "0.35",
-          "value": "0.35"
+          "text": "0.5",
+          "value": "0.5"
         },
         "options": [
           {
@@ -1148,12 +1144,12 @@
             "value": "0.2"
           },
           {
-            "selected": true,
+            "selected": false,
             "text": "0.35",
             "value": "0.35"
           },
           {
-            "selected": false,
+            "selected": true,
             "text": "0.5",
             "value": "0.5"
           },
@@ -1166,6 +1162,58 @@
             "selected": false,
             "text": "1",
             "value": "1"
+          },
+          {
+            "selected": false,
+            "text": "1.5",
+            "value": "1.5"
+          },
+          {
+            "selected": false,
+            "text": "2",
+            "value": "2"
+          }
+        ]
+      },
+      {
+        "type": "custom",
+        "name": "odds_top",
+        "label": "Teams shown",
+        "hide": 0,
+        "description": "Draw only the teams with the best odds now.",
+        "query": "3,5,8,10,All : 1000",
+        "multi": false,
+        "includeAll": false,
+        "current": {
+          "selected": true,
+          "text": "5",
+          "value": "5"
+        },
+        "options": [
+          {
+            "selected": false,
+            "text": "3",
+            "value": "3"
+          },
+          {
+            "selected": true,
+            "text": "5",
+            "value": "5"
+          },
+          {
+            "selected": false,
+            "text": "8",
+            "value": "8"
+          },
+          {
+            "selected": false,
+            "text": "10",
+            "value": "10"
+          },
+          {
+            "selected": false,
+            "text": "All",
+            "value": "1000"
           }
         ]
       }
