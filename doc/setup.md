@@ -54,6 +54,14 @@ docker compose down && docker volume rm pwnboard_pwnboard-data && docker compose
 
 The volume is named `<project>_pwnboard-data`, where the project defaults to the directory name. Check with `docker volume ls` if yours differs. Do not use `docker compose down -v`: it also deletes the Caddy volumes, which hold your HTTPS certificates.
 
+**Also set a new `SECRET_KEY` in `.env` before bringing it back up.** A login is a cookie signed with `SECRET_KEY`, and the app does not check it against the database afterwards. If you keep the old key, anyone who was logged in stays logged in after the reset, as a user that no longer exists and with the same role, until their cookie expires (12 hours without activity). A new key logs everyone out. Generate one with `python3 scripts/setup.py` or:
+
+```bash
+python3 -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+The same applies without a reset: deleting a user or changing their role does not end a session they already have open. Changing `SECRET_KEY` (and recreating the web container with `docker compose up -d --force-recreate --no-deps pwnboard`) logs everyone out.
+
 ## Exporting and backing up data
 
 Export what you need before you [reset the test data](#resetting-test-data) or remove the database volume.
