@@ -13,6 +13,7 @@ DATA_TABLES = (
     "callback_events",
     "credentials_latest",
     "credentials_by_user",
+    "host_info",
 )
 
 _TABLES_DDL = """
@@ -97,6 +98,15 @@ _TABLES_DDL = """
 
     CREATE INDEX IF NOT EXISTS idx_credentials_by_user_ip ON credentials_by_user(ip);
     CREATE INDEX IF NOT EXISTS idx_credentials_by_user_last_seen ON credentials_by_user(last_seen);
+
+    CREATE TABLE IF NOT EXISTS host_info (
+        ip INET NOT NULL,
+        info_key TEXT NOT NULL,
+        info_value TEXT NOT NULL,
+        application TEXT NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (ip, info_key)
+    );
 """
 
 

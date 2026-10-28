@@ -6,6 +6,7 @@ import redis
 # Beacons/creds pushed by the web endpoints, popped in batches by the worker
 CALLBACK_QUEUE = "callback_queue"
 CREDS_QUEUE = "creds_queue"
+INFO_QUEUE = "info_queue"
 
 # JSON of the rendered board, written by the worker, read by the dashboard
 BOARD_CACHE_KEY = "board_cache"

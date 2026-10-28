@@ -18,6 +18,7 @@ This API is also described as an OpenAPI file, served at `https://pwnboard.win/o
 |------|----------------|-----------------|
 | Callback (beacon) | `POST https://pwnboard.win/pwn` (also `/checkin`) | `ip`, `application` |
 | Credentials | `POST https://pwnboard.win/creds` | `ip`, `application`, `username`, `password` |
+| Host information | `POST https://pwnboard.win/info` | `ip`, `application`, `key`, `value` |
 
 - The body is JSON, sent with `Content-Type: application/json`.
 - If access tokens are enabled (the default), add the header `Authorization: Bearer <token>`.
@@ -68,6 +69,22 @@ POST data in this format to https://pwnboard.win/creds :
 
 Passwords that are one character or shorter are ignored. Credentials count as active for `CREDS_TIMEOUT` minutes (30 by default) after they were last received. After that they stay in the host's popup, marked **stale**, since the password may still work.
 
+## Sending host information to PWNBoard
+Use this for facts about a host that are not callbacks or credentials, such as its hostname, operating system, or where a flag is. POST data in this format to https://pwnboard.win/info :
+
+`{"ip": "<ip>", "application": "<your tool>", "key": "<label>", "value": "<value>"}`
+
+- The notes show up in the host's popup, under **Information**, and the host's square shows `Info: Yes`.
+- A note is identified by the host and its `key`. Sending the same `key` for a host again **overwrites** the note, even if a different tool sent the first one. The popup shows which tool set it last, and when.
+- Sending an **empty `value`** deletes the note.
+- Notes **do not expire**, unlike callbacks and credentials.
+- Limits: a `key` is at most 64 characters, a `value` at most 1000, and a host can have at most 50 notes. A new key on a host that already has 50 is dropped.
+- URLs in a value become links. `ips` works here as well, to send the same note for several hosts.
+
+```bash
+curl -X POST -H "Content-Type: application/json" -H "Authorization: Bearer <ACCESS TOKEN GENERATED IN /manage_apps>" -d '{"ip": "10.1.1.254", "application": "Javalanche", "key": "hostname", "value": "web-01.corp.local"}' https://pwnboard.win/info
+```
+
 ## Responses
 
 | Status | Body | Meaning |
@@ -76,6 +93,7 @@ Passwords that are one character or shorter are ignored. Credentials count as ac
 | `400` | `invalid IP` | The `ip` is not on this PWNBoard (a wrong or unexpected address is the usual cause) |
 | `400` | `invalid POST` | The body has neither `ip` nor `ips` |
 | `400` | `Invalid: Missing ...` | A required field is missing |
+| `400` | `Invalid: 'key' must not be empty` | `/info` only: the `key` is empty or only spaces |
 | `400` | `Invalid: the request body must be a JSON object` | The body is not valid JSON, or is JSON but not an object (for example a list) |
 | `400` | `Invalid: '<field>' must be a string of at most N characters` | A field is not a string or is too long. Limits: `ip` 45, `application` 64, `access_info` 2000, `username` and `password` 256 characters |
 | `400` | `Invalid: 'ips' ...` | `ips` is not a list of strings, or has more than 1000 addresses |

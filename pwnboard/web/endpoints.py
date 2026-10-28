@@ -21,12 +21,13 @@ from .authentication import (
 from ..core.board import IP_SET
 from ..core.data import getEpoch
 from ..core.db import dict_cursor
+from ..core.info import MAX_KEY_LENGTH, MAX_VALUE_LENGTH, get_host_info
 from ..core.logger import logger
-from ..core.queues import CALLBACK_QUEUE, CREDS_QUEUE, redis_client
+from ..core.queues import CALLBACK_QUEUE, CREDS_QUEUE, INFO_QUEUE, redis_client
 
 from .api_errors import api_error
 from . import (
-    app, get_db, api_admin_required, api_forbid_roles,
+    app, get_db, api_admin_required, api_forbid_roles, api_login_required,
     PASSWORD_BLOCKED_ROLES, TOKEN_BLOCKED_ROLES, USE_ACCESS_TOKENS,
 )
 
@@ -42,6 +43,9 @@ PAYLOAD_STRING_LIMITS = {
     'username': 256,
     'password': 256,
 }
+# Extra limits for POST /info. They are not part of PAYLOAD_STRING_LIMITS because the other
+# ingest endpoints accept (and ignore) fields with these names.
+INFO_STRING_LIMITS = {'key': MAX_KEY_LENGTH, 'value': MAX_VALUE_LENGTH}
 MAX_IPS_PER_REQUEST = 1000
 
 
@@ -53,9 +57,9 @@ def _read_payload():
     return data, None
 
 
-def _check_payload_types(data):
+def _check_payload_types(data, extra_limits=None):
     """Return an error response if a field has the wrong type or is too long, else None."""
-    for field, limit in PAYLOAD_STRING_LIMITS.items():
+    for field, limit in {**PAYLOAD_STRING_LIMITS, **(extra_limits or {})}.items():
         if field in data and (not isinstance(data[field], str) or len(data[field]) > limit):
             return f"Invalid: '{field}' must be a string of at most {limit} characters\n", 400
     ips = data.get('ips')
@@ -159,6 +163,38 @@ def _user_error(message):
     if message in USER_SERVER_ERRORS:
         return api_error(500, 'internal_error', message)
     return api_error(400, 'invalid_request', message)
+
+
+@app.route('/info', methods=['POST'])
+def info_callback():
+    """Handle a tool attaching a key/value note to a host. An empty value deletes the note."""
+    data, error = _read_payload()
+    if error:
+        return error
+
+    if 'application' not in data or 'key' not in data or 'value' not in data:
+        return "Invalid: Missing 'application', 'key' or 'value' in the request\n", 400
+
+    error = _check_payload_types(data, INFO_STRING_LIMITS)
+    if error:
+        return error
+    data['key'], data['value'] = data['key'].strip(), data['value'].strip()
+    if not data['key']:
+        return "Invalid: 'key' must not be empty\n", 400
+
+    error = _authorize(data['application']) or _enqueue(INFO_QUEUE, data)
+    if error:
+        return error
+    return "valid\n", 200
+
+
+@app.route('/hosts/<ip>/info', methods=['GET'])
+@api_login_required
+def host_info(ip):
+    """The notes tools have attached to a host, for the dashboard's host popup."""
+    if ip not in IP_SET:
+        return api_error(404, 'not_found', 'Not found')
+    return jsonify(get_host_info(get_db(), ip))
 
 
 @app.route('/admin/users', methods=['GET'])

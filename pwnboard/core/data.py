@@ -6,6 +6,7 @@ import copy
 
 from .logger import logger
 from .board import BOARD
+from .info import get_info_counts
 
 # How long after the last callback a host counts as online, and how long credentials count
 # as current, in minutes. Set HOST_TIMEOUT / CREDS_TIMEOUT to change them. The web app and
@@ -33,9 +34,12 @@ def getBoardDict(db):
     '''
     # Get the teams and the basehost list from the config
     board = copy.deepcopy(BOARD['board'])
+    info_counts = get_info_counts(db)
     for row in board:
         for _host in row['hosts']:
             _host.update(getHostData(_host['ip'], db))
+            if info_counts.get(_host['ip']):
+                _host['Info'] = "Yes"
     return board
 
 def getActiveCreds(ip, db):

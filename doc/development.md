@@ -25,6 +25,7 @@ Guide for developers contributing to or extending PWNboard.
 │  - Routes       │ queue  │  - callback_    │
 │  - Auth         │        │    queue        │
 │  - Dashboard    │ ◀───── │  - creds_queue  │
+│                 │        │  - info_queue   │
 └────────┬────────┘ cache  │  - board_cache  │
          │                 └────────┬────────┘
          │ users, tokens            │
@@ -152,6 +153,7 @@ Defined in `pwnboard/core/queues.py`.
 |-----|------|-----------|---------|
 | `callback_queue` | List of JSON beacons (`LPUSH`) | Web (`/pwn`, `/checkin`) | Worker (`RPOP`, up to 500 at a time) |
 | `creds_queue` | List of JSON credential reports (`LPUSH`) | Web (`/creds`) | Worker (`RPOP`, up to 500 at a time) |
+| `info_queue` | List of JSON host info notes (`LPUSH`) | Web (`/info`) | Worker (`RPOP`, up to 500 at a time) |
 | `board_cache` | String, JSON board | Worker | Web dashboard |
 
 ## Testing

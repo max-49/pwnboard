@@ -26,7 +26,7 @@ Testing with `sim_callbacks.py` and `sim_creds.py` leaves fake callbacks and cre
 
 ### Keep users and access tokens
 
-The worker image includes a reset command that deletes all callbacks, credentials, callback history (what Grafana graphs) and the queued/cached board data in Redis, but keeps user accounts and access tokens:
+The worker image includes a reset command that deletes all callbacks, credentials, host information, callback history (what Grafana graphs) and the queued/cached board data in Redis, but keeps user accounts and access tokens:
 
 ```bash
 docker compose stop pwnboard worker
@@ -71,6 +71,11 @@ docker compose exec -T db psql -U pwnboard_user pwnboard_db < pwnboard-backup.sq
 Callback history as CSV (one row per callback received, handy for reports):
 ```bash
 docker compose exec -T db psql -U pwnboard_user -d pwnboard_db -c "COPY (SELECT received_at, team, ip, application, access_info FROM callback_events ORDER BY received_at) TO STDOUT WITH CSV HEADER" > callbacks.csv
+```
+
+Host information notes as CSV:
+```bash
+docker compose exec -T db psql -U pwnboard_user -d pwnboard_db -c "COPY (SELECT ip, info_key, info_value, application, updated_at FROM host_info ORDER BY ip, info_key) TO STDOUT WITH CSV HEADER" > host_info.csv
 ```
 
 Captured credentials as CSV:

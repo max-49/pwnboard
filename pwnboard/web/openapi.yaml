@@ -33,6 +33,8 @@ servers:
 tags:
   - name: Ingest
     description: Endpoints that red team tools post callbacks and credentials to.
+  - name: Hosts
+    description: Information about hosts on the board. Requires a login.
   - name: Tokens
     description: Access tokens for tools. Requires a login.
   - name: Users
@@ -134,6 +136,69 @@ paths:
           $ref: '#/components/responses/IngestUnauthorized'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
+  /info:
+    post:
+      operationId: postHostInfo
+      tags: [Ingest]
+      summary: Attach a note (key and value) to a host
+      description: |
+        Stores a note shown in the host's popup under Information. A note is identified by the
+        host and its `key`: sending the same key again overwrites the note, and sending an empty
+        `value` deletes it. Notes do not expire. A host can have at most 50 notes, and a new key
+        on a host that has 50 is dropped.
+
+        Like the other ingest endpoints, a `200` means the note was accepted and queued, `ips`
+        sends the same note for several hosts, and a bearer token is required unless the server
+        runs with `USE_ACCESS_TOKENS=false`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InfoRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Accepted'
+        '400':
+          $ref: '#/components/responses/IngestBadRequest'
+        '401':
+          $ref: '#/components/responses/IngestUnauthorized'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
+  /hosts/{ip}/info:
+    get:
+      operationId: getHostInfo
+      tags: [Hosts]
+      summary: List the notes attached to a host
+      description: Used by the dashboard when a host's popup is opened.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: ip
+          in: path
+          required: true
+          description: An address on the board.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The host's notes, sorted by key.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HostInfoItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/ApiError'
         '500':
           $ref: '#/components/responses/UnexpectedError'
   /tokens:
@@ -612,6 +677,51 @@ components:
           description: Whether the account is an administrator. Unknown when left out.
         server:
           type: string
+    InfoRequest:
+      type: object
+      description: Unlisted fields are accepted and ignored.
+      required: [application, key, value]
+      anyOf:
+        - required: [ip]
+        - required: [ips]
+      properties:
+        ip:
+          type: string
+          maxLength: 45
+        ips:
+          type: array
+          maxItems: 1000
+          items:
+            type: string
+            maxLength: 45
+        application:
+          type: string
+          maxLength: 64
+          description: The tool sending the note. Must match the token's application.
+        key:
+          type: string
+          minLength: 1
+          maxLength: 64
+          example: hostname
+        value:
+          type: string
+          maxLength: 1000
+          description: The note. An empty value deletes the note.
+          example: web-01.corp.local
+    HostInfoItem:
+      type: object
+      required: [key, value, application, updated]
+      properties:
+        key:
+          type: string
+        value:
+          type: string
+        application:
+          type: string
+          description: The tool that last set this note.
+        updated:
+          type: integer
+          description: Unix time in seconds.
     User:
       type: object
       required: [username, role, created]
