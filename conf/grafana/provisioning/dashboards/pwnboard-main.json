@@ -943,13 +943,233 @@
       ],
       "title": "Recently Received Credentials",
       "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PF37523F25C86FB03"
+      },
+      "description": "Each team's chance of winning, drawn like a prediction market: 100 cents is a sure thing, and the odds of all teams add up to 100. A team's odds fall as red team holds more of its hosts (hosts that called back in the last 5 minutes) and rise as it gets them back. It is a joke model: lost callbacks can also mean a team's own scorechecks are down. Change the market sharpness above: higher means a few compromised hosts move the odds more.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 1,
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "suffix:\u00a2"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 16,
+        "x": 0,
+        "y": 31
+      },
+      "id": 10,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "PF37523F25C86FB03"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "WITH buckets AS (\n  SELECT generate_series(\n    $__timeFrom()::timestamptz,\n    $__timeTo()::timestamptz,\n    make_interval(secs => GREATEST($__interval_ms / 1000.0, 60))\n  ) AS t\n),\nteams AS (\n  SELECT DISTINCT team FROM callback_events WHERE team IS NOT NULL\n),\npresence AS (\n  -- which hosts called back in which minute (5 minutes of lookback before the range)\n  SELECT DISTINCT team, ip, date_trunc('minute', received_at) AS m\n  FROM callback_events\n  WHERE team IS NOT NULL\n    AND received_at >= $__timeFrom()::timestamptz - INTERVAL '5 minutes'\n    AND received_at <= $__timeTo()::timestamptz\n),\nonline AS (\n  -- hosts of each team that called back during the 5 minutes up to each bucket\n  SELECT b.t, tm.team, COUNT(DISTINCT p.ip) AS hosts\n  FROM buckets b\n  CROSS JOIN teams tm\n  LEFT JOIN presence p\n    ON p.team = tm.team\n   AND p.m > b.t - INTERVAL '5 minutes'\n   AND p.m <= b.t\n  GROUP BY b.t, tm.team\n),\nweights AS (\n  -- fewer compromised hosts means a bigger weight\n  SELECT t, team, EXP(-${odds_sharpness} * hosts) AS w FROM online\n)\nSELECT\n  t AS \"time\",\n  team AS metric,\n  (100.0 * w / SUM(w) OVER (PARTITION BY t))::float8 AS \"Odds\"\nFROM weights\nORDER BY t, team",
+          "refId": "A"
+        }
+      ],
+      "title": "Odds of Winning",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PF37523F25C86FB03"
+      },
+      "description": "The latest odds from the chart on the left, highest first.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-BlPu"
+          },
+          "decimals": 1,
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "suffix:\u00a2"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 8,
+        "x": 16,
+        "y": 31
+      },
+      "id": 11,
+      "options": {
+        "displayMode": "gradient",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "left",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "PF37523F25C86FB03"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH buckets AS (\n  SELECT generate_series(\n    $__timeFrom()::timestamptz,\n    $__timeTo()::timestamptz,\n    make_interval(secs => GREATEST($__interval_ms / 1000.0, 60))\n  ) AS t\n),\nteams AS (\n  SELECT DISTINCT team FROM callback_events WHERE team IS NOT NULL\n),\npresence AS (\n  -- which hosts called back in which minute (5 minutes of lookback before the range)\n  SELECT DISTINCT team, ip, date_trunc('minute', received_at) AS m\n  FROM callback_events\n  WHERE team IS NOT NULL\n    AND received_at >= $__timeFrom()::timestamptz - INTERVAL '5 minutes'\n    AND received_at <= $__timeTo()::timestamptz\n),\nonline AS (\n  -- hosts of each team that called back during the 5 minutes up to each bucket\n  SELECT b.t, tm.team, COUNT(DISTINCT p.ip) AS hosts\n  FROM buckets b\n  CROSS JOIN teams tm\n  LEFT JOIN presence p\n    ON p.team = tm.team\n   AND p.m > b.t - INTERVAL '5 minutes'\n   AND p.m <= b.t\n  GROUP BY b.t, tm.team\n),\nweights AS (\n  -- fewer compromised hosts means a bigger weight\n  SELECT t, team, EXP(-${odds_sharpness} * hosts) AS w FROM online\n)\nSELECT\n  team AS metric,\n  (100.0 * w / SUM(w) OVER ())::float8 AS \"Odds\"\nFROM weights\nWHERE t = (SELECT MAX(t) FROM weights)\nORDER BY 2 DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Current Odds",
+      "type": "bargauge"
     }
   ],
   "preload": false,
   "schemaVersion": 42,
   "tags": [],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "type": "custom",
+        "name": "odds_sharpness",
+        "label": "Market sharpness",
+        "hide": 0,
+        "description": "How strongly one compromised host moves a team's odds.",
+        "query": "0.2,0.35,0.5,0.75,1",
+        "multi": false,
+        "includeAll": false,
+        "current": {
+          "selected": true,
+          "text": "0.35",
+          "value": "0.35"
+        },
+        "options": [
+          {
+            "selected": false,
+            "text": "0.2",
+            "value": "0.2"
+          },
+          {
+            "selected": true,
+            "text": "0.35",
+            "value": "0.35"
+          },
+          {
+            "selected": false,
+            "text": "0.5",
+            "value": "0.5"
+          },
+          {
+            "selected": false,
+            "text": "0.75",
+            "value": "0.75"
+          },
+          {
+            "selected": false,
+            "text": "1",
+            "value": "1"
+          }
+        ]
+      }
+    ]
   },
   "time": {
     "from": "now-1h",

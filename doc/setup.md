@@ -91,6 +91,17 @@ Captured credentials as CSV:
 docker compose exec -T db psql -U pwnboard_user -d pwnboard_db -c "COPY (SELECT ip, username, password, server, to_timestamp(last_seen) AS last_seen FROM credentials_by_user ORDER BY ip, username) TO STDOUT WITH CSV HEADER" > credentials.csv
 ```
 
+## The odds panel on the Grafana dashboard
+
+The dashboard has an **Odds of Winning** chart and a **Current Odds** bar, drawn like a prediction market: each team's price is its chance of winning, in cents, and the prices of all teams add up to 100. A team's odds fall as red team holds more of its hosts and rise as it gets them back. It is a joke model for the final presentation, and not a real prediction: lost callbacks can also mean a team's own scorechecks are down.
+
+- **How it is computed:** for every point in time, count each team's hosts that called back during the previous 5 minutes (the same idea as a host being online on the board), then give each team the weight `exp(-sharpness * hosts)` and divide by the total. Fewer compromised hosts means a bigger share.
+- **Market sharpness** (drop-down at the top of the dashboard, default 0.35): how strongly one compromised host moves the odds. 0.2 gives a close race, 1 makes the least-compromised team an overwhelming favorite.
+- **Teams** are taken from the callback history, so a team shows up once it has had its first callback. Clearing the data with the reset command clears the chart too.
+- **Changing the 5-minute window:** edit the `INTERVAL '5 minutes'` (three times) in the panel's query in `conf/grafana/provisioning/dashboards/pwnboard-main.json`.
+
+The dashboard folder is mounted into the Grafana container, so after a `git pull` Grafana picks up the change within about 10 seconds. No restart is needed.
+
 ## Troubleshooting
 
 ### 1) Navbar shows wrong user/options (SHOULD BE FIXED NOW)
