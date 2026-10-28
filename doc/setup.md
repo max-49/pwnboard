@@ -93,10 +93,12 @@ docker compose exec -T db psql -U pwnboard_user -d pwnboard_db -c "COPY (SELECT 
 
 ## The odds panel on the Grafana dashboard
 
-The dashboard has an **Odds of Winning** chart and a **Current Odds** bar, drawn like a prediction market: each team's price is its chance of winning, in cents, and the prices of all teams add up to 100. A team's odds fall as red team holds more of its hosts and rise as it gets them back. It is a joke model for the final presentation, and not a real prediction: lost callbacks can also mean a team's own scorechecks are down.
+The dashboard has an **Odds of Winning** chart and a **Current Odds** bar, drawn like a prediction market: each team's price is its chance of winning, in percent, and the chances of all teams add up to 100%. A team's chance falls as red team holds more of its hosts and rises as it gets them back. It is a joke model for the final presentation, and not a real prediction: lost callbacks can also mean a team's own scorechecks are down.
 
 - **How it is computed:** for every point in time, count each team's hosts that called back during the previous 5 minutes (the same idea as a host being online on the board), then give each team the weight `exp(-sharpness * hosts)` and divide by the total. Fewer compromised hosts means a bigger share.
-- **Market sharpness** (drop-down at the top of the dashboard, default 0.35): how strongly one compromised host moves the odds. 0.2 gives a close race, 1 makes the least-compromised team an overwhelming favorite.
+- **Market sharpness** (drop-down at the top of the dashboard, default 0.5): how strongly one compromised host moves the odds. When all teams are close, as with random simulated callbacks, every chance stays near 1 divided by the number of teams. Turn it up (1 to 2) to spread them out.
+- **Teams shown** (drop-down, default 5): only the teams with the best chances right now are drawn, so the chart stays readable with many teams. Pick *All* to draw every team.
+- **The chart's axis** fits the data instead of always showing 0 to 100%.
 - **Teams** are taken from the callback history, so a team shows up once it has had its first callback. Clearing the data with the reset command clears the chart too.
 - **Changing the 5-minute window:** edit the `INTERVAL '5 minutes'` (three times) in the panel's query in `conf/grafana/provisioning/dashboards/pwnboard-main.json`.
 
