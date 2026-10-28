@@ -103,19 +103,65 @@ class TestTokenAuth:
 
     def test_rejected_token(self, client, redis, tokens_enabled, monkeypatch):
         from pwnboard.web import endpoints
-        monkeypatch.setattr(endpoints, "verifyAccessToken", lambda token, application: False)
+        monkeypatch.setattr(endpoints, "verifyAccessToken", lambda token: False)
         response = client.post("/pwn", json={"ip": IP_A, "application": "c2"}, headers={"Authorization": "Bearer nope"})
         assert response.status_code == 401
-        assert response.get_data(as_text=True) == "Not authorized! Ensure 'application' field matches PWNBoard app name.\n"
+        assert response.get_data(as_text=True) == "Not authorized! The access token is not valid or has expired.\n"
+        assert redis.llen("callback_queue") == 0
 
-    def test_valid_token_is_checked_against_the_payload_application(self, client, redis, tokens_enabled, valid_token):
-        response = client.post("/pwn", json={"ip": IP_A, "application": "c2"}, headers={"Authorization": "bearer abc"})
-        assert response.status_code == 200
-        assert valid_token == [("abc", "c2")]
+    def test_the_token_alone_authenticates_whatever_the_application(self, client, redis, tokens_enabled, valid_token):
+        for application in ("c2", "scanner", "something-else"):
+            response = client.post("/pwn", json={"ip": IP_A, "application": application},
+                                   headers={"Authorization": "bearer abc"})
+            assert response.status_code == 200
+        assert valid_token == ["abc", "abc", "abc"]
+        # LPUSH puts the newest first
+        assert [item["application"] for item in reversed(queued(redis, "callback_queue"))] == ["c2", "scanner", "something-else"]
 
     def test_no_header_needed_when_tokens_are_disabled(self, client, redis, tokens_disabled):
         response = client.post("/pwn", json={"ip": IP_A, "application": "c2"})
         assert response.status_code == 200
+
+
+class TestTokenLookup:
+    """The real token check against a fake database, instead of the valid_token shortcut."""
+
+    def token_row(self, application="c2", expires=None):
+        return {"token_name": "deploy", "application": application, "description": "", "username": "bob",
+                "created": 1760000000, "expires": expires, "prefix": "abc"}
+
+    @pytest.mark.parametrize("path, body", [
+        ("/pwn", {"ip": IP_A, "application": "totally-different"}),
+        ("/creds", {"ip": IP_A, "application": "totally-different", "username": "u", "password": "pw"}),
+        ("/info", {"ip": IP_A, "application": "totally-different", "key": "k", "value": "v"}),
+    ])
+    def test_a_token_made_for_one_application_works_for_another(self, client, redis, tokens_enabled, db, path, body):
+        db.cur.fetchone.return_value = self.token_row(application="c2")
+        response = client.post(path, json=body, headers={"Authorization": "Bearer abc"})
+        assert response.status_code == 200
+
+    def test_unknown_tokens_are_rejected(self, client, redis, tokens_enabled, db):
+        db.cur.fetchone.return_value = None
+        response = client.post("/pwn", json={"ip": IP_A, "application": "c2"}, headers={"Authorization": "Bearer nope"})
+        assert response.status_code == 401
+        assert redis.llen("callback_queue") == 0
+
+    def test_expired_tokens_are_rejected(self, client, redis, tokens_enabled, db):
+        db.cur.fetchone.return_value = self.token_row(expires=1)
+        response = client.post("/pwn", json={"ip": IP_A, "application": "c2"}, headers={"Authorization": "Bearer abc"})
+        assert response.status_code == 401
+
+    def test_tokens_without_an_expiry_and_unexpired_ones_are_accepted(self, client, redis, tokens_enabled, db):
+        for expires in (None, 4102444800):  # 2100-01-01
+            db.cur.fetchone.return_value = self.token_row(expires=expires)
+            response = client.post("/pwn", json={"ip": IP_A, "application": "c2"}, headers={"Authorization": "Bearer abc"})
+            assert response.status_code == 200
+
+    def test_the_lookup_uses_the_hash_of_the_token(self, client, redis, tokens_enabled, db):
+        import hashlib
+        db.cur.fetchone.return_value = self.token_row()
+        client.post("/pwn", json={"ip": IP_A, "application": "c2"}, headers={"Authorization": "Bearer secret-token"})
+        assert db.cur.execute.call_args.args[1] == (hashlib.sha256(b"secret-token").hexdigest(),)
 
 
 class TestCredentials:

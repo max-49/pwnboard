@@ -86,12 +86,12 @@ def tokens_disabled(monkeypatch):
 
 @pytest.fixture
 def valid_token(monkeypatch):
-    """Make every bearer token valid, and record which (token, application) pairs were checked."""
+    """Make every bearer token valid, and record which tokens were checked."""
     checked = []
 
-    def verify(token, application):
-        checked.append((token, application))
-        return {"application": application}
+    def verify(token):
+        checked.append(token)
+        return {"application": "whatever the token was created for"}
 
     monkeypatch.setattr(endpoints, "verifyAccessToken", verify)
     return checked

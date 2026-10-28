@@ -31,7 +31,7 @@ To create an access token for your application:
 2. Click your username (top right) --> Manage Apps (`/manage_apps`) --> **+ Add Token**
 3. Fill in the form:
    - **Token name**: any label for you to recognize the token by
-   - **Application**: must match the `application` field your tool sends (not case sensitive). A token with the application name `global` works for every application
+   - **Application**: a label to help you recognize what the token is for. It is **not checked**: any valid token works for any `application` your tools send, so one token can be shared by several tools. Treat a token like a password, and create a separate token for each tool if you want to revoke them separately
    - **Expiry**: defaults to 7 days. Choose "No expiry" for a token that should never stop working
 4. Copy and save the created token. It is shown only once, so you will not be able to see it again
 
@@ -98,7 +98,7 @@ curl -X POST -H "Content-Type: application/json" -H "Authorization: Bearer <ACCE
 | `400` | `Invalid: '<field>' must be a string of at most N characters` | A field is not a string or is too long. Limits: `ip` 45, `application` 64, `access_info` 2000, `username` and `password` 256 characters |
 | `400` | `Invalid: 'ips' ...` | `ips` is not a list of strings, or has more than 1000 addresses |
 | `400` | `Invalid: admin must be ...` | `admin` was something other than `0` or `1` |
-| `401` | `Not authorized...` | Missing, wrong, or expired token, or the token's application does not match the `application` field |
+| `401` | `Not authorized...` | Missing, wrong, or expired token |
 | `401` | `Please use Bearer Token...` | The `Authorization` header is not in the form `Bearer <token>` |
 | `413` | (HTML error page) | The request body is larger than 1 MB |
 

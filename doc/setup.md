@@ -96,8 +96,7 @@ docker compose exec -T db psql -U pwnboard_user -d pwnboard_db -c "COPY (SELECT 
 > **Check the following:**
 > - Confirm you are POSTing to the correct PWNBoard IP/URL.
 > - Confirm the `ip` field matches an IP address present on PWNBoard (sometimes tools will return the wrong IP address depending on how you gather it)
-> - Confirm the `application` field exactly matches your token's application name (if using Access Tokens).
-> - If necessary, tokens with application name `global` will ignore the application name in the POST request, so you can use this token for everything
+> - Confirm the token is valid and has not expired (if using Access Tokens). The `application` field does not have to match the token's application.
 
 ### 3) Self-signed certs and failed POST requests
 > **Issue:** POST requests fail with a certificate error. This happens when `PWNBOARD_DOMAIN` is `localhost` or an IP address, or when `tls internal` is set in the Caddyfile, because Caddy signs the certificate with its own internal CA.

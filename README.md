@@ -129,7 +129,7 @@ See the [usage guide](doc/usage.md) for detailed instructions on how to send dat
 The [sim_callbacks](scripts/sim_callbacks.py) and [sim_creds](scripts/sim_creds.py) testing tools can be used to test your PWNBoard deployment!
 1. Log into PWNBoard
 
-2. If `USE_ACCESS_TOKENS=true`, create an access token at `/manage_apps` with the application name `global` and copy it. If you don't want to input it into the script, you can configure an environment variable `ACCESS_TOKEN` on your local machine.
+2. If `USE_ACCESS_TOKENS=true`, create an access token at `/manage_apps` (any application name works) and copy it. If you don't want to input it into the script, you can configure an environment variable `ACCESS_TOKEN` on your local machine.
 
 3. Run the Python script
 ```bash
@@ -142,7 +142,7 @@ python3 scripts/sim_creds.py [/path/to/board/file]
 
 4. If board file was not specified, follow the script instructions to set up IP addresses to POST to
 
-5. Include your `global` Access Token when prompted (if using access tokens)
+5. Include your access token when prompted (if using access tokens)
 
 6. Include the full POST endpoint URL of your PWNBoard (ex. https://www.pwnboard.win/pwn, https://10.1.1.11/pwn, https://www.redteam.win/creds)
 
