@@ -1018,7 +1018,7 @@
             "lastNotNull"
           ],
           "displayMode": "list",
-          "placement": "top",
+          "placement": "bottom",
           "showLegend": true
         },
         "tooltip": {
