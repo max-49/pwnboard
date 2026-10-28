@@ -5,7 +5,7 @@ environment variables and their default settings.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SECRET_KEY` | `change-me-please` | Flask secret key for sessions (**please change**) |
+| `SECRET_KEY` | `change-me-please` | Flask secret key for sessions (**please change**). Logins are cookies signed with it, so changing it logs everyone out. Change it whenever you wipe the database, or users who were logged in stay logged in |
 | `DEFAULT_USER` | `admin` | Default admin username |
 | `DEFAULT_USER_PASSWORD` | `password` | Default admin password |
 | `PWNBOARD_DOMAIN` | `localhost` | Hostname or IP PWNBoard is served on, without `https://` or a port (set in `.env`; read by `docker-compose.yml` and the Caddyfile, not by the app) |
