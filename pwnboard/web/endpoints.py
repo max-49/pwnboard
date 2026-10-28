@@ -71,7 +71,7 @@ def _check_payload_types(data, extra_limits=None):
     return None
 
 
-def _authorize(application):
+def _authorize():
     """Check the access token when tokens are enabled. Returns an error response, or None if allowed."""
     if not USE_ACCESS_TOKENS:
         return None
@@ -84,8 +84,8 @@ def _authorize(application):
     if parts[0].strip().lower() != "bearer" or len(parts) < 2 or not parts[1].strip():
         return "Please use Bearer Token (and Bearer keyword)\n", 401
 
-    if not verifyAccessToken(parts[1].strip(), application):
-        return "Not authorized! Ensure 'application' field matches PWNBoard app name.\n", 401
+    if not verifyAccessToken(parts[1].strip()):
+        return "Not authorized! The access token is not valid or has expired.\n", 401
     return None
 
 
@@ -125,7 +125,7 @@ def callback():
     if 'application' not in data:
         return "Invalid: Missing 'application' field in the request", 400
 
-    error = _check_payload_types(data) or _authorize(data['application']) or _enqueue(CALLBACK_QUEUE, data)
+    error = _check_payload_types(data) or _authorize() or _enqueue(CALLBACK_QUEUE, data)
     if error:
         return error
     return "valid\n", 200
@@ -150,7 +150,7 @@ def creds_callback():
         # -1 = unknown
         data['admin'] = -1
 
-    error = _check_payload_types(data) or _authorize(data['application']) or _enqueue(CREDS_QUEUE, data)
+    error = _check_payload_types(data) or _authorize() or _enqueue(CREDS_QUEUE, data)
     if error:
         return error
     return "valid\n", 200
@@ -182,7 +182,7 @@ def info_callback():
     if not data['key']:
         return "Invalid: 'key' must not be empty\n", 400
 
-    error = _authorize(data['application']) or _enqueue(INFO_QUEUE, data)
+    error = _authorize() or _enqueue(INFO_QUEUE, data)
     if error:
         return error
     return "valid\n", 200

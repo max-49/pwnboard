@@ -165,7 +165,7 @@ def createAccessToken(token_name, username, application, description, expires_af
 
     return token
 
-def verifyAccessToken(token, application):
+def verifyAccessToken(token):
     if not token:
         return False
 
@@ -189,9 +189,6 @@ def verifyAccessToken(token, application):
 
     expires = info.get('expires')
     if expires and int(expires) < int(time.time()):
-        return False
-
-    if application and info.get('application').lower() != application.lower() and info.get('application') != 'global':
         return False
 
     return info

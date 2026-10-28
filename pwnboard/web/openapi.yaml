@@ -60,8 +60,8 @@ paths:
         authentication.
 
         A bearer token is required unless the server runs with `USE_ACCESS_TOKENS=false`.
-        The token's application must match the request's `application`, unless the token's
-        application is `global`.
+        The token alone authenticates the request: the `application` it was created for is only
+        a label, and a token works for any `application` in the request.
       security:
         - bearerAuth: []
       requestBody:
@@ -561,7 +561,7 @@ components:
     IngestUnauthorized:
       description: |
         No `Authorization` header, a header that is not `Bearer <token>`, or a token that
-        is unknown, expired or not valid for the request's `application`.
+        is unknown or expired.
       content:
         text/html:
           schema:
@@ -629,7 +629,7 @@ components:
         application:
           type: string
           maxLength: 64
-          description: The tool the callback came from. Must match the token's application.
+          description: The tool the callback came from. Stored with the callback; it does not have to match the token's application.
           example: Javalanche
         access_info:
           type: string
@@ -697,7 +697,7 @@ components:
         application:
           type: string
           maxLength: 64
-          description: The tool sending the note. Must match the token's application.
+          description: The tool sending the note. It does not have to match the token's application.
         key:
           type: string
           minLength: 1
@@ -779,6 +779,7 @@ components:
           type: string
         application:
           type: string
+          description: A label for the token. It is not checked when the token is used.
         description:
           type: [string, 'null']
         username:
@@ -827,6 +828,7 @@ components:
         application:
           type: string
           maxLength: 64
+          description: A label to recognize the token by. It is not checked when the token is used.
         description:
           type: string
           maxLength: 256

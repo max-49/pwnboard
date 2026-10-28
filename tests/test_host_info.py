@@ -69,10 +69,10 @@ class TestInfoEndpoint:
         response = client.post("/pwn", json={"ip": IP_A, "application": "c2", "key": 5, "value": ["anything"]})
         assert response.status_code == 200
 
-    def test_needs_a_token_for_the_notes_application(self, client, redis, tokens_enabled, valid_token):
+    def test_needs_a_token(self, client, redis, tokens_enabled, valid_token):
         assert client.post("/info", json=BODY).status_code == 401
         assert client.post("/info", json=BODY, headers={"Authorization": "Bearer abc"}).status_code == 200
-        assert valid_token == [("abc", "c2")]
+        assert valid_token == ["abc"]
 
 
 class TestHostInfoRead:

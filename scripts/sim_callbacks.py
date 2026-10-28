@@ -57,7 +57,7 @@ def main():
 
     access_token = os.environ.get("ACCESS_TOKEN", None)
     if not access_token:
-        access_token = input("Input your global access token (token with application name global): ").strip()
+        access_token = input("Input your access token: ").strip()
     server = input("Full POST URL for PWNBoard website (ex. https://www.pwnboard.win/pwn): ").strip()
     self = input("Using self signed certs (Y/N)?: ")
     self_res = False if self.strip().lower() == "y" else True
