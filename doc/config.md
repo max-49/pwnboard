@@ -46,6 +46,7 @@ this is an easter egg
 - `ip` is a pattern: every `x` is replaced by the team number. `10.x.1.10` is `10.1.1.10` for team 1 and `10.5.1.10` for team 5. A machine appears in every team's column.
 - `skip` (optional) lists teams that have no host for this machine. Their cell is shown blank. In the example, `Web` has no team 5 host.
 - `ips` (optional) gives the address of a team whose host does not follow the pattern. In the example, team 2's `Mail` is `10.2.9.30` and the other teams use `10.x.1.30`.
+- `test_teams` (optional) lists teams that are not real competitors, such as `"test_teams": [99]` (the team must also be in `teams`). The team's header is striped and labelled **TEST**. Its data is stored and shown like any other team's.
 - To add a team, add its number to `teams`. To add a machine, add a line to `machines`.
 - A mistake in the file (a duplicate address, a pattern with no `x` that several teams would share, a team that is not in `teams`, a misspelled key, ...) stops PWNBoard from starting, and the message says what to fix.
 

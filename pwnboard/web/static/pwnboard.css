@@ -12,6 +12,11 @@ h1 {
 .bg-red-4 { background-color: rgb(236, 20, 20) !important; }
 .bg-red-5 { background-color: rgb(236, 5, 5) !important; }
 
+/* Header of a test team's column: striped, so it stands out in both colour themes */
+.team-test {
+    background: repeating-linear-gradient(45deg, #4b2e83, #4b2e83 10px, #5d3a9e 10px, #5d3a9e 20px) !important;
+}
+
 /* Mobile & modal improvements */
 .modal-content.text-dark { 
     color: #212529; 

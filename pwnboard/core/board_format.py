@@ -16,9 +16,13 @@ Format (version 2). Each machine is one row of the dashboard and has one host pe
       ]
     }
 
-`teams` and `machines` set the order of the dashboard columns and rows. Two optional keys
-handle the exceptions: `skip` lists teams that have no host for the machine (the cell is
-left blank), and `ips` gives a team's address when it does not follow the pattern.
+`teams` and `machines` set the order of the dashboard columns and rows. An optional top-level
+`"test_teams": [99]` marks teams that are not real competitors. They are labelled on the
+dashboard and otherwise treated like any other team.
+
+Two optional machine keys handle the exceptions: `skip` lists teams that have no host for
+the machine (the cell is left blank), and `ips` gives a team's address when it does not
+follow the pattern.
 
 The older format (rows of hosts, matched to the `teams` list by position) is still accepted
 and converted when it is read.
@@ -226,6 +230,15 @@ def validate_board(board):
         duplicate = next(team for team in teams if teams.count(team) > 1)
         raise BoardError(f"team {duplicate} is listed twice")
 
+    test_teams = board.get("test_teams", [])
+    if not isinstance(test_teams, list):
+        raise BoardError("'test_teams' must be a list of team numbers")
+    for team in test_teams:
+        if not _is_int(team) or team not in teams:
+            raise BoardError(f"'test_teams' names team {team!r}, which is not in 'teams'")
+    if len(set(test_teams)) != len(test_teams):
+        raise BoardError("'test_teams' lists a team twice")
+
     machines = board.get("machines")
     if not isinstance(machines, list):
         raise BoardError("'machines' must be a list")
@@ -282,11 +295,13 @@ def format_board(board):
     for machine in board["machines"]:
         ordered = {key: machine[key] for key in MACHINE_KEYS if key in machine}
         machines.append("    " + json.dumps(ordered))
+    test_teams = board.get("test_teams")
     return (
         "{\n"
         f'  "version": {VERSION},\n'
         f'  "teams": {json.dumps(board["teams"])},\n'
-        '  "machines": [\n' + ",\n".join(machines) + "\n  ]\n"
+        + (f'  "test_teams": {json.dumps(test_teams)},\n' if test_teams else "")
+        + '  "machines": [\n' + ",\n".join(machines) + "\n  ]\n"
         "}\n"
     )
 
@@ -296,6 +311,11 @@ def format_board(board):
 def team_ids(board):
     """The team numbers, in dashboard order."""
     return list(board["teams"])
+
+
+def marked_test_teams(board):
+    """The team numbers marked as test teams."""
+    return list(board.get("test_teams", []))
 
 
 def build_indexes(board):
