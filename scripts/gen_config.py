@@ -2,13 +2,16 @@
 
 https://github.com/ritredteam/topology-generator
 """
+import os
 import sys
-import json
 try:
     from termcolor import colored as c
 except:
     def c(text, *ars, **kwargs):
         return text
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir))
+from pwnboard.core.board_format import BoardError, format_board, normalize_board  # noqa: E402
 
 COLOR = 'blue'
 
@@ -26,25 +29,18 @@ def get_hosts(data):
     return hosts
 
 def gen_board(data):
-    """Build a version 2 board: every host says which team and machine it belongs to."""
-    teams = data['teams']
-    machines, hosts = [], []
+    """Build a version 2 board: one line per machine, with the team number as an `x` in its ip."""
+    machines, names = [], []
     for host in get_hosts(data):
         # Machine names identify the rows, so they must be unique
         name = base = host.get('name', host.get('ip'))
         n = 1
-        while name in machines:
+        while name in names:
             n += 1
             name = f"{base} ({n})"
-        machines.append(name)
-        for team in teams:
-            hosts.append({'ip': host['ip'].replace("x", str(team)), 'team': team, 'machine': name})
-    return {
-        'version': 2,
-        'teams': [{'id': team} for team in teams],
-        'machines': machines,
-        'hosts': hosts,
-    }
+        names.append(name)
+        machines.append({'name': name, 'ip': host['ip']})
+    return {'version': 2, 'teams': list(data['teams']), 'machines': machines}
 
 
 def prompt(text="", color=COLOR):
@@ -144,8 +140,13 @@ def main():
     config['networks'] = addNetworks()
     data = config
     board = gen_board(data)
+    try:
+        normalize_board(board)
+    except BoardError as e:
+        print(f"Cannot create board.json: {e}")
+        sys.exit(1)
     with open("board.json", 'w') as fil:
-        fil.write(json.dumps(board, indent=2))
+        fil.write(format_board(board))
 
 if __name__ == "__main__":
     main()

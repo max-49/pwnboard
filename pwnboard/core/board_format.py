@@ -3,24 +3,31 @@
 This module has no side effects, so scripts and tests can import it. core/board.py is the
 one that loads the file for the running app.
 
-Format (version 2). Every host says which team and machine it belongs to:
+Format (version 2). Each machine is one row of the dashboard and has one host per team. Its
+`ip` is a pattern: every `x` is replaced by the team number.
 
     {
       "version": 2,
-      "teams":    [{"id": 1}, {"id": 2}],
-      "machines": ["DC01", "Web"],
-      "hosts":    [{"ip": "10.1.1.10", "team": 1, "machine": "DC01"}, ...]
+      "teams": [1, 2, 5],
+      "machines": [
+        {"name": "DC01", "ip": "10.x.1.10"},
+        {"name": "Web",  "ip": "10.x.1.20", "skip": [5]},
+        {"name": "Mail", "ip": "10.x.1.30", "ips": {"2": "10.2.9.30"}}
+      ]
     }
 
-`teams` and `machines` set the order of the dashboard columns and rows. A machine does not
-need a host for every team: the missing cell is left blank.
+`teams` and `machines` set the order of the dashboard columns and rows. Two optional keys
+handle the exceptions: `skip` lists teams that have no host for the machine (the cell is
+left blank), and `ips` gives a team's address when it does not follow the pattern.
 
 The older format (rows of hosts, matched to the `teams` list by position) is still accepted
 and converted when it is read.
 """
 import json
+from collections import Counter
 
 VERSION = 2
+MACHINE_KEYS = ("name", "ip", "skip", "ips")
 
 
 class BoardError(ValueError):
@@ -49,28 +56,157 @@ def _unique_name(name, taken):
     return candidate
 
 
+def _cells(machine, teams):
+    """The machine's hosts as (team, ip, from_pattern), in team order. Assumes a valid machine."""
+    skip = machine.get("skip", [])
+    overrides = machine.get("ips", {})
+    for team in teams:
+        if team in skip:
+            continue
+        if str(team) in overrides:
+            yield team, overrides[str(team)], False
+        else:
+            yield team, machine["ip"].replace("x", str(team)), True
+
+
+def expand_hosts(board):
+    """Every host on a valid board as {"ip", "team", "machine"}, machine by machine."""
+    return [
+        {"ip": ip, "team": team, "machine": machine["name"]}
+        for machine in board["machines"]
+        for team, ip, _ in _cells(machine, board["teams"])
+    ]
+
+
+# Converting the older format ---------------------------------------------------------------
+
+def _following_octets(cells):
+    """The positions in a machine's addresses that follow the team number.
+
+    A position qualifies when it differs between teams and holds the team's own number for
+    most of them, as the 1 does in 10.1.1.10 for team 1 and 10.2.1.10 for team 2.
+    """
+    parts = {team: ip.split(".") for team, ip in cells.items()}
+    width = Counter(len(p) for p in parts.values()).most_common(1)[0][0]
+    usable = {team: p for team, p in parts.items() if len(p) == width}
+    positions = set()
+    for i in range(width):
+        matches = sum(p[i] == str(team) for team, p in usable.items())
+        varies = len({p[i] for p in usable.values()}) > 1
+        if varies and matches * 2 > len(usable):
+            positions.add(i)
+    return frozenset(positions)
+
+
+def _team_octet_hint(all_cells):
+    """The position that follows the team number on most machines, used where a machine has
+    only one host and cannot show it by itself."""
+    found = Counter(_following_octets(cells) for cells in all_cells if len(cells) > 1)
+    found.pop(frozenset(), None)
+    return found.most_common(1)[0][0] if found else frozenset()
+
+
+def _compact_machine(name, cells, teams, hint):
+    """One machine as {"name", "ip" pattern, "skip", "ips"} from its {team: ip} hosts."""
+    if not cells:
+        # No hosts at all: keep the row, with every team skipped
+        return {"name": name, "ip": "x", "skip": list(teams)}
+
+    if len(cells) > 1:
+        positions = _following_octets(cells)
+    else:
+        (team, ip), = cells.items()
+        parts = ip.split(".")
+        positions = frozenset(i for i in hint if i < len(parts) and parts[i] == str(team))
+
+    # Build the pattern from the first host that has the usual number of parts
+    width = Counter(len(ip.split(".")) for ip in cells.values()).most_common(1)[0][0]
+    rep = next(cells[team] for team in teams if team in cells and len(cells[team].split(".")) == width)
+    pattern = ".".join("x" if i in positions else part for i, part in enumerate(rep.split(".")))
+
+    machine = {"name": name, "ip": pattern}
+    skip = [team for team in teams if team not in cells]
+    if skip:
+        machine["skip"] = skip
+    irregular = {str(team): ip for team, ip in cells.items() if pattern.replace("x", str(team)) != ip}
+    if irregular:
+        machine["ips"] = irregular
+    return machine
+
+
 def _convert_v1(raw):
     """Turn rows of hosts, matched to the teams by position, into the version 2 format."""
     if not isinstance(raw.get("teams"), list) or not isinstance(raw.get("board"), list):
         raise BoardError("expected a 'teams' list and a 'board' list")
 
-    teams = [{"id": _team_number(team, "teams")} for team in raw["teams"]]
-    machines, hosts = [], []
+    teams = [_team_number(team, "teams") for team in raw["teams"]]
+    names, rows = [], []
     for number, row in enumerate(raw["board"], start=1):
         if not isinstance(row, dict) or not isinstance(row.get("hosts", []), list):
             raise BoardError(f"board row {number}: expected an object with a 'hosts' list")
         name = row.get("name")
         name = name if isinstance(name, str) and name.strip() else f"Machine {number}"
-        name = _unique_name(name, machines)
-        machines.append(name)
+        name = _unique_name(name, names)
+        names.append(name)
+
+        cells = {}
         for host in row.get("hosts", []):
             if not isinstance(host, dict) or not host.get("ip"):
                 continue
-            where = f"host {host.get('ip')}"
+            where = f"host {host['ip']}"
+            if not isinstance(host["ip"], str):
+                raise BoardError(f"{where}: the ip must be text")
             if "team" not in host:
                 raise BoardError(f"{where}: missing 'team'")
-            hosts.append({"ip": host["ip"], "team": _team_number(host["team"], where), "machine": name})
-    return {"version": VERSION, "teams": teams, "machines": machines, "hosts": hosts}
+            team = _team_number(host["team"], where)
+            if team not in teams:
+                raise BoardError(f"{where}: team {team} is not in 'teams'")
+            if team in cells:
+                raise BoardError(f"machine {name!r} has two hosts for team {team}")
+            cells[team] = host["ip"]
+        rows.append((name, cells))
+
+    hint = _team_octet_hint([cells for _, cells in rows])
+    machines = [_compact_machine(name, cells, teams, hint) for name, cells in rows]
+
+    # The conversion must not change a single address
+    for (name, cells), machine in zip(rows, machines):
+        if {team: ip for team, ip, _ in _cells(machine, teams)} != cells:
+            raise BoardError(f"machine {name!r} could not be converted")
+    return {"version": VERSION, "teams": teams, "machines": machines}
+
+
+# Validating --------------------------------------------------------------------------------
+
+def _validate_machine(machine, teams):
+    name = machine.get("name") if isinstance(machine, dict) else None
+    if not isinstance(machine, dict):
+        raise BoardError(f"every machine must be an object with a 'name' and an 'ip', got {machine!r}")
+    if not isinstance(name, str) or not name.strip():
+        raise BoardError(f"every machine needs a 'name', got {machine!r}")
+    unknown = sorted(set(machine) - set(MACHINE_KEYS))
+    if unknown:
+        raise BoardError(f"machine {name!r}: unknown key {unknown[0]!r} (expected {', '.join(MACHINE_KEYS)})")
+    if not isinstance(machine.get("ip"), str) or not machine["ip"].strip():
+        raise BoardError(f"machine {name!r}: needs an 'ip' pattern such as '10.x.1.10'")
+
+    skip = machine.get("skip", [])
+    if not isinstance(skip, list):
+        raise BoardError(f"machine {name!r}: 'skip' must be a list of team numbers")
+    for team in skip:
+        if team not in teams or not _is_int(team):
+            raise BoardError(f"machine {name!r}: 'skip' names team {team!r}, which is not in 'teams'")
+
+    ips = machine.get("ips", {})
+    if not isinstance(ips, dict):
+        raise BoardError(f"machine {name!r}: 'ips' must map team numbers to addresses")
+    for key, ip in ips.items():
+        if not key.isdigit() or int(key) not in teams:
+            raise BoardError(f"machine {name!r}: 'ips' names team {key!r}, which is not in 'teams'")
+        if int(key) in skip:
+            raise BoardError(f"machine {name!r}: team {key} is both skipped and given an address")
+        if not isinstance(ip, str) or not ip.strip():
+            raise BoardError(f"machine {name!r}: the address for team {key} must be text")
 
 
 def validate_board(board):
@@ -82,47 +218,40 @@ def validate_board(board):
 
     teams = board.get("teams")
     if not isinstance(teams, list):
-        raise BoardError("'teams' must be a list")
-    team_ids = set()
+        raise BoardError("'teams' must be a list of team numbers")
     for team in teams:
-        team_id = team.get("id") if isinstance(team, dict) else None
-        if not _is_int(team_id):
-            raise BoardError(f"every team needs a whole number 'id', got {team!r}")
-        if team_id in team_ids:
-            raise BoardError(f"team {team_id} is listed twice")
-        team_ids.add(team_id)
+        if not _is_int(team):
+            raise BoardError(f"team numbers must be whole numbers, got {team!r}")
+    if len(set(teams)) != len(teams):
+        duplicate = next(team for team in teams if teams.count(team) > 1)
+        raise BoardError(f"team {duplicate} is listed twice")
 
     machines = board.get("machines")
     if not isinstance(machines, list):
         raise BoardError("'machines' must be a list")
-    machine_names = set()
-    for name in machines:
-        if not isinstance(name, str) or not name.strip():
-            raise BoardError(f"every machine needs a name, got {name!r}")
-        if name in machine_names:
-            raise BoardError(f"machine {name!r} is listed twice")
-        machine_names.add(name)
+    names = set()
+    for machine in machines:
+        _validate_machine(machine, teams)
+        if machine["name"] in names:
+            raise BoardError(f"machine {machine['name']!r} is listed twice")
+        names.add(machine["name"])
 
-    hosts = board.get("hosts")
-    if not isinstance(hosts, list):
-        raise BoardError("'hosts' must be a list")
-    seen_ips, seen_cells = set(), set()
-    for host in hosts:
-        if not isinstance(host, dict):
-            raise BoardError(f"every host must be an object, got {host!r}")
-        ip, team, machine = host.get("ip"), host.get("team"), host.get("machine")
-        if not isinstance(ip, str) or not ip.strip():
-            raise BoardError(f"every host needs an 'ip', got {host!r}")
-        if ip in seen_ips:
-            raise BoardError(f"host {ip} is listed twice")
-        seen_ips.add(ip)
-        if team not in team_ids or not _is_int(team):
-            raise BoardError(f"host {ip}: team {team!r} is not in 'teams'")
-        if machine not in machine_names:
-            raise BoardError(f"host {ip}: machine {machine!r} is not in 'machines'")
-        if (team, machine) in seen_cells:
-            raise BoardError(f"machine {machine!r} has two hosts for team {team}")
-        seen_cells.add((team, machine))
+    owners = {}
+    for machine in machines:
+        shared = [team for team, _, from_pattern in _cells(machine, teams) if from_pattern]
+        if len(shared) > 1 and "x" not in machine["ip"]:
+            raise BoardError(
+                f"machine {machine['name']!r}: the ip {machine['ip']!r} has no 'x' for the team number, "
+                f"so teams {shared[0]} and {shared[1]} would share it"
+            )
+        for team, ip, _ in _cells(machine, teams):
+            if ip in owners:
+                other_machine, other_team = owners[ip]
+                raise BoardError(
+                    f"host {ip} is used twice: {other_machine!r} team {other_team} "
+                    f"and {machine['name']!r} team {team}"
+                )
+            owners[ip] = (machine["name"], team)
     return board
 
 
@@ -130,7 +259,9 @@ def normalize_board(raw):
     """Return a validated version 2 board from either file format."""
     if not isinstance(raw, dict):
         raise BoardError("the board must be a JSON object")
-    if "version" not in raw and "board" in raw:
+    if "version" not in raw:
+        if "board" not in raw:
+            raise BoardError("this is not a board file: it has neither 'version' nor the older 'board' key")
         raw = _convert_v1(raw)
     return validate_board(raw)
 
@@ -145,14 +276,31 @@ def load_board_file(path):
     return normalize_board(raw)
 
 
+def format_board(board):
+    """The board as JSON text with one line per machine, which is easy to read and edit."""
+    machines = []
+    for machine in board["machines"]:
+        ordered = {key: machine[key] for key in MACHINE_KEYS if key in machine}
+        machines.append("    " + json.dumps(ordered))
+    return (
+        "{\n"
+        f'  "version": {VERSION},\n'
+        f'  "teams": {json.dumps(board["teams"])},\n'
+        '  "machines": [\n' + ",\n".join(machines) + "\n  ]\n"
+        "}\n"
+    )
+
+
+# Using a valid board -----------------------------------------------------------------------
+
 def team_ids(board):
     """The team numbers, in dashboard order."""
-    return [team["id"] for team in board["teams"]]
+    return list(board["teams"])
 
 
 def build_indexes(board):
     """Return (ip -> "Team N", set of every ip) for looking hosts up."""
-    team_map = {host["ip"]: f"Team {host['team']}" for host in board["hosts"]}
+    team_map = {host["ip"]: f"Team {host['team']}" for host in expand_hosts(board)}
     return team_map, set(team_map)
 
 
@@ -161,10 +309,9 @@ def board_rows(board):
 
     A cell is {"ip": ...}, or None where the machine has no host for that team.
     """
-    cells = {(host["team"], host["machine"]): host["ip"] for host in board["hosts"]}
-    ids = team_ids(board)
     rows = []
     for machine in board["machines"]:
-        row = [{"ip": cells[(team, machine)]} if (team, machine) in cells else None for team in ids]
-        rows.append({"name": machine, "hosts": row})
+        cells = {team: ip for team, ip, _ in _cells(machine, board["teams"])}
+        hosts = [{"ip": cells[team]} if team in cells else None for team in board["teams"]]
+        rows.append({"name": machine["name"], "hosts": hosts})
     return rows

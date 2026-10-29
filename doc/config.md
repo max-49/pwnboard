@@ -28,26 +28,26 @@ environment variables and their default settings.
 this is an easter egg
 ## board.json
 
-`board.json` lists the teams, the machines and the host (IP address) each team has for each machine. `scripts/setup.py` creates it for you by running `scripts/gen_config.py`. You can also write or edit it by hand:
+`board.json` lists the teams and the machines, and says how each machine's address is made from the team number. `scripts/setup.py` creates it for you by running `scripts/gen_config.py`. You can also write or edit it by hand:
 
 ```json
 {
   "version": 2,
-  "teams":    [{"id": 1}, {"id": 2}, {"id": 5}],
-  "machines": ["DC01", "Web"],
-  "hosts": [
-    {"ip": "10.1.1.10", "team": 1, "machine": "DC01"},
-    {"ip": "10.2.1.10", "team": 2, "machine": "DC01"},
-    {"ip": "10.5.1.10", "team": 5, "machine": "DC01"},
-    {"ip": "10.1.1.20", "team": 1, "machine": "Web"}
+  "teams": [1, 2, 5],
+  "machines": [
+    {"name": "DC01", "ip": "10.x.1.10"},
+    {"name": "Web",  "ip": "10.x.1.20", "skip": [5]},
+    {"name": "Mail", "ip": "10.x.1.30", "ips": {"2": "10.2.9.30"}}
   ]
 }
 ```
 
-- `teams` sets the columns and `machines` the rows, in the order they are listed. Team ids are whole numbers and do not have to be consecutive.
-- Every host names its team and machine. Each IP can appear once, and a team can have one host per machine.
-- A machine does not need a host for every team. The missing cell is shown blank (above, `Web` has no team 2 or team 5 host).
-- A mistake in the file (a duplicate IP, a host whose team is not in `teams`, ...) stops PWNBoard from starting, and the message says what to fix.
+- `teams` sets the columns and `machines` the rows, in the order they are listed. Team numbers are whole numbers and do not have to be consecutive.
+- `ip` is a pattern: every `x` is replaced by the team number. `10.x.1.10` is `10.1.1.10` for team 1 and `10.5.1.10` for team 5. A machine appears in every team's column.
+- `skip` (optional) lists teams that have no host for this machine. Their cell is shown blank. In the example, `Web` has no team 5 host.
+- `ips` (optional) gives the address of a team whose host does not follow the pattern. In the example, team 2's `Mail` is `10.2.9.30` and the other teams use `10.x.1.30`.
+- To add a team, add its number to `teams`. To add a machine, add a line to `machines`.
+- A mistake in the file (a duplicate address, a pattern with no `x` that several teams would share, a team that is not in `teams`, a misspelled key, ...) stops PWNBoard from starting, and the message says what to fix.
 
 Boards in the older format (`{"teams": [1, 2], "board": [{"name": ..., "hosts": [{"ip": ..., "team": "1"}]}]}`) still work. They are converted when PWNBoard starts, and the file itself is not changed.
 
@@ -59,4 +59,4 @@ python3 scripts/convert_board.py board.json --in-place       # rewrite board.jso
 python3 scripts/convert_board.py board.json                  # just print the result
 ```
 
-It stops with a message if the file has a problem, and tells you if it had to rename a machine because two rows had the same name.
+It works out each machine's pattern from its addresses and keeps any address that does not fit as an `ips` entry, so no address changes. It tells you when that happens, and when it had to rename a machine because two rows had the same name. It stops with a message if the file has a problem.

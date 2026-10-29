@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert an older board.json (rows of hosts) to the version 2 format.
+"""Convert an older board.json (rows of hosts) to the version 2 format, with one line per machine.
 
     python3 scripts/convert_board.py board.json              # print the result
     python3 scripts/convert_board.py board.json new.json     # write a new file
@@ -16,7 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from pwnboard.core.board_format import BoardError, normalize_board  # noqa: E402
+from pwnboard.core.board_format import expand_hosts, format_board, normalize_board  # noqa: E402
 
 
 def convert(raw):
@@ -26,8 +26,15 @@ def convert(raw):
     if "board" in raw:
         # Row names must be unique in the new format, so repeated or missing ones were changed
         for row, machine in zip(raw["board"], board["machines"]):
-            if row.get("name") != machine:
-                warnings.append(f"row {row.get('name')!r} was renamed {machine!r}")
+            if row.get("name") != machine["name"]:
+                warnings.append(f"row {row.get('name')!r} was renamed {machine['name']!r}")
+    for machine in board["machines"]:
+        if "ips" in machine:
+            teams = ", ".join(machine["ips"])
+            warnings.append(
+                f"machine {machine['name']!r} has addresses that do not follow its pattern "
+                f"{machine['ip']!r} for team {teams}; they are kept in 'ips'"
+            )
     return board, warnings
 
 
@@ -56,7 +63,7 @@ def main(argv=None):
 
     for warning in warnings:
         print(f"warning: {warning}", file=sys.stderr)
-    text = json.dumps(board, indent=2) + "\n"
+    text = format_board(board)
 
     if args.in_place:
         backup = args.input + ".bak"
@@ -76,7 +83,7 @@ def main(argv=None):
     else:
         sys.stdout.write(text)
 
-    print(f"{len(board['teams'])} teams, {len(board['machines'])} machines, {len(board['hosts'])} hosts",
+    print(f"{len(board['teams'])} teams, {len(board['machines'])} machines, {len(expand_hosts(board))} hosts",
           file=sys.stderr)
     return 0
 

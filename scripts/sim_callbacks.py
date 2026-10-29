@@ -7,6 +7,9 @@ import requests
 import json
 import time
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir))
+from pwnboard.core.board_format import expand_hosts, load_board_file  # noqa: E402
+
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def random_callbacks(server, time_interval, hosts, access_token, verify):
@@ -41,14 +44,7 @@ def main():
     if (len(sys.argv) > 1):
         try:
             board_path = sys.argv[1]
-            with open(board_path, 'r') as f:
-                board_file = json.load(f)
-            if "hosts" in board_file:
-                # board.json version 2: a flat list of hosts
-                board = [host["ip"] for host in board_file["hosts"]]
-            else:
-                # older board.json: rows of hosts
-                board = [host["ip"] for row in board_file["board"] for host in row["hosts"]]
+            board = [host["ip"] for host in expand_hosts(load_board_file(board_path))]
         except:
             print("Invalid board file")
             exit(1)
