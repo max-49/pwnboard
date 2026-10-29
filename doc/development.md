@@ -45,8 +45,8 @@ The web app and the worker are separate containers built from separate targets o
 
 ```
 pwnboard/
-  core/     Shared by web and worker: Postgres pool, schema, Redis queues, board.json loading,
-            board state queries (no Flask)
+  core/     Shared by web and worker: Postgres pool, schema, Redis queues, board.json loading
+            (`board_format.py` reads and checks the file, `board.py` loads it), board state queries (no Flask)
   web/      Flask app: routes, endpoints, authentication, templates, static files
   worker/   Redis queue ingestion and board cache builder (run with `python -m pwnboard.worker`)
 ```

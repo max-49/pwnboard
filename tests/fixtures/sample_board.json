@@ -1,7 +1,11 @@
 {
-  "teams": [1, 2],
-  "board": [
-    {"name": "box1", "hosts": [{"ip": "10.1.1.1", "team": "1"}, {"ip": "10.2.1.1", "team": "2"}]},
-    {"name": "box2", "hosts": [{"ip": "10.1.1.2", "team": "1"}, {"ip": "10.2.1.2", "team": "2"}]}
+  "version": 2,
+  "teams": [{"id": 1}, {"id": 2}],
+  "machines": ["box1", "box2"],
+  "hosts": [
+    {"ip": "10.1.1.1", "team": 1, "machine": "box1"},
+    {"ip": "10.2.1.1", "team": 2, "machine": "box1"},
+    {"ip": "10.1.1.2", "team": 1, "machine": "box2"},
+    {"ip": "10.2.1.2", "team": 2, "machine": "box2"}
   ]
 }

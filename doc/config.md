@@ -26,3 +26,37 @@ environment variables and their default settings.
 | `REDIS_PORT` | `6379` | Redis port |
 
 this is an easter egg
+## board.json
+
+`board.json` lists the teams, the machines and the host (IP address) each team has for each machine. `scripts/setup.py` creates it for you by running `scripts/gen_config.py`. You can also write or edit it by hand:
+
+```json
+{
+  "version": 2,
+  "teams":    [{"id": 1}, {"id": 2}, {"id": 5}],
+  "machines": ["DC01", "Web"],
+  "hosts": [
+    {"ip": "10.1.1.10", "team": 1, "machine": "DC01"},
+    {"ip": "10.2.1.10", "team": 2, "machine": "DC01"},
+    {"ip": "10.5.1.10", "team": 5, "machine": "DC01"},
+    {"ip": "10.1.1.20", "team": 1, "machine": "Web"}
+  ]
+}
+```
+
+- `teams` sets the columns and `machines` the rows, in the order they are listed. Team ids are whole numbers and do not have to be consecutive.
+- Every host names its team and machine. Each IP can appear once, and a team can have one host per machine.
+- A machine does not need a host for every team. The missing cell is shown blank (above, `Web` has no team 2 or team 5 host).
+- A mistake in the file (a duplicate IP, a host whose team is not in `teams`, ...) stops PWNBoard from starting, and the message says what to fix.
+
+Boards in the older format (`{"teams": [1, 2], "board": [{"name": ..., "hosts": [{"ip": ..., "team": "1"}]}]}`) still work. They are converted when PWNBoard starts, and the file itself is not changed.
+
+To convert a file yourself, for example to edit it by hand, use `scripts/convert_board.py`:
+
+```bash
+python3 scripts/convert_board.py board.json new-board.json   # write a new file
+python3 scripts/convert_board.py board.json --in-place       # rewrite board.json, saving board.json.bak
+python3 scripts/convert_board.py board.json                  # just print the result
+```
+
+It stops with a message if the file has a problem, and tells you if it had to rename a machine because two rows had the same name.

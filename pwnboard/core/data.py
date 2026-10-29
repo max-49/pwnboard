@@ -2,10 +2,10 @@
 import datetime
 import time
 import os
-import copy
 
 from .logger import logger
 from .board import BOARD
+from .board_format import board_rows
 from .info import get_info_counts
 
 # How long after the last callback a host counts as online, and how long credentials count
@@ -32,11 +32,13 @@ def getBoardDict(db):
     Generate a game board based on the config file
     Get all the DB info for each host
     '''
-    # Get the teams and the basehost list from the config
-    board = copy.deepcopy(BOARD['board'])
+    # Get the machine rows from the config. Each row has one cell per team, None where blank
+    board = board_rows(BOARD)
     info_counts = get_info_counts(db)
     for row in board:
         for _host in row['hosts']:
+            if _host is None:
+                continue
             _host.update(getHostData(_host['ip'], db))
             if info_counts.get(_host['ip']):
                 _host['Info'] = "Yes"
