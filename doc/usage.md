@@ -6,6 +6,7 @@
 - [Generate an access token for your tool](#generate-an-access-token-for-your-tool)
 - [Sending callback data](#sending-callback-data-to-pwnboard)
 - [Sending credential data](#sending-credential-data-to-pwnboard)
+- [Reading callbacks and credentials](#reading-callbacks-and-credentials-from-pwnboard)
 - [Responses](#responses)
 - [Examples](#examples-of-posting-data-to-pwnboard) (curl, Bash beacon loop, Python, Go, PowerShell, C#)
 - [Self-signed certificates](#self-signed-certificates)
@@ -19,6 +20,8 @@ This API is also described as an OpenAPI file, served at `https://pwnboard.win/o
 | Callback (beacon) | `POST https://pwnboard.win/pwn` (also `/checkin`) | `ip`, `application` |
 | Credentials | `POST https://pwnboard.win/creds` | `ip`, `application`, `username`, `password` |
 | Host information | `POST https://pwnboard.win/info` | `ip`, `application`, `key`, `value` |
+| Read callbacks | `GET https://pwnboard.win/hosts/<ip>/callbacks` | none (optional `?active=true`) |
+| Read credentials | `GET https://pwnboard.win/hosts/<ip>/creds` | none (optional `?active=true`) |
 
 - The body is JSON, sent with `Content-Type: application/json`.
 - If access tokens are enabled (the default), add the header `Authorization: Bearer <token>`.
@@ -83,6 +86,44 @@ Use this for facts about a host that are not callbacks or credentials, such as i
 
 ```bash
 curl -X POST -H "Content-Type: application/json" -H "Authorization: Bearer <ACCESS TOKEN GENERATED IN /manage_apps>" -d '{"ip": "10.1.1.254", "application": "Javalanche", "key": "hostname", "value": "web-01.corp.local"}' https://pwnboard.win/info
+```
+
+## Reading callbacks and credentials from PWNBoard
+To check from another machine what PWNBoard has recorded for a host, send a GET request with your access token (the same kind of token the endpoints above use):
+
+```bash
+curl -H "Authorization: Bearer <ACCESS TOKEN GENERATED IN /manage_apps>" https://pwnboard.win/hosts/10.1.1.254/callbacks
+curl -H "Authorization: Bearer <ACCESS TOKEN GENERATED IN /manage_apps>" "https://pwnboard.win/hosts/10.1.1.254/creds?active=true"
+```
+
+Both return a JSON list. Each callback looks like this:
+
+```json
+{"application": "Javalanche", "access_info": "https://c2.example/x", "last_seen": 1761660000, "age_minutes": 3, "active": true}
+```
+
+and each credential like this:
+
+```json
+{"username": "admin", "password": "Change.me123!", "last_seen": 1761660000, "age_minutes": 12, "active": true}
+```
+
+- Active entries come first, then the most recent. `last_seen` is Unix time in seconds, and `age_minutes` is the whole minutes since then.
+- A callback is active for `HOST_TIMEOUT` minutes (5 by default) and credentials for `CREDS_TIMEOUT` minutes (30 by default), the same as on the dashboard. Older credentials are still listed, since the password may still work, with `"active": false`.
+- Add `?active=true` to get only the active entries. `?active=false`, or leaving it out, returns everything. Any other value is rejected with `400`.
+- A host with nothing recorded returns `[]`. An `ip` that is not on the PWNBoard returns `404`.
+- Errors are JSON, like `{"error": {"code": "unauthenticated", "message": "..."}}`. A missing, wrong or expired token returns `401`.
+- A logged-in session (the browser) also works, but with `USE_ACCESS_TOKENS=false` **only** a session works, because these endpoints return passwords and are never open to unauthenticated requests.
+- Reading does not change anything on the server, and the answers are sent with `Cache-Control: no-store`. Anyone with a token can read credentials this way, so keep tokens private.
+
+```py
+# pip install requests
+import requests
+
+headers = {"Authorization": "Bearer <ACCESS TOKEN GENERATED IN /manage_apps>"}
+resp = requests.get("https://pwnboard.win/hosts/10.1.1.254/creds", params={"active": "true"}, headers=headers, timeout=10)
+for cred in resp.json():
+    print(cred["username"], cred["password"], f"{cred['age_minutes']}m ago")
 ```
 
 ## Responses

@@ -12,7 +12,9 @@ info:
     * **Ingest** (`/pwn`, `/checkin`, `/creds`) is called by red team tools. It takes JSON
       and an optional bearer token, and answers in plain text.
     * **Everything else** is called by the PWNBoard web pages with the browser's login
-      session cookie. These endpoints take form-encoded bodies.
+      session cookie. These endpoints take form-encoded bodies. The exceptions are
+      `/hosts/{ip}/callbacks` and `/hosts/{ip}/creds`, which tools call with an access token
+      (a login session also works).
 
     The HTML pages (`/`, `/pwnboard`, `/manage_apps`, `/account_settings`,
     `/manage_user_accounts`, `/logout`) are not part of this API and are not described here.
@@ -34,7 +36,9 @@ tags:
   - name: Ingest
     description: Endpoints that red team tools post callbacks and credentials to.
   - name: Hosts
-    description: Information about hosts on the board. Requires a login.
+    description: |
+      Information about hosts on the board. Needs a login, except that the callbacks and
+      credentials listings also accept an access token.
   - name: Tokens
     description: Access tokens for tools. Requires a login.
   - name: Users
@@ -195,6 +199,104 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/HostInfoItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/ApiError'
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
+  /hosts/{ip}/callbacks:
+    get:
+      operationId: getHostCallbacks
+      tags: [Hosts]
+      summary: List the callbacks recorded for a host
+      description: |
+        A callback is active for `HOST_TIMEOUT` minutes (5 by default) after it was last received.
+
+        Authenticate with an access token (`Authorization: Bearer <token>`), the same tokens
+        the ingest endpoints use. A logged-in session also works. When the server runs with
+        `USE_ACCESS_TOKENS=false` the header is ignored and only a session works, so these
+        endpoints are never open to anyone.
+
+        A request that sends an `Authorization` header is judged by its token alone.
+        Reading does not change anything on the server.
+      security:
+        - bearerAuth: []
+        - sessionCookie: []
+      parameters:
+        - name: ip
+          in: path
+          required: true
+          description: An address on the board.
+          schema:
+            type: string
+        - $ref: '#/components/parameters/ActiveOnly'
+      responses:
+        '200':
+          description: The host's callbacks, active ones first and then newest first. An empty list if there are none.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HostCallback'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/ApiError'
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
+  /hosts/{ip}/creds:
+    get:
+      operationId: getHostCreds
+      tags: [Hosts]
+      summary: List the credentials recorded for a host
+      description: |
+        Credentials are active for `CREDS_TIMEOUT` minutes (30 by default) after they were last
+        received. Older ones are still listed, since the password may still work, and have
+        `active: false`.
+
+        Authenticate with an access token (`Authorization: Bearer <token>`), the same tokens
+        the ingest endpoints use. A logged-in session also works. When the server runs with
+        `USE_ACCESS_TOKENS=false` the header is ignored and only a session works, so these
+        endpoints are never open to anyone.
+
+        A request that sends an `Authorization` header is judged by its token alone.
+        Reading does not change anything on the server.
+      security:
+        - bearerAuth: []
+        - sessionCookie: []
+      parameters:
+        - name: ip
+          in: path
+          required: true
+          description: An address on the board.
+          schema:
+            type: string
+        - $ref: '#/components/parameters/ActiveOnly'
+      responses:
+        '200':
+          description: The host's credentials, active ones first and then newest first. An empty list if there are none.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HostCredential'
+        '400':
+          $ref: '#/components/responses/ApiError'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -529,6 +631,15 @@ components:
         The login session cookie set by the HTML login form. There is no API call that
         logs in, so a script has to submit that form first.
   parameters:
+    ActiveOnly:
+      name: active
+      in: query
+      required: false
+      description: |
+        `true` returns only entries that are still active. `false`, or leaving it out, returns
+        every entry, each marked active or not.
+      schema:
+        type: boolean
     Username:
       name: username
       in: path
@@ -578,7 +689,10 @@ components:
           schema:
             type: string
     Unauthorized:
-      description: Not logged in, or the session has ended.
+      description: |
+        Not logged in or the session has ended. On the endpoints that take access tokens, also a
+        missing, malformed, unknown or expired bearer token (with a `WWW-Authenticate: Bearer`
+        header when tokens are enabled).
       content:
         application/json:
           schema:
@@ -722,6 +836,39 @@ components:
         updated:
           type: integer
           description: Unix time in seconds.
+    HostCallback:
+      type: object
+      required: [application, access_info, last_seen, age_minutes, active]
+      properties:
+        application:
+          type: string
+        access_info:
+          type: string
+          description: The `access_info` sent with the callback, or an empty string.
+        last_seen:
+          type: integer
+          description: Unix time in seconds.
+        age_minutes:
+          type: integer
+          description: Whole minutes since `last_seen`.
+        active:
+          type: boolean
+    HostCredential:
+      type: object
+      required: [username, password, last_seen, age_minutes, active]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        last_seen:
+          type: integer
+          description: Unix time in seconds.
+        age_minutes:
+          type: integer
+          description: Whole minutes since `last_seen`.
+        active:
+          type: boolean
     User:
       type: object
       required: [username, role, created]

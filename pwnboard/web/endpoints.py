@@ -1,6 +1,7 @@
 
 from flask import request, session, jsonify, Response
 
+from functools import wraps
 import re
 import csv
 import io
@@ -19,7 +20,7 @@ from .authentication import (
     verifyAccessToken,
 )
 from ..core.board import IP_SET
-from ..core.data import getEpoch
+from ..core.data import getEpoch, list_host_callbacks, list_host_creds
 from ..core.db import dict_cursor
 from ..core.info import MAX_KEY_LENGTH, MAX_VALUE_LENGTH, get_host_info
 from ..core.logger import logger
@@ -195,6 +196,74 @@ def host_info(ip):
     if ip not in IP_SET:
         return api_error(404, 'not_found', 'Not found')
     return jsonify(get_host_info(get_db(), ip))
+
+
+def _unauthenticated(message):
+    response = api_error(401, 'unauthenticated', message)
+    if USE_ACCESS_TOKENS:
+        response.headers['WWW-Authenticate'] = 'Bearer'
+    return response
+
+
+def api_token_or_login_required(f):
+    """For JSON endpoints that tools call: accept a bearer access token, or a login session.
+
+    A request with an Authorization header is judged by its token alone, so a bad token is
+    refused even if the caller is also logged in. Without the header, the session is used.
+    When tokens are disabled (USE_ACCESS_TOKENS=false) the header is ignored and only a
+    session works, because these endpoints return passwords and must never be open.
+    """
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        auth_header = request.headers.get('Authorization')
+        if USE_ACCESS_TOKENS and auth_header:
+            scheme, _, token = auth_header.partition(' ')
+            if scheme.strip().lower() != 'bearer' or not token.strip():
+                return _unauthenticated('Use the header "Authorization: Bearer <access token>".')
+            if not verifyAccessToken(token.strip()):
+                return _unauthenticated('The access token is not valid or has expired.')
+        elif not session.get('user'):
+            if USE_ACCESS_TOKENS:
+                return _unauthenticated('Send an access token as "Authorization: Bearer <access token>", or log in.')
+            return _unauthenticated('You are not logged in.')
+        return f(*args, **kwargs)
+    return wrapper
+
+
+def _active_only():
+    """The ?active= filter: (True/False, None), or (None, error response) for a bad value."""
+    value = request.args.get('active')
+    if value is None:
+        return False, None
+    if value.lower() in ('true', 'false'):
+        return value.lower() == 'true', None
+    return None, api_error(400, 'invalid_request', "'active' must be true or false")
+
+
+def _host_listing(ip, listing):
+    """Answer with listing(db, ip, active_only) for a host on the board. Never cached."""
+    active_only, error = _active_only()
+    if error:
+        return error
+    if ip not in IP_SET:
+        return api_error(404, 'not_found', 'Not found')
+    response = jsonify(listing(get_db(), ip, active_only))
+    response.headers['Cache-Control'] = 'no-store'
+    return response
+
+
+@app.route('/hosts/<ip>/callbacks', methods=['GET'])
+@api_token_or_login_required
+def host_callbacks(ip):
+    """The callbacks recorded for a host, newest active first. ?active=true keeps only active ones."""
+    return _host_listing(ip, list_host_callbacks)
+
+
+@app.route('/hosts/<ip>/creds', methods=['GET'])
+@api_token_or_login_required
+def host_creds(ip):
+    """The credentials recorded for a host, newest active first. ?active=true keeps only active ones."""
+    return _host_listing(ip, list_host_creds)
 
 
 @app.route('/admin/users', methods=['GET'])

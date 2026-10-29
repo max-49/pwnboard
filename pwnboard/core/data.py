@@ -156,6 +156,54 @@ def getActiveCallbacks(ip, db):
 
     return num_valid_callbacks, active_callbacks
 
+def _timed_entries(rows, timeout, fields, active_only):
+    """Turn (…, last_seen) rows into dicts with the age and whether the entry is still active.
+
+    `fields` names the columns before last_seen. An entry is active for `timeout` minutes, the
+    same whole-minute comparison the dashboard makes. Active entries come first, newest first.
+    """
+    entries = []
+    for *values, last_seen in rows:
+        age = getTimeDelta(last_seen)
+        if age is None:
+            continue
+        active = age < timeout
+        if active_only and not active:
+            continue
+        entries.append({
+            **dict(zip(fields, values)),
+            "last_seen": int(float(last_seen)),
+            "age_minutes": age,
+            "active": active,
+        })
+    entries.sort(key=lambda entry: (not entry["active"], -entry["last_seen"]))
+    return entries
+
+
+def list_host_callbacks(db, ip, active_only=False):
+    """Every callback recorded for the host, or only the active ones. Reads only: it never
+    changes the online flags the way the dashboard's helpers do."""
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT application, access_info, last_seen FROM callbacks WHERE ip = %s",
+            (ip,),
+        )
+        rows = cur.fetchall()
+    return _timed_entries(rows, getHostTimeout(), ("application", "access_info"), active_only)
+
+
+def list_host_creds(db, ip, active_only=False):
+    """Every credential recorded for the host, or only the active ones. Stale credentials are
+    listed because the password may still work. Reads only."""
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT username, password, last_seen FROM credentials_by_user WHERE ip = %s",
+            (ip,),
+        )
+        rows = cur.fetchall()
+    return _timed_entries(rows, getCredsTimeout(), ("username", "password"), active_only)
+
+
 def getHostData(ip, db):
     '''
     Get the host data for a single host.
