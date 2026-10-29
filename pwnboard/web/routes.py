@@ -8,7 +8,7 @@ from pathlib import Path
 
 from .authentication import verifyUser
 from ..core.board import BOARD
-from ..core.board_format import team_ids
+from ..core.board_format import team_ids, marked_test_teams
 from ..core.data import getBoardDict
 from ..core.logger import logger
 from ..core.queues import BOARD_CACHE_KEY, redis_client
@@ -71,7 +71,7 @@ def index():
     # Always render HTML per-request so session-specific navbar data stays accurate
     theme = os.environ.get('PWN_THEME', "blue")
     html = render_template('index.html', error=error, theme=theme,
-                           board=board, teams=team_ids(BOARD), refresh_seconds=REFRESH_SECONDS)
+                           board=board, teams=team_ids(BOARD), test_teams=marked_test_teams(BOARD), refresh_seconds=REFRESH_SECONDS)
     return make_response(html)
 
 @app.route('/openapi.yaml', methods=['GET'])

@@ -7,9 +7,10 @@ from pathlib import Path
 import pytest
 
 from pwnboard.core import board as board_module, data
+from pwnboard.web import routes
 from pwnboard.core.board_format import (
     BoardError, board_rows, build_indexes, expand_hosts, format_board, load_board_file,
-    normalize_board, team_ids, validate_board,
+    normalize_board, team_ids, marked_test_teams, validate_board,
 )
 from tests.test_host_info import FakeBoardDb
 
@@ -199,6 +200,42 @@ class TestOlderFormat:
             normalize_board(old)
 
 
+class TestTestTeams:
+    def board(self, **extra):
+        return {**copy.deepcopy(V2), **extra}
+
+    def test_none_by_default(self):
+        assert marked_test_teams(V2) == []
+
+    def test_they_are_listed(self):
+        assert marked_test_teams(validate_board(self.board(test_teams=[5, 1]))) == [5, 1]
+
+    def test_a_test_team_still_has_its_hosts(self):
+        board = validate_board(self.board(test_teams=[5]))
+        assert addresses(board)[("DC01", 5)] == "10.5.1.10"
+        assert build_indexes(board)[0]["10.5.1.10"] == "Team 5"
+
+    @pytest.mark.parametrize("value, message", [
+        ([9], "team 9, which is not in 'teams'"),
+        (["5"], "team '5'"),
+        ([True], "team True"),
+        (5, "'test_teams' must be a list"),
+        ([5, 5], "lists a team twice"),
+    ])
+    def test_problems_are_reported(self, value, message):
+        with pytest.raises(BoardError, match=message):
+            validate_board(self.board(test_teams=value))
+
+    def test_they_are_written_and_read_back(self):
+        board = self.board(test_teams=[5])
+        text = format_board(board)
+        assert '  "test_teams": [5],\n  "machines"' in text
+        assert normalize_board(json.loads(text)) == board
+
+    def test_nothing_is_written_when_there_are_none(self):
+        assert "test_teams" not in format_board(self.board(test_teams=[]))
+
+
 class TestIndexes:
     def test_ip_lookups(self):
         team_map, ip_set = build_indexes(V2)
@@ -286,6 +323,24 @@ class TestDashboard:
         assert "<td></td>" in html
 
 
+class TestTestTeamHeader:
+    def page(self, login, redis, monkeypatch, board):
+        monkeypatch.setattr(routes, "BOARD", board)
+        redis.set("board_cache", json.dumps([{"name": "box", "hosts": [{"ip": "10.1.1.1"}, {"ip": "10.5.1.1"}]}]))
+        return login("user").get("/pwnboard").get_data(as_text=True)
+
+    def test_a_test_team_header_is_labelled_and_styled(self, client, redis, login, monkeypatch):
+        html = self.page(login, redis, monkeypatch, {"version": 2, "teams": [1, 5], "test_teams": [5], "machines": []})
+        assert 'class="team-test"' in html
+        assert "Team 5 <span" in html and ">TEST</span>" in html
+        assert html.count("TEST</span>") == 1
+        assert "<td>Team 1</td>" in html
+
+    def test_without_test_teams_nothing_is_marked(self, client, redis, login, monkeypatch):
+        html = self.page(login, redis, monkeypatch, {"version": 2, "teams": [1, 5], "machines": []})
+        assert "team-test" not in html and "TEST</span>" not in html
+
+
 def load_script(name):
     path = Path(__file__).parent.parent / "scripts" / f"{name}.py"
     spec = importlib.util.spec_from_file_location(name, path)
@@ -349,6 +404,13 @@ class TestConverter:
         path.write_text(format_board(V2))
         assert convert_board.main([str(path)]) == 0
         assert capsys.readouterr().out == format_board(V2)
+
+    def test_test_teams_survive_the_conversion(self, convert_board, tmp_path, capsys):
+        board = {**copy.deepcopy(V2), "test_teams": [5]}
+        path = tmp_path / "board.json"
+        path.write_text(format_board(board))
+        assert convert_board.main([str(path)]) == 0
+        assert capsys.readouterr().out == format_board(board)
 
     def test_renamed_rows_are_reported(self, convert_board, tmp_path, capsys):
         old = copy.deepcopy(V1)
