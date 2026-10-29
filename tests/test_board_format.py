@@ -329,16 +329,15 @@ class TestTestTeamHeader:
         redis.set("board_cache", json.dumps([{"name": "box", "hosts": [{"ip": "10.1.1.1"}, {"ip": "10.5.1.1"}]}]))
         return login("user").get("/pwnboard").get_data(as_text=True)
 
-    def test_a_test_team_header_is_labelled_and_styled(self, client, redis, login, monkeypatch):
+    def test_only_a_test_teams_header_is_styled(self, client, redis, login, monkeypatch):
         html = self.page(login, redis, monkeypatch, {"version": 2, "teams": [1, 5], "test_teams": [5], "machines": []})
-        assert 'class="team-test"' in html
-        assert "Team 5 <span" in html and ">TEST</span>" in html
-        assert html.count("TEST</span>") == 1
+        assert html.count('class="team-test"') == 1
+        assert 'class="team-test" title="Test team: not a real competitor">Team 5</td>' in html
         assert "<td>Team 1</td>" in html
 
     def test_without_test_teams_nothing_is_marked(self, client, redis, login, monkeypatch):
         html = self.page(login, redis, monkeypatch, {"version": 2, "teams": [1, 5], "machines": []})
-        assert "team-test" not in html and "TEST</span>" not in html
+        assert "team-test" not in html
 
 
 def load_script(name):
