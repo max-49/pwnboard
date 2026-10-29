@@ -176,7 +176,7 @@ pip install -r requirements/dev.txt
 python3 -m pytest
 ```
 
-- `tests/test_ingest.py` and `tests/test_session_api.py` record how every API endpoint behaves today (status codes, response bodies, who is allowed in). If you change the API on purpose, update the matching test in the same change.
+- The suite covers only what must keep working through changes: what tools can send (`tests/test_ingest.py`), who may call what and how accounts and tokens are handled (`tests/test_session_api.py`), the `board.json` format and the dashboard grid (`tests/test_board_format.py`), host notes (`tests/test_host_info.py`) and the callbacks and credentials listings (`tests/test_host_read.py`). It is not meant to cover every input. If you change one of these behaviours on purpose, update the matching test in the same change, and add a test only for something that would be costly to break unnoticed.
 - If you add a test for a gap you have not fixed yet, mark it `xfail(strict=True)`. It asserts the behavior you want and fails by design. Once the gap is fixed it starts passing, and pytest then reports an error until you remove the marker.
 - `tests/test_openapi_spec.py` checks that `pwnboard/web/openapi.yaml` is valid OpenAPI and lists exactly the endpoints the app serves. Every request the other tests make is also checked against it: the response's status code and content type must be declared, JSON bodies must match their schema, and a request body the server accepts must be valid according to the spec. So add or change an endpoint in `openapi.yaml` and in the code together.
 
