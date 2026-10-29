@@ -26,15 +26,25 @@ def get_hosts(data):
     return hosts
 
 def gen_board(data):
-    board = []
+    """Build a version 2 board: every host says which team and machine it belongs to."""
+    teams = data['teams']
+    machines, hosts = [], []
     for host in get_hosts(data):
-        row = {}
-        row['name'] = host.get('name', host.get('ip'))
-        row['hosts'] = []
-        for team in data['teams']:
-            row['hosts'].append({'ip': host['ip'].replace("x", str(team)), 'team': str(team)})
-        board.append(row)
-    return board
+        # Machine names identify the rows, so they must be unique
+        name = base = host.get('name', host.get('ip'))
+        n = 1
+        while name in machines:
+            n += 1
+            name = f"{base} ({n})"
+        machines.append(name)
+        for team in teams:
+            hosts.append({'ip': host['ip'].replace("x", str(team)), 'team': team, 'machine': name})
+    return {
+        'version': 2,
+        'teams': [{'id': team} for team in teams],
+        'machines': machines,
+        'hosts': hosts,
+    }
 
 
 def prompt(text="", color=COLOR):
@@ -133,8 +143,7 @@ def main():
     # Get the networks
     config['networks'] = addNetworks()
     data = config
-    board = {"teams": data['teams']}
-    board['board'] = gen_board(data)
+    board = gen_board(data)
     with open("board.json", 'w') as fil:
         fil.write(json.dumps(board, indent=2))
 

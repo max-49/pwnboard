@@ -57,6 +57,9 @@
                     <tr>
                         <td><b>{{ row['name'] }}</b></td>
                 {% for host in row['hosts'] %}
+                    {% if host is none %}
+                        <td></td>
+                    {% else %}
                     {% set ip = host.get('ip') %}
                     {% set cb = host.get('Active Callbacks', 0) %}
                             {% if cb <= 2 %}
@@ -152,6 +155,7 @@
                             </span><br>
                             {% endfor %}
                         </td>
+                    {% endif %}
                         {% endfor %}
                     </tr>
                     {% endfor %}

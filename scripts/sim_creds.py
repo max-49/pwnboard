@@ -54,12 +54,12 @@ def main():
             board_path = sys.argv[1]
             with open(board_path, 'r') as f:
                 board_file = json.load(f)
-            board = []
-            subnets = board_file["board"]
-            for subnet in subnets:
-                hosts = subnet["hosts"]
-                for host in hosts:
-                    board.append(host["ip"])  
+            if "hosts" in board_file:
+                # board.json version 2: a flat list of hosts
+                board = [host["ip"] for host in board_file["hosts"]]
+            else:
+                # older board.json: rows of hosts
+                board = [host["ip"] for row in board_file["board"] for host in row["hosts"]]
         except:
             print("Invalid board file")
             exit(1)
