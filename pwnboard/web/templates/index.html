@@ -61,7 +61,7 @@
                     <tr>
                         <td>
                             <b>{{ row['name'] }}</b>
-                            {% if row.get('os') %}<br><small class="text-muted">{{ row['os'] }}</small>{% endif %}
+                            {% if row.get('os') %}<br><small class="text-light">{{ row['os'] }}</small>{% endif %}
                             {% if row.get('services') %}<br>{% for service in row['services'] %}<span class="badge badge-secondary">{{ service }}</span> {% endfor %}{% endif %}
                         </td>
                 {% for host in row['hosts'] %}
