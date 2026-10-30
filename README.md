@@ -61,6 +61,8 @@ PWNBoard requires a topology configuration to define teams and hosts. Generate y
 
 Follow the steps in the script to define your hosts. This will generate a `board.json` in the project root, necessary for PWNBoard to deploy correctly.
 
+The script asks for the team numbers, which of them (if any) is the test team, and then each network and its hosts with an optional OS and critical services. If you answered `Y` to adding a host or network by mistake, leave the IP blank to finish.
+
 ### Environment Setup
 
 1. **Configure environment**:

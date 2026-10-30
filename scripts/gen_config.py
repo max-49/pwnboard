@@ -44,7 +44,11 @@ def gen_board(data):
             if host.get(key):
                 machine[key] = host[key]
         machines.append(machine)
-    return {'version': 2, 'teams': list(data['teams']), 'machines': machines}
+    board = {'version': 2, 'teams': list(data['teams'])}
+    if data.get('test_teams'):
+        board['test_teams'] = list(data['test_teams'])
+    board['machines'] = machines
+    return board
 
 
 def prompt(text="", color=COLOR):
@@ -77,12 +81,35 @@ def getTeamRange():
             # Loop if there is any errors
 
 
-def addHost(network):
+def getTestTeams(teams):
     '''
-    Get the input information for a host on the network
+    Ask which of the teams (if any) is the test team, which is shown differently on the dashboard
     '''
     while True:
-        ip = input(c('IP: ', COLOR, attrs=('bold',))+network+".")
+        answer = prompt("Test team number, or several separated by commas (leave blank for none): ").strip()
+        if not answer:
+            return []
+        try:
+            test_teams = [int(number) for number in answer.split(",")]
+        except ValueError:
+            print("Enter team numbers only")
+            continue
+        unknown = [number for number in test_teams if number not in teams]
+        if unknown:
+            print(f"Not one of the teams: {', '.join(str(number) for number in unknown)}")
+            continue
+        return test_teams
+
+
+def addHost(network):
+    '''
+    Get the input information for a host on the network.
+    Returns None if the IP is left blank, which means there are no more hosts to add.
+    '''
+    while True:
+        ip = input(c('IP (leave blank if you are done adding hosts): ', COLOR, attrs=('bold',))+network+".").strip()
+        if not ip:
+            return None
         hostname = prompt("Hostname: ")
         os_name = prompt("OS (optional): ").strip()
         services = [name.strip() for name in prompt("Critical services, separated by commas (optional): ").split(",")
@@ -100,14 +127,17 @@ def addHost(network):
 
 def addNetwork():
     '''
-    Add a network to the config. add hosts to each network
+    Add a network to the config. add hosts to each network.
+    Returns None if the network IP is left blank, which means no network is added.
     '''
     data = {}
     # Get the network ip. Keep trying until it is right
     while True:
         try:
             ip = prompt(
-                'Network IP (e.g. "10.2.x.0"): ')
+                'Network IP (e.g. "10.2.x.0", leave blank if you are done adding networks): ')
+            if not ip.strip():
+                return None
             ip = ".".join(ip.split(".")[:3]).lower()
             data['ip'] = ip
             # Make sure there is an 'x' in the ip
@@ -125,7 +155,10 @@ def addNetwork():
         if newHost.lower() not in ("", "y", "yes"):
             break
         # Create a new host and add it to the dataset
-        data['hosts'] += [addHost(ip)]
+        host = addHost(ip)
+        if host is None:
+            break
+        data['hosts'] += [host]
     return data
 
 
@@ -137,7 +170,10 @@ def addNetworks():
         if newNetwork.lower() not in ("", "y", "yes"):
             break
         # Create a new network and add it to the dataset
-        data += [addNetwork()]
+        network = addNetwork()
+        if network is None:
+            break
+        data += [network]
     return data
 
 def main():
@@ -147,6 +183,7 @@ def main():
     config = {}
     # Get the teams
     config['teams'] = getTeamRange()
+    config['test_teams'] = getTestTeams(config['teams'])
     # Get the networks
     config['networks'] = addNetworks()
     data = config

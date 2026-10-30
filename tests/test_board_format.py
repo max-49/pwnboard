@@ -253,6 +253,30 @@ class TestScripts:
         assert board["machines"][0] == {"name": "DC", "ip": "10.x.1.10", "os": "Ubuntu", "services": ["SSH"]}
         assert addresses(board)[("DC (2)", 3)] == "10.3.1.11"
 
+    def run_generator(self, monkeypatch, tmp_path, answers):
+        answers = iter(answers)
+        monkeypatch.setattr("builtins.input", lambda prompt="": next(answers))
+        monkeypatch.chdir(tmp_path)
+        load_script("gen_config").main()
+        assert next(answers, None) is None  # every answer was used
+        return json.loads((tmp_path / "board.json").read_text())
+
+    def test_the_generator_asks_for_the_test_team_and_a_blank_ip_finishes_a_network(self, monkeypatch, tmp_path):
+        board = self.run_generator(monkeypatch, tmp_path, [
+            "1", "3", "y",                              # teams 1-3
+            "3",                                        # test team
+            "y", "10.x.1.0",                            # a network
+            "y", "10", "DC", "Windows", "AD, DNS", "y",  # a host
+            "y", "",                                    # asked to add another, but blank: done with hosts
+            "y", "",                                    # asked to add another network, but blank: done
+        ])
+        assert board["test_teams"] == [3]
+        assert board["machines"] == [{"name": "DC", "ip": "10.x.1.10", "os": "Windows", "services": ["AD", "DNS"]}]
+
+    def test_the_generator_asks_again_for_a_test_team_that_is_not_a_team(self, monkeypatch, tmp_path):
+        board = self.run_generator(monkeypatch, tmp_path, ["1", "3", "y", "9", "x", "2, 3", "n"])
+        assert board["test_teams"] == [2, 3] and board["machines"] == []
+
     def test_the_converter_prints_the_new_format(self, tmp_path, capsys):
         old = tmp_path / "board.json"
         old.write_text(json.dumps(V1))
