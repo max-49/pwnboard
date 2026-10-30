@@ -39,7 +39,11 @@ def gen_board(data):
             n += 1
             name = f"{base} ({n})"
         names.append(name)
-        machines.append({'name': name, 'ip': host['ip']})
+        machine = {'name': name, 'ip': host['ip']}
+        for key in ('os', 'services'):
+            if host.get(key):
+                machine[key] = host[key]
+        machines.append(machine)
     return {'version': 2, 'teams': list(data['teams']), 'machines': machines}
 
 
@@ -80,11 +84,18 @@ def addHost(network):
     while True:
         ip = input(c('IP: ', COLOR, attrs=('bold',))+network+".")
         hostname = prompt("Hostname: ")
-        # os = prompt("OS: ")
+        os_name = prompt("OS (optional): ").strip()
+        services = [name.strip() for name in prompt("Critical services, separated by commas (optional): ").split(",")
+                    if name.strip()]
         isGood = prompt("Correct? [Y/n] ", "green")
         if isGood.lower() in ("", "y", "yes"):
             # If its right, return the host info
-            return {'ip': ip, 'name': hostname}
+            host = {'ip': ip, 'name': hostname}
+            if os_name:
+                host['os'] = os_name
+            if services:
+                host['services'] = services
+            return host
 
 
 def addNetwork():

@@ -18,7 +18,7 @@ V2 = {
     "version": 2,
     "teams": [1, 2, 5],
     "machines": [
-        {"name": "DC01", "ip": "10.x.1.10"},
+        {"name": "DC01", "ip": "10.x.1.10", "os": "Windows Server 2019", "services": ["AD", "DNS"]},
         {"name": "Web", "ip": "10.x.1.20", "skip": [5]},
         {"name": "Mail", "ip": "10.x.1.30", "ips": {"2": "10.2.9.30"}},
     ],
@@ -77,6 +77,9 @@ class TestFormat:
         (lambda b: b["machines"].append({"name": "New", "ip": "10.x.2.1", "skp": [1]}), "unknown key 'skp'"),
         (lambda b: b["machines"][1].update(skip=[9]), "team 9, which is not in 'teams'"),
         (lambda b: b["machines"][0].update(ip="10.0.1.10"), "no 'x' for the team number"),
+        (lambda b: b["machines"][0].update(os=5), "'os' must be text"),
+        (lambda b: b["machines"][0].update(services="DNS"), "'services' must be a list"),
+        (lambda b: b["machines"][0].update(services=["x" * 33]), "each service must be text"),
         (lambda b: b["machines"].append({"name": "Dup", "ip": "10.x.1.10"}),
          r"host 10.1.1.10 is used twice: 'DC01' team 1 and 'Dup' team 1"),
     ])
@@ -167,6 +170,11 @@ class TestGrid:
         assert rows[0]["hosts"] == [{"ip": "10.1.1.10"}, {"ip": "10.2.1.10"}, {"ip": "10.5.1.10"}]
         assert rows[1]["hosts"] == [{"ip": "10.1.1.20"}, {"ip": "10.2.1.20"}, None]
 
+    def test_os_and_services_come_with_the_row_only_when_set(self):
+        rows = board_rows(V2)
+        assert (rows[0]["os"], rows[0]["services"]) == ("Windows Server 2019", ["AD", "DNS"])
+        assert "os" not in rows[1] and "services" not in rows[1]
+
     def test_a_skipped_first_team_does_not_shift_the_rest(self):
         board = broken(lambda b: b["machines"][0].update(skip=[1]))
         assert board_rows(board)[0]["hosts"] == [None, {"ip": "10.2.1.10"}, {"ip": "10.5.1.10"}]
@@ -210,6 +218,14 @@ class TestDashboard:
         assert "10.1.1.1" in html
         assert "<td></td>" in html
 
+    def test_os_and_services_show_under_the_name_and_are_escaped(self, client, redis, login):
+        rows = [{"name": "DC01", "os": "Windows <b>2019</b>", "services": ["AD", "DNS"], "hosts": [{"ip": "10.1.1.1"}]},
+                {"name": "Plain", "hosts": [{"ip": "10.1.1.2"}]}]
+        redis.set("board_cache", json.dumps(rows))
+        html = login("user").get("/pwnboard").get_data(as_text=True)
+        assert "Windows &lt;b&gt;2019&lt;/b&gt;" in html
+        assert html.count('class="badge badge-secondary"') == 2
+
     def test_only_a_test_teams_header_is_styled(self, client, redis, login, monkeypatch):
         monkeypatch.setattr(routes, "BOARD", {"version": 2, "teams": [1, 5], "test_teams": [5], "machines": []})
         redis.set("board_cache", json.dumps([{"name": "box", "hosts": [{"ip": "10.1.1.1"}, {"ip": "10.5.1.1"}]}]))
@@ -229,10 +245,12 @@ def load_script(name):
 class TestScripts:
     def test_the_generated_board_is_valid(self):
         config = {"teams": [1, 3], "networks": [
-            {"ip": "10.x.1", "hosts": [{"ip": "10", "name": "DC"}, {"ip": "11", "name": "DC"}]},
+            {"ip": "10.x.1", "hosts": [{"ip": "10", "name": "DC", "os": "Ubuntu", "services": ["SSH"]},
+                                       {"ip": "11", "name": "DC"}]},
         ]}
         board = load_script("gen_config").gen_board(config)
         assert validate_board(board) is board
+        assert board["machines"][0] == {"name": "DC", "ip": "10.x.1.10", "os": "Ubuntu", "services": ["SSH"]}
         assert addresses(board)[("DC (2)", 3)] == "10.3.1.11"
 
     def test_the_converter_prints_the_new_format(self, tmp_path, capsys):

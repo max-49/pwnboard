@@ -35,7 +35,7 @@ this is an easter egg
   "version": 2,
   "teams": [1, 2, 5],
   "machines": [
-    {"name": "DC01", "ip": "10.x.1.10"},
+    {"name": "DC01", "ip": "10.x.1.10", "os": "Windows Server 2019", "services": ["AD", "DNS"]},
     {"name": "Web",  "ip": "10.x.1.20", "skip": [5]},
     {"name": "Mail", "ip": "10.x.1.30", "ips": {"2": "10.2.9.30"}}
   ]
@@ -44,6 +44,7 @@ this is an easter egg
 
 - `teams` sets the columns and `machines` the rows, in the order they are listed. Team numbers are whole numbers and do not have to be consecutive.
 - `ip` is a pattern: every `x` is replaced by the team number. `10.x.1.10` is `10.1.1.10` for team 1 and `10.5.1.10` for team 5. A machine appears in every team's column.
+- `os` (optional) is the machine's operating system, and `services` (optional) is a list of its critical services. They are shown under the machine's name on the dashboard. `os` can be up to 64 characters, and there can be up to 20 services of up to 32 characters each.
 - `skip` (optional) lists teams that have no host for this machine. Their cell is shown blank. In the example, `Web` has no team 5 host.
 - `ips` (optional) gives the address of a team whose host does not follow the pattern. In the example, team 2's `Mail` is `10.2.9.30` and the other teams use `10.x.1.30`.
 - `test_teams` (optional) lists teams that are not real competitors, such as `"test_teams": [99]` (the team must also be in `teams`). The team's header is shown with red stripes. Its data is stored and shown like any other team's.

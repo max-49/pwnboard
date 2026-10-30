@@ -10,7 +10,7 @@ Format (version 2). Each machine is one row of the dashboard and has one host pe
       "version": 2,
       "teams": [1, 2, 5],
       "machines": [
-        {"name": "DC01", "ip": "10.x.1.10"},
+        {"name": "DC01", "ip": "10.x.1.10", "os": "Windows Server 2019", "services": ["AD", "DNS"]},
         {"name": "Web",  "ip": "10.x.1.20", "skip": [5]},
         {"name": "Mail", "ip": "10.x.1.30", "ips": {"2": "10.2.9.30"}}
       ]
@@ -20,8 +20,11 @@ Format (version 2). Each machine is one row of the dashboard and has one host pe
 `"test_teams": [99]` marks teams that are not real competitors. They are labelled on the
 dashboard and otherwise treated like any other team.
 
-Two optional machine keys handle the exceptions: `skip` lists teams that have no host for
-the machine (the cell is left blank), and `ips` gives a team's address when it does not
+A machine can also have an `os` (text) and a list of critical `services`. They are shown
+under the machine's name on the dashboard, and left out when not set.
+
+Two more optional machine keys handle the exceptions: `skip` lists teams that have no host
+for the machine (the cell is left blank), and `ips` gives a team's address when it does not
 follow the pattern.
 
 The older format (rows of hosts, matched to the `teams` list by position) is still accepted
@@ -31,7 +34,10 @@ import json
 from collections import Counter
 
 VERSION = 2
-MACHINE_KEYS = ("name", "ip", "skip", "ips")
+MACHINE_KEYS = ("name", "ip", "os", "services", "skip", "ips")
+MAX_OS_LENGTH = 64
+MAX_SERVICES = 20
+MAX_SERVICE_LENGTH = 32
 
 
 class BoardError(ValueError):
@@ -194,6 +200,19 @@ def _validate_machine(machine, teams):
     if not isinstance(machine.get("ip"), str) or not machine["ip"].strip():
         raise BoardError(f"machine {name!r}: needs an 'ip' pattern such as '10.x.1.10'")
 
+    if "os" in machine and (not isinstance(machine["os"], str) or not machine["os"].strip()
+                            or len(machine["os"]) > MAX_OS_LENGTH):
+        raise BoardError(f"machine {name!r}: 'os' must be text of at most {MAX_OS_LENGTH} characters")
+
+    services = machine.get("services", [])
+    if not isinstance(services, list) or len(services) > MAX_SERVICES:
+        raise BoardError(f"machine {name!r}: 'services' must be a list of at most {MAX_SERVICES} names")
+    for service in services:
+        if not isinstance(service, str) or not service.strip() or len(service) > MAX_SERVICE_LENGTH:
+            raise BoardError(
+                f"machine {name!r}: each service must be text of at most {MAX_SERVICE_LENGTH} characters, got {service!r}"
+            )
+
     skip = machine.get("skip", [])
     if not isinstance(skip, list):
         raise BoardError(f"machine {name!r}: 'skip' must be a list of team numbers")
@@ -333,5 +352,9 @@ def board_rows(board):
     for machine in board["machines"]:
         cells = {team: ip for team, ip, _ in _cells(machine, board["teams"])}
         hosts = [{"ip": cells[team]} if team in cells else None for team in board["teams"]]
-        rows.append({"name": machine["name"], "hosts": hosts})
+        row = {"name": machine["name"], "hosts": hosts}
+        for key in ("os", "services"):
+            if machine.get(key):
+                row[key] = list(machine[key]) if key == "services" else machine[key]
+        rows.append(row)
     return rows
