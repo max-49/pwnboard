@@ -41,19 +41,6 @@ CREATE TABLE IF NOT EXISTS market.odds (
 CREATE INDEX IF NOT EXISTS idx_market_odds_ts ON market.odds(ts);
 """
 
-# Grafana's read-only user is created by PWNBoard; give it the market schema too.
-_GRAFANA_GRANTS = """
-DO $$
-BEGIN
-    IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'grafana_user') THEN
-        GRANT USAGE ON SCHEMA market TO grafana_user;
-        GRANT SELECT ON ALL TABLES IN SCHEMA market TO grafana_user;
-        ALTER DEFAULT PRIVILEGES IN SCHEMA market GRANT SELECT ON TABLES TO grafana_user;
-    END IF;
-END
-$$;
-"""
-
 _ODDS_COLUMNS = (
     "ts", "round", "team", "team_number", "price", "win_prob", "top3_prob", "score",
     "exp_final", "rate_long", "rate_form", "rate_proj", "access_hosts", "stale",
@@ -94,7 +81,6 @@ class Store:
         def run(conn):
             with conn.cursor() as cur:
                 cur.execute(_DDL)
-                cur.execute(_GRAFANA_GRANTS)
                 cur.execute("DELETE FROM market.odds WHERE ts < NOW() - INTERVAL '3 days'")
             conn.commit()
         self._run(run)

@@ -2,7 +2,7 @@
 
 Turns the scoring engine's live scores and PWNBoard's red team callbacks into "who wins" prices
 and shows them on its own prediction-market website, `http://<host>:8080` (a price chart, a Yes/No
-list of teams, details per team, and a play-money trade ticket). The Grafana odds panels read the same data.
+list of teams, details per team, and a play-money trade ticket).
 
 **This lives on the `competition/prediction-market` branch only. It is not part of CI and the
 image is not published: it is built on the host.**
@@ -65,8 +65,7 @@ docker compose logs -f market
 ```
 
 Healthy startup logs look like `connected to .../round/info`, then `round N: 20 teams` for each round.
-Then open `http://<host>:8080`. (The Grafana odds panels read `market.odds`, which the service creates on its
-first start, so they show no data for the first minute.)
+Then open `http://<host>:8080`.
 
 **Port 8080 has no login**, and the page shows how many hosts red team holds on each team. To keep it to the
 VM itself (for example behind an SSH tunnel), add `MARKET_BIND=127.0.0.1:8080` to `.env` before starting.
@@ -78,7 +77,7 @@ The page is backed by a small JSON API: `GET /api/odds` (current prices and deta
 
 ```bash
 docker compose rm -sf market        # stops and removes only the market container
-git checkout main                   # Grafana restores the old odds panels within ~10 seconds
+git checkout main
 ```
 
 The `market` schema in Postgres is left behind and harmless (`DROP SCHEMA market CASCADE;` removes it).
