@@ -76,7 +76,7 @@ services:
       redis:
         condition: service_started
 
-  # Prediction market odds for the Grafana dashboard. Built on the host from ./market (it is
+  # Prediction market odds and their website (http://<host>:8080). Built on the host from ./market (it is
   # not in the published images), so deploy it with:  docker compose up -d --build market
   market:
     build: ./market
@@ -95,6 +95,9 @@ services:
       - FORM_HALF_LIFE=${FORM_HALF_LIFE:-}
       - PRICE_KEEP=${PRICE_KEEP:-}
       - TAIL_DF=${TAIL_DF:-}
+    ports:
+      # The market website. To keep it off the network, set MARKET_BIND=127.0.0.1:8080 in .env
+      - "${MARKET_BIND:-8080}:8080"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8080/healthz', timeout=3)"]
       interval: 30s

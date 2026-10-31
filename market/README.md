@@ -1,7 +1,8 @@
 # PWNBoard prediction market
 
 Turns the scoring engine's live scores and PWNBoard's red team callbacks into "who wins" prices
-for the Grafana dashboard (**Odds of Winning**, **Current Odds** and **Market Details**).
+and shows them on its own prediction-market website, `http://<host>:8080` (a price chart, a Yes/No
+list of teams, details per team, and a play-money trade ticket). The Grafana odds panels read the same data.
 
 **This lives on the `competition/prediction-market` branch only. It is not part of CI and the
 image is not published: it is built on the host.**
@@ -53,7 +54,7 @@ unset means the default.
 ## Deploying without downtime
 
 `docker compose up -d --build market` creates only the `market` container. The other services' config
-is unchanged, so compose leaves them running. Grafana reloads the dashboard file by itself.
+is unchanged, so compose leaves them running. Port 8080 is published by the `market` container alone.
 
 ```bash
 git fetch origin
@@ -63,15 +64,15 @@ docker compose up -d --build market
 docker compose logs -f market
 ```
 
-The odds panels read `market.odds`, which the service creates on its first start, so they show an
-error or no data for the first minute after you check the branch out. Healthy startup logs look like
-`connected to .../round/info`, then `round N: 20 teams` for each round.
+Healthy startup logs look like `connected to .../round/info`, then `round N: 20 teams` for each round.
+Then open `http://<host>:8080`. (The Grafana odds panels read `market.odds`, which the service creates on its
+first start, so they show no data for the first minute.)
 
-Check it without Grafana (the port is not published, so go through the container):
+**Port 8080 has no login**, and the page shows how many hosts red team holds on each team. To keep it to the
+VM itself (for example behind an SSH tunnel), add `MARKET_BIND=127.0.0.1:8080` to `.env` before starting.
 
-```bash
-docker compose exec market python -c "import urllib.request as u; print(u.urlopen('http://127.0.0.1:8080/odds').read().decode())"
-```
+The page is backed by a small JSON API: `GET /api/odds` (current prices and details),
+`GET /api/history?minutes=60` (price series for charts) and `GET /healthz`.
 
 ### Rolling back
 

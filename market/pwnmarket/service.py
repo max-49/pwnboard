@@ -11,6 +11,23 @@ from .model import Noise, TeamInput, simulate, to_prices
 logger = logging.getLogger("market.service")
 
 REPLAY_ROUNDS = 40  # recent rounds reloaded after a restart to rebuild "recent form"
+HISTORY_POINTS = 240  # about how many points a chart line gets
+HISTORY_CACHE_SECONDS = 5  # many browsers may ask at once; ask the database once
+MAX_HISTORY_MINUTES = 72 * 60
+
+
+def shape_history(rows, bucket_seconds):
+    """[(epoch, team, price, top3)] -> aligned series for charts, with None where a team has no data."""
+    times = sorted({row[0] for row in rows})
+    index = {t: i for i, t in enumerate(times)}
+    teams = {}
+    for epoch, team, price, top3 in rows:
+        series = teams.setdefault(
+            str(team), {"price": [None] * len(times), "top3": [None] * len(times)}
+        )
+        series["price"][index[epoch]] = price
+        series["top3"][index[epoch]] = top3
+    return {"bucket_seconds": bucket_seconds, "times": times, "teams": teams}
 
 
 class Market:
@@ -33,6 +50,7 @@ class Market:
         self.arrivals = deque(maxlen=12)  # (round, monotonic time) of recent rounds
         self.last_update = None
         self.latest = []
+        self._history_cache = {}
 
     # --- inputs -------------------------------------------------------------------------
 
@@ -172,3 +190,16 @@ class Market:
                     {k: (v.isoformat() if k == "ts" else v) for k, v in row.items()} for row in rows
                 ],
             }
+
+    def history(self, minutes):
+        """Chart series for the last `minutes`, bucketed so a line has about HISTORY_POINTS points."""
+        minutes = max(5, min(int(minutes), MAX_HISTORY_MINUTES))
+        cached = self._history_cache.get(minutes)
+        if cached and self._mono() - cached[0] < HISTORY_CACHE_SECONDS:
+            return cached[1]
+        bucket = max(15, round(minutes * 60 / HISTORY_POINTS))
+        data = shape_history(self.store.history(minutes, bucket), bucket)
+        if len(self._history_cache) > 16:
+            self._history_cache.clear()
+        self._history_cache[minutes] = (self._mono(), data)
+        return data

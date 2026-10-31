@@ -1,5 +1,6 @@
 """Postgres access: the market's own schema, plus a read of PWNBoard's callback data."""
 import logging
+import threading
 
 import psycopg2
 from psycopg2.extras import execute_values
@@ -63,6 +64,7 @@ class Store:
     def __init__(self, cfg):
         self.cfg = cfg
         self._conn = None
+        self._lock = threading.Lock()  # the web server and the ticker share one connection
 
     def _connection(self):
         if self._conn is None or self._conn.closed:
@@ -75,17 +77,18 @@ class Store:
 
     def _run(self, fn):
         """Run fn(conn); on a database error drop the connection so the next call reconnects."""
-        conn = self._connection()
-        try:
-            return fn(conn)
-        except psycopg2.Error:
+        with self._lock:
+            conn = self._connection()
             try:
-                conn.rollback()
+                return fn(conn)
             except psycopg2.Error:
-                pass
-            conn.close()
-            self._conn = None
-            raise
+                try:
+                    conn.rollback()
+                except psycopg2.Error:
+                    pass
+                conn.close()
+                self._conn = None
+                raise
 
     def setup(self):
         def run(conn):
@@ -144,3 +147,23 @@ class Store:
                 )
             conn.commit()
         self._run(run)
+
+    def history(self, minutes, bucket_seconds):
+        """Average price and top-3 chance per team per time bucket: [(epoch, team, price, top3)]."""
+        def run(conn):
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT EXTRACT(EPOCH FROM date_bin(make_interval(secs => %s), ts, TIMESTAMPTZ '2000-01-01'))::float8 AS b,
+                           team_number, AVG(price)::float8, AVG(top3_prob)::float8
+                    FROM market.odds
+                    WHERE ts > NOW() - make_interval(mins => %s)
+                    GROUP BY b, team_number
+                    ORDER BY b, team_number
+                    """,
+                    (bucket_seconds, minutes),
+                )
+                rows = cur.fetchall()
+            conn.commit()
+            return rows
+        return self._run(run)

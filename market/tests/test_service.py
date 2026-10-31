@@ -5,7 +5,7 @@ import pytest
 
 from pwnmarket.config import Config
 from pwnmarket.scoring import RoundUpdate
-from pwnmarket.service import Market
+from pwnmarket.service import Market, shape_history
 
 NOW = datetime(2026, 10, 31, 12, 0, tzinfo=timezone.utc)
 
@@ -13,7 +13,7 @@ NOW = datetime(2026, 10, 31, 12, 0, tzinfo=timezone.utc)
 class FakeStore:
     def __init__(self, access=None, history=()):
         self.access = access or {}
-        self.history = list(history)
+        self.past = list(history)
         self.rounds, self.odds = [], []
         self.fail_access = False
 
@@ -29,7 +29,11 @@ class FakeStore:
         self.odds.append(rows)
 
     def load_recent_rounds(self, limit):
-        return self.history
+        return self.past
+
+    def history(self, minutes, bucket_seconds):
+        self.history_calls = getattr(self, "history_calls", []) + [(minutes, bucket_seconds)]
+        return [(1000.0, 1, 0.6, 0.9), (1000.0, 2, 0.4, 0.7), (1015.0, 1, 0.7, 0.95)]
 
 
 class Clock:
@@ -154,3 +158,26 @@ def test_whole_game_rate_counts_only_rounds_that_scored_using_the_test_team():
     m.on_round(RoundUpdate(100, scores, {1: 9, 2: 8, 21: 10}, 10))
     rates = {r["team_number"]: r["rate_long"] for r in m.tick()}
     assert rates == {1: pytest.approx(0.9), 2: pytest.approx(0.8)}
+
+
+def test_shape_history_aligns_teams_on_shared_times_with_gaps():
+    rows = [(10.0, 1, 0.6, 0.9), (10.0, 2, 0.4, 0.7), (25.0, 1, 0.7, 0.95)]
+    data = shape_history(rows, 15)
+    assert data["times"] == [10.0, 25.0]
+    assert data["teams"]["1"]["price"] == [0.6, 0.7]
+    assert data["teams"]["2"]["price"] == [0.4, None]
+    assert data["teams"]["1"]["top3"] == [0.9, 0.95]
+
+
+def test_history_buckets_clamps_and_caches_briefly():
+    clock = Clock()
+    m = market(clock=clock)
+    first = m.history(60)
+    assert m.store.history_calls == [(60, 15)]
+    assert m.history(60) is first and len(m.store.history_calls) == 1  # cached
+    clock.t = 10
+    m.history(60)
+    assert len(m.store.history_calls) == 2  # cache expired
+    m.history(1)
+    m.history(10**9)
+    assert [c[0] for c in m.store.history_calls[2:]] == [5, 72 * 60]
