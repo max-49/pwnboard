@@ -229,8 +229,9 @@ function renderMeta() {
   const o = state.odds;
   if (!o || !o.teams.length) { $("meta").textContent = "Waiting for the first round of scores…"; return; }
   const left = o.rounds_left === null ? "" : ` · about ${Math.round(o.rounds_left)} rounds left`;
+  const ends = o.ends_at ? "closes " + new Date(o.ends_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "closes when scoring ends";
   const age = Math.max(0, Math.round((Date.now() - new Date(o.teams[0].ts).getTime()) / 1000));
-  $("meta").textContent = `${o.teams.length} teams · closes when scoring ends${left} · prices updated ${age}s ago`;
+  $("meta").textContent = `${o.teams.length} teams · ${ends}${left} · prices updated ${age}s ago`;
 }
 function renderHead(list) {
   if (!list.length) { $("headline").innerHTML = ""; return; }

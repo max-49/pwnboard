@@ -1,6 +1,7 @@
 import logging
 import signal
 import threading
+from datetime import datetime, timezone
 
 from .config import Config
 from .scoring import stream_rounds
@@ -32,7 +33,11 @@ def main():
     except Exception:
         log.exception("could not restore recent rounds; starting fresh")
     if cfg.competition_end is None:
-        log.warning("COMPETITION_END is not set; assuming %.0f rounds remain", cfg.rounds_remaining)
+        log.warning("COMPETITION_END is not set; assuming %.0f scoring rounds remain", cfg.rounds_remaining)
+    else:
+        log.info("competition ends at %s", cfg.competition_end.isoformat())
+        if cfg.competition_end <= datetime.now(timezone.utc):
+            log.warning("COMPETITION_END is already in the past, so no rounds are left; check the date, time and UTC offset")
 
     def follow_scores():
         for update in stream_rounds(cfg.scoring_url, stop):

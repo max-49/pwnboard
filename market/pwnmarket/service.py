@@ -40,7 +40,7 @@ class Market:
         self.lock = threading.RLock()
 
         self.round = None
-        self.first_round = None
+        self.scored_at_start = None  # scored_rounds when ROUNDS_REMAINING started counting down
         self.scored_rounds = 0.0  # rounds that actually awarded points (not paused, not before scoring began)
         self.checks = 11
         self.scores = {}
@@ -69,7 +69,7 @@ class Market:
                 replay=True,
             )
         if self.round is not None:
-            self.first_round = self.round  # ROUNDS_REMAINING counts from now, not from the replay
+            self.scored_at_start = self.scored_rounds  # ROUNDS_REMAINING counts from now, not from the replay
             logger.info("restored recent rounds up to round %d", self.round)
 
     def on_round(self, update, replay=False):
@@ -98,8 +98,8 @@ class Market:
                     self.form[team] = previous + alpha * (points / checks - previous)
             self.round, self.checks = update.round, checks
             self.scores = dict(update.uptime_score)
-            if self.first_round is None:
-                self.first_round = update.round
+            if self.scored_at_start is None:
+                self.scored_at_start = self.scored_rounds
             if not replay:
                 self.arrivals.append((update.round, self._mono()))
                 self.last_update = self._mono()
@@ -131,7 +131,8 @@ class Market:
         if self.cfg.competition_end:
             seconds = (self.cfg.competition_end - self._now()).total_seconds()
             return max(0.0, seconds / self.round_seconds())
-        return max(0.0, self.cfg.rounds_remaining - (self.round - self.first_round))
+        # only rounds that awarded points count down, so a paused scoring engine (lunch) uses none up
+        return max(0.0, self.cfg.rounds_remaining - (self.scored_rounds - self.scored_at_start))
 
     # --- output -------------------------------------------------------------------------
 
@@ -188,6 +189,7 @@ class Market:
             return {
                 "round": self.round,
                 "rounds_left": None if self.round is None else round(self.rounds_left(), 1),
+                "ends_at": self.cfg.competition_end.isoformat() if self.cfg.competition_end else None,
                 "stale": bool(rows and rows[0]["stale"]),
                 "teams": [
                     {k: (v.isoformat() if k == "ts" else v) for k, v in row.items()} for row in rows
@@ -248,6 +250,8 @@ class Market:
                     "round": self.round, "rounds_left": rounds_left, "round_seconds": self.round_seconds(),
                     "scored_rounds": self.scored_rounds, "checks_per_round": self.checks,
                     "points_left": c["points_left"], "unknown_sd": float(c["unknown_sd"]),
+                    "ends_at": self.cfg.competition_end.isoformat() if self.cfg.competition_end else None,
+                    "rounds_remaining_setting": self.cfg.rounds_remaining,
                 },
                 "teams": out,
             }

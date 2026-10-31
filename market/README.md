@@ -42,8 +42,8 @@ unset means the default.
 
 | Variable | Default | Effect |
 |---|---|---|
-| `COMPETITION_END` | none | End time as `2026-10-31T18:00:00-04:00`. Without it, `ROUNDS_REMAINING` is used. |
-| `ROUNDS_REMAINING` | 60 | Rounds left when the service starts, if no end time is set. |
+| `COMPETITION_END` | none | End time, e.g. `2026-10-31T15:30:00-04:00`. A time without a UTC offset is read as **Eastern (-04:00)**. The site and the logs show the end time in use. Without it, `ROUNDS_REMAINING` is used. |
+| `ROUNDS_REMAINING` | 60 | Scoring rounds left when the service starts, if no end time is set. Paused rounds don't count down. |
 | `UNKNOWN_POINTS_SD` | 250 | Points we cannot see. **Lower = the leader runs away; higher = flatter, more upsets.** |
 | `ACCESS_PENALTY` | 0.06 | Share of projected uptime lost per host red team holds. Higher = red team moves prices more. |
 | `FORM_WEIGHT` | 0.7 | 0 = whole-game uptime only, 1 = recent rounds only. Higher = twitchier. |
@@ -59,7 +59,7 @@ is unchanged, so compose leaves them running. Port 8080 is published by the `mar
 ```bash
 git fetch origin
 git checkout competition/prediction-market      # or: git pull, if you are already on it
-echo 'COMPETITION_END=2026-10-31T18:00:00-04:00' >> .env   # optional, see above
+echo 'COMPETITION_END=2026-10-31T15:30:00-04:00' >> .env   # optional, see above
 docker compose up -d --build market
 docker compose logs -f market
 ```
@@ -93,7 +93,7 @@ The `market` schema in Postgres is left behind and harmless (`DROP SCHEMA market
   checks per round, which relies on one team having perfect uptime (the test team, 21). If it ever stops
   being perfect, whole-game rates read slightly high.
 - After a restart the last 40 rounds are reloaded so "recent form" does not reset.
-  `ROUNDS_REMAINING` counts from each start, so prefer `COMPETITION_END`.
+  `ROUNDS_REMAINING` counts scoring rounds from each start, so prefer `COMPETITION_END`.
 - Teams 19 (did not show up), 20 (red team test team) and 21 (blue team test team) get no odds. This is
   hardcoded in `excluded_teams` in `pwnmarket/config.py` for this competition.
 

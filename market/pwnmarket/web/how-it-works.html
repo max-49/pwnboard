@@ -158,7 +158,8 @@ function renderExample() {
   if (picked === null || !teams.some((t) => t.team === picked)) picked = teams[0].team;
   sel.innerHTML = teams.map((t) => `<option value="${t.team}" ${t.team === picked ? "selected" : ""}>Team ${t.team}</option>`).join("");
   const t = teams.find((x) => x.team === picked), p = model.params, l = model.live;
-  $("roundline").textContent = `Round ${l.round} · ${l.rounds_left.toFixed(1)} rounds left`;
+  const basis = l.ends_at ? `ends ${new Date(l.ends_at).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}` : `no end time set, counting down ${l.rounds_remaining_setting} scoring rounds`;
+  $("roundline").textContent = `Round ${l.round} · ${l.rounds_left.toFixed(1)} rounds left (${basis})`;
   const rows = [
     ["Whole-game rate", `${t.score} ÷ (${num(l.scored_rounds, 1)} × ${l.checks_per_round})`, pc(t.rate_long)],
     ["Recent form", "weighted average of recent rounds", pc(t.rate_form)],

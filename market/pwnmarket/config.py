@@ -1,7 +1,7 @@
 """Settings, all read from environment variables (see market/README.md)."""
 import os
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 
 def _float(name, default):
@@ -12,12 +12,20 @@ def _int(name, default):
     return int(os.environ.get(name) or default)
 
 
+# The competition runs on Eastern time (the scoring site reports -04:00). Hardcoded for this competition.
+LOCAL_TZ = timezone(timedelta(hours=-4))
+
+
 def _end_time(raw):
-    """COMPETITION_END as an ISO timestamp, e.g. 2026-10-31T18:00:00-04:00 (UTC if no offset)."""
+    """COMPETITION_END as an ISO timestamp, e.g. 2026-10-31T15:30:00-04:00.
+
+    Without a UTC offset the time is Eastern (-04:00), the same clock as the scoring site and the
+    people running the competition, so `2026-10-31T15:30:00` means 3:30 PM there.
+    """
     if not raw:
         return None
-    end = datetime.fromisoformat(raw)
-    return end if end.tzinfo else end.replace(tzinfo=timezone.utc)
+    end = datetime.fromisoformat(raw.strip())
+    return end if end.tzinfo else end.replace(tzinfo=LOCAL_TZ)
 
 
 @dataclass(frozen=True)

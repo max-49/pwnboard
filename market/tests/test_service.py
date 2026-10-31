@@ -79,7 +79,7 @@ def test_rounds_left_from_end_time_and_measured_round_length():
     assert m.rounds_left() == pytest.approx(120)
 
 
-def test_rounds_left_without_end_time_counts_down_from_first_round_seen():
+def test_rounds_left_without_end_time_counts_down_from_scoring_rounds_seen():
     m = market(rounds_remaining=50)
     m.on_round(update(100))
     m.on_round(update(110))
@@ -198,3 +198,23 @@ def test_explain_matches_the_saved_odds_and_never_exposes_the_database_password(
         assert t["price"] == pytest.approx(rows[t["team"]]["price"])
     assert out["teams"] == sorted(out["teams"], key=lambda t: -t["price"])
     assert next(t for t in out["teams"] if t["team"] == 1)["hosts"] == 4
+
+
+def test_countdown_without_end_time_is_not_used_up_by_a_scoring_pause():
+    m = market(rounds_remaining=50)
+    frozen = {1: 100, 2: 90, 3: 80}
+    m.on_round(update(10, scores=frozen))
+    for rnd in range(11, 41):  # thirty rounds tick by while scoring is paused
+        m.on_round(update(rnd, scores=frozen, points={1: 0, 2: 0, 3: 0}))
+    assert m.rounds_left() == 50
+    m.on_round(update(41, scores={1: 110, 2: 99, 3: 88}, points={1: 10, 2: 9, 3: 8}))
+    assert m.rounds_left() == 49
+
+
+def test_snapshot_and_explain_report_the_end_time():
+    m = market(competition_end=NOW + timedelta(hours=2))
+    m.on_round(update(10))
+    m.tick()
+    assert m.snapshot()["ends_at"] == (NOW + timedelta(hours=2)).isoformat()
+    assert m.explain()["live"]["ends_at"] == (NOW + timedelta(hours=2)).isoformat()
+    assert market().snapshot()["ends_at"] is None
