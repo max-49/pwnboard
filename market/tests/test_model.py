@@ -3,7 +3,7 @@ import dataclasses
 import pytest
 
 from pwnmarket.config import Config
-from pwnmarket.model import Noise, TeamInput, simulate, to_prices
+from pwnmarket.model import Noise, TeamInput, components, simulate, to_prices
 
 CFG = Config(simulations=4000)
 
@@ -67,3 +67,17 @@ def test_prices_sum_to_one_respect_the_floor_and_smooth():
     moved = to_prices({1: 0.0, 2: 1.0}, prices, cfg)
     assert sum(moved.values()) == pytest.approx(1)
     assert moved[1] > prices[2]  # still remembers being the favourite
+
+
+def test_components_are_what_the_simulation_uses():
+    teams = [team(1, score=1200, access=3), team(2, score=1000)]
+    c = components(teams, 60, 11, CFG)
+    result = {o.team: o for o in simulate(teams, 60, 11, CFG, Noise(CFG.simulations))}
+    for i, t in enumerate(teams):
+        assert result[t.team].exp_final == pytest.approx(c["mean"][i])
+        assert result[t.team].rate_proj == pytest.approx(c["rate"][i])
+    # hand-worked: blended 0.9, penalty 3 x 0.06 = 0.18, projected 0.9 x 0.82
+    assert c["penalty"][0] == pytest.approx(0.18)
+    assert c["rate"][0] == pytest.approx(0.9 * 0.82)
+    assert c["mean"][0] == pytest.approx(1200 + 60 * 11 * 0.9 * 0.82)
+    assert c["sd"][0] == pytest.approx((c["play_sd"][0] ** 2 + c["rate_sd"][0] ** 2 + c["unknown_sd"] ** 2) ** 0.5)

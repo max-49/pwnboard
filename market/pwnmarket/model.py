@@ -32,11 +32,44 @@ class TeamOdds:
     rate_proj: float
 
 
+def rate_parts(team, cfg):
+    """(blended rate, access penalty, projected rate) for one team."""
+    blended = max(MIN_RATE, min(1.0, (1 - cfg.form_weight) * team.rate_long + cfg.form_weight * team.rate_form))
+    penalty = min(MAX_ACCESS_PENALTY, cfg.access_penalty * team.access)
+    return blended, penalty, blended * (1 - penalty)
+
+
 def project_rate(team, cfg):
     """Share of the available uptime points this team is expected to keep earning."""
-    blended = (1 - cfg.form_weight) * team.rate_long + cfg.form_weight * team.rate_form
-    penalty = min(MAX_ACCESS_PENALTY, cfg.access_penalty * team.access)
-    return max(MIN_RATE, min(1.0, blended)) * (1 - penalty)
+    return rate_parts(team, cfg)[2]
+
+
+def components(teams, rounds_left, checks, cfg):
+    """Every number behind each team's projected final score, as arrays in the order of `teams`.
+
+    The simulation and the "How it works" page both read these, so the page cannot disagree
+    with the model.
+    """
+    rounds_left = max(0.0, rounds_left)
+    parts = [rate_parts(t, cfg) for t in teams]
+    blended = np.array([p[0] for p in parts])
+    penalty = np.array([p[1] for p in parts])
+    rates = np.array([p[2] for p in parts])
+    scores = np.array([t.score for t in teams], dtype=float)
+
+    points_left = rounds_left * checks
+    mean = scores + points_left * rates
+    per_round = rates * (1 - rates)
+    play_sd = np.sqrt(points_left * per_round)
+    # how unsure we are of the rate itself, from about two half-lives of recent results
+    rate_sd = points_left * np.sqrt(per_round / (checks * max(1.0, 2 * cfg.form_half_life)))
+    unknown_sd = cfg.unknown_points_sd * min(1.0, sqrt(rounds_left / cfg.unknown_ref_rounds))
+    sd = np.sqrt(play_sd**2 + rate_sd**2 + unknown_sd**2)
+    return {
+        "points_left": points_left, "unknown_sd": unknown_sd,
+        "blended": blended, "penalty": penalty, "rate": rates,
+        "mean": mean, "play_sd": play_sd, "rate_sd": rate_sd, "sd": sd,
+    }
 
 
 class Noise:
@@ -62,18 +95,8 @@ def simulate(teams, rounds_left, checks, cfg, noise):
     """Return a TeamOdds for each team, in the order given."""
     if not teams:
         return []
-    rounds_left = max(0.0, rounds_left)
-    rates = np.array([project_rate(t, cfg) for t in teams])
-    scores = np.array([t.score for t in teams], dtype=float)
-
-    points_left = rounds_left * checks
-    mean = scores + points_left * rates
-    per_round = rates * (1 - rates)
-    play_sd = np.sqrt(points_left * per_round)
-    # how unsure we are of the rate itself, from about two half-lives of recent results
-    rate_sd = points_left * np.sqrt(per_round / (checks * max(1.0, 2 * cfg.form_half_life)))
-    unknown_sd = cfg.unknown_points_sd * min(1.0, sqrt(rounds_left / cfg.unknown_ref_rounds))
-    sd = np.sqrt(play_sd**2 + rate_sd**2 + unknown_sd**2)
+    c = components(teams, rounds_left, checks, cfg)
+    rates, mean, sd = c["rate"], c["mean"], c["sd"]
 
     final = mean[None, :] + noise.draws(len(teams), cfg.tail_df) * sd[None, :]
     n_paths = final.shape[0]

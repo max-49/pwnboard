@@ -181,3 +181,20 @@ def test_history_buckets_clamps_and_caches_briefly():
     m.history(1)
     m.history(10**9)
     assert [c[0] for c in m.store.history_calls[2:]] == [5, 72 * 60]
+
+
+def test_explain_matches_the_saved_odds_and_never_exposes_the_database_password():
+    m = market(store=FakeStore(access={1: 4}), form_weight=0.5)
+    m.cfg = dataclasses.replace(m.cfg, db_password="hunter2")
+    assert m.explain()["ready"] is False
+    m.on_round(update(10))
+    rows = {r["team_number"]: r for r in m.tick()}
+    out = m.explain()
+    assert out["ready"] and out["params"]["form_weight"] == 0.5
+    assert "hunter2" not in repr(out) and "db_password" not in out["params"]
+    assert out["live"]["round"] == 10 and out["live"]["checks_per_round"] == 10
+    for t in out["teams"]:
+        assert t["rate_proj"] == pytest.approx(rows[t["team"]]["rate_proj"])
+        assert t["price"] == pytest.approx(rows[t["team"]]["price"])
+    assert out["teams"] == sorted(out["teams"], key=lambda t: -t["price"])
+    assert next(t for t in out["teams"] if t["team"] == 1)["hosts"] == 4

@@ -13,6 +13,9 @@ class FakeMarket:
     def history(self, minutes):
         return {"minutes": minutes}
 
+    def explain(self):
+        return {"ready": False, "params": {}}
+
 
 @pytest.fixture
 def get():
@@ -47,3 +50,12 @@ def test_bad_input_and_unknown_paths(get):
     assert get("/api/history?minutes=abc")[0] == 400
     assert get("/nope")[0] == 404
     assert get("/healthz")[0] == 200
+
+
+def test_how_it_works_page_and_shared_assets(get):
+    status, content_type, body = get("/how-it-works")
+    assert status == 200 and content_type.startswith("text/html")
+    assert b"/api/model" in body
+    assert get("/site.css")[1].startswith("text/css")
+    assert get("/site.js")[1].startswith("text/javascript")
+    assert json.loads(get("/api/model")[2]) == {"ready": False, "params": {}}

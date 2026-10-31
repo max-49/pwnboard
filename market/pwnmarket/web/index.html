@@ -4,54 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PWNMarket</title>
+<link rel="stylesheet" href="/site.css">
 <style>
-  :root {
-    --bg: #f4f6f8; --card: #ffffff; --ink: #0d1b2a; --muted: #5d6b7a; --line: #e3e8ee;
-    --yes: #0a9b5c; --yes-bg: #e3f6ec; --no: #d6364b; --no-bg: #fde8eb; --accent: #2457f5;
-    --shadow: 0 1px 2px rgba(13,27,42,.06), 0 4px 16px rgba(13,27,42,.04); --warn: #b7791f; --warn-bg: #fff4de;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --bg: #0b1017; --card: #131a23; --ink: #e8eef5; --muted: #8b9aab; --line: #232d3a;
-      --yes: #2ed18a; --yes-bg: #10281f; --no: #ff6b7f; --no-bg: #2e151b; --accent: #6b8cff;
-      --shadow: none; --warn: #f0b45b; --warn-bg: #2b2112;
-    }
-  }
-  :root[data-theme="dark"] {
-    --bg: #0b1017; --card: #131a23; --ink: #e8eef5; --muted: #8b9aab; --line: #232d3a;
-    --yes: #2ed18a; --yes-bg: #10281f; --no: #ff6b7f; --no-bg: #2e151b; --accent: #6b8cff;
-    --shadow: none; --warn: #f0b45b; --warn-bg: #2b2112;
-  }
-  * { box-sizing: border-box; }
-  html { color-scheme: light dark; }
-  body {
-    margin: 0; background: var(--bg); color: var(--ink);
-    font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    font-variant-numeric: tabular-nums;
-  }
-  button { font: inherit; color: inherit; cursor: pointer; }
-  .top {
-    position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 24px;
-    padding: 0 24px; height: 56px; background: var(--card); border-bottom: 1px solid var(--line);
-  }
-  .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: -.02em; font-size: 18px; }
-  .logo { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: var(--ink); color: var(--card); font-weight: 800; font-size: 15px; }
-  .top nav { display: flex; gap: 20px; color: var(--muted); font-weight: 600; font-size: 14px; }
-  .top nav .on { color: var(--ink); }
-  .spacer { flex: 1; }
-  .status { white-space: nowrap; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; padding: 5px 12px; border-radius: 999px; background: var(--yes-bg); color: var(--yes); }
-  .status i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; animation: pulse 1.6s infinite; }
-  .status.paused { background: var(--warn-bg); color: var(--warn); }
-  .status.paused i { animation: none; }
-  .status.down { background: var(--no-bg); color: var(--no); }
-  @keyframes pulse { 50% { opacity: .35; } }
-  .iconbtn { border: 1px solid var(--line); background: transparent; border-radius: 8px; width: 34px; height: 34px; }
   main { max-width: 1180px; margin: 0 auto; padding: 24px 24px 64px; }
   .crumbs { color: var(--muted); font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
   h1 { margin: 6px 0 4px; font-size: 30px; letter-spacing: -.02em; line-height: 1.15; }
   .meta { color: var(--muted); font-size: 14px; margin-bottom: 20px; }
   .grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; align-items: start; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
   .right { display: grid; gap: 16px; position: sticky; top: 76px; }
   .chartcard { padding: 20px 20px 12px; margin-bottom: 20px; }
   .chart-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
@@ -119,8 +78,7 @@
     .detail { padding-left: 16px; }
   }
   @media (max-width: 560px) {
-    main { padding: 16px 16px 48px; } .top { padding: 0 16px; gap: 12px; } .top nav { display: none; }
-    .status { font-size: 11px; padding: 4px 10px; }
+    main { padding: 16px 16px 48px; }
     h1 { font-size: 24px; } .headline .big { font-size: 32px; }
   }
 </style>
@@ -128,7 +86,7 @@
 <body>
 <header class="top">
   <div class="brand"><span class="logo">P</span>PWNMarket</div>
-  <nav><span class="on">Markets</span><span>Leaderboard</span><span>How it works</span></nav>
+  <nav><a class="on" href="/">Markets</a><a href="/how-it-works">How it works</a></nav>
   <div class="spacer"></div>
   <div class="status" id="status"><i></i><span>CONNECTING</span></div>
   <button class="iconbtn" id="theme" title="Switch light/dark" aria-label="Switch light or dark theme">◐</button>
@@ -161,6 +119,7 @@
   </div>
 </main>
 <div id="toast"></div>
+<script src="/site.js"></script>
 <script>
 "use strict";
 const RANGES = [[30, "30M"], [60, "1H"], [360, "6H"], [1440, "24H"]];
@@ -171,16 +130,6 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&
 // golden-angle hues: every team number gets its own colour, with neighbours well apart
 // (teams 13 apart land on nearly the same hue, so the higher numbers are drawn darker)
 const colorOf = (team) => `hsl(${Math.round((team * 137.508) % 360)}, 72%, ${team > 13 ? 44 : 58}%)`;
-
-function store(key, value) { try { if (value === undefined) return localStorage.getItem(key); localStorage.setItem(key, value); } catch (e) { return null; } }
-function applyTheme(t) { if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; }
-applyTheme(store("pwnmarket-theme"));
-$("theme").onclick = () => {
-  const dark = matchMedia("(prefers-color-scheme: dark)").matches;
-  const now = document.documentElement.dataset.theme || (dark ? "dark" : "light");
-  const next = now === "dark" ? "light" : "dark";
-  applyTheme(next); store("pwnmarket-theme", next);
-};
 
 const pct = (p) => { const v = p * 100; return v < 10 ? v.toFixed(1) : String(Math.round(v)); };
 const cents = (p) => Math.max(1, Math.min(99, Math.round(p * 100)));

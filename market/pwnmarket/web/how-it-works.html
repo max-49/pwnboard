@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How PWNMarket works</title>
+<link rel="stylesheet" href="/site.css">
+<style>
+  main { max-width: 860px; margin: 0 auto; padding: 28px 24px 72px; }
+  h1 { margin: 6px 0 8px; font-size: 32px; letter-spacing: -.02em; line-height: 1.15; }
+  h2 { margin: 36px 0 12px; font-size: 21px; letter-spacing: -.01em; }
+  .lede { color: var(--muted); font-size: 17px; margin: 0 0 8px; }
+  .crumbs { color: var(--muted); font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+  .crumbs a { color: inherit; }
+  .note { padding: 14px 16px; border-radius: 12px; background: var(--warn-bg); color: var(--ink); margin: 18px 0; font-size: 14.5px; }
+  .note b { color: var(--warn); }
+  .step { padding: 18px 20px; margin-bottom: 14px; }
+  .step h3 { margin: 0 0 4px; font-size: 16px; display: flex; gap: 10px; align-items: center; }
+  .step h3 i { font-style: normal; display: grid; place-items: center; min-width: 26px; height: 26px; border-radius: 8px; background: var(--ink); color: var(--card); font-size: 13px; }
+  .step p { margin: 6px 0 10px; color: var(--muted); font-size: 14.5px; }
+  pre.f { margin: 8px 0; padding: 12px 14px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); overflow-x: auto; font: 13.5px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--ink); white-space: pre; }
+  .v { font-weight: 800; color: var(--accent); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 12px; border-top: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; border-top: 0; }
+  td.num, th.num { text-align: right; white-space: nowrap; }
+  td code, .envname { font: 12.5px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--muted); }
+  .tablecard { padding: 6px 8px; overflow-x: auto; }
+  .pick { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+  .pick select { font: inherit; padding: 8px 10px; border-radius: 9px; border: 1px solid var(--line); background: var(--card); color: var(--ink); }
+  .out td:last-child { font-weight: 800; white-space: nowrap; text-align: right; }
+  .out td:nth-child(2) { color: var(--muted); font-size: 13px; }
+  .out tr.key td { background: var(--yes-bg); }
+  .src { color: var(--muted); font-size: 13.5px; margin-top: 28px; }
+  .src code { font: 12.5px ui-monospace, Menlo, monospace; }
+  @media (max-width: 560px) { main { padding: 18px 16px 56px; } h1 { font-size: 26px; } .out td:nth-child(2) { display: none; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="logo">P</span>PWNMarket</div>
+  <nav><a href="/">Markets</a><a class="on" href="/how-it-works">How it works</a></nav>
+  <div class="spacer"></div>
+  <button class="iconbtn" id="theme" title="Switch light/dark" aria-label="Switch light or dark theme">◐</button>
+</header>
+<main>
+  <div class="crumbs"><a href="/">Markets</a> · How it works</div>
+  <h1>How the prices are made</h1>
+  <p class="lede">Every price is a chance of winning, worked out by playing the rest of the competition out thousands of times. This page shows the real formula, and the numbers on it are read live from the running market.</p>
+  <div class="note"><b>What the market can see:</b> only each team's <em>uptime</em> score from the scoring site, plus how many hosts red team holds on it (from PWNBoard). It cannot see injects or any other scoring, so a catch-all “unknown points” term (step 6) stands in for them. The settings below were picked by hand to make the odds lively, not fitted to past competitions. It is play money.</div>
+  <div id="notready" class="note" hidden>Waiting for the first round of scores. The formulas below fill in once they arrive.</div>
+
+  <h2>The model, step by step</h2>
+
+  <div class="card step"><h3><i>1</i>Whole-game uptime rate</h3>
+    <p>The share of the available uptime points a team has actually earned. “Scored rounds” counts only rounds that awarded points, so a paused scoring engine (lunch) does not count against anyone.</p>
+    <pre class="f">whole_game = score ÷ (scored_rounds × checks_per_round)
+           = score ÷ (<span class="v" data-live="scored_rounds" data-fmt="1">…</span> × <span class="v" data-live="checks_per_round">…</span>)</pre></div>
+
+  <div class="card step"><h3><i>2</i>Recent form</h3>
+    <p>The same rate over recent rounds only, as an exponentially weighted average, so a team that just started failing checks loses ground quickly. Old rounds count half as much every <b><span class="v" data-p="form_half_life">…</span> rounds</b>. A round where nobody scored is skipped.</p>
+    <pre class="f">α    = 1 − 0.5 ^ (1 ÷ <span class="v" data-p="form_half_life">…</span>) = <span class="v" data-p="form_alpha" data-fmt="3">…</span>
+form ← form + α × (points_last_round ÷ checks_per_round − form)</pre></div>
+
+  <div class="card step"><h3><i>2b</i>Blend</h3>
+    <p>The two rates are mixed. A higher form weight makes the odds react faster to recent rounds.</p>
+    <pre class="f">blended = (1 − w) × whole_game + w × form        w = <span class="v" data-p="form_weight">…</span>
+          kept between <span class="v" data-p="min_rate" data-fmt="pct">…</span> and 100%</pre></div>
+
+  <div class="card step"><h3><i>3</i>Red team access</h3>
+    <p>Each host red team holds (it called back to PWNBoard in the last few minutes) takes a slice off the team's projected uptime, up to a cap.</p>
+    <pre class="f">penalty        = min(<span class="v" data-p="max_access_penalty" data-fmt="pct">…</span>, <span class="v" data-p="access_penalty">…</span> × hosts_held)
+projected_rate = blended × (1 − penalty)</pre></div>
+
+  <div class="card step"><h3><i>4</i>Projected final score</h3>
+    <p>What the team has now, plus what it is expected to earn in the rounds left. The rounds left come from the competition end time and the measured length of a round.</p>
+    <pre class="f">points_left = rounds_left × checks_per_round = <span class="v" data-live="rounds_left" data-fmt="1">…</span> × <span class="v" data-live="checks_per_round">…</span> = <span class="v" data-live="points_left" data-fmt="0">…</span>
+expected_final = score + points_left × projected_rate</pre></div>
+
+  <div class="card step"><h3><i>5</i>Luck we can model</h3>
+    <p>Even at a fixed rate, checks pass or fail at random, and the rate itself is only roughly known.</p>
+    <pre class="f">play_sd = √( points_left × rate × (1 − rate) )
+rate_sd = points_left × √( rate × (1 − rate) ÷ (checks_per_round × max(1, 2 × <span class="v" data-p="form_half_life">…</span>)) )</pre></div>
+
+  <div class="card step"><h3><i>6</i>Everything we cannot see</h3>
+    <p>Injects, adjustments and any other scoring are invisible to the market, so a large extra spread stands in for them. It shrinks as fewer rounds remain than the reference number, so odds settle toward the uptime leader near the end. <b>This is the main reason a leader is never a sure thing, and the biggest lever on how lively the odds are.</b></p>
+    <pre class="f">unknown_sd = <span class="v" data-p="unknown_points_sd">…</span> × min(1, √(rounds_left ÷ <span class="v" data-p="unknown_ref_rounds">…</span>)) = <span class="v" data-live="unknown_sd" data-fmt="0">…</span> points now
+total_sd   = √( play_sd² + rate_sd² + unknown_sd² )</pre></div>
+
+  <div class="card step"><h3><i>7</i>Simulate</h3>
+    <p>The rest of the competition is played out <b><span class="v" data-p="simulations">…</span> times</b>. In each run, every team's final score is its expected final plus a random amount scaled by its total spread. The randomness is fat-tailed (a Student-t distribution with <b><span class="v" data-p="tail_df">…</span> degrees of freedom</b>), so upsets are more likely than with a bell curve. The same random draws are reused every tick, so prices only move when the inputs change.</p>
+    <pre class="f">final = expected_final + total_sd × t_draw
+win chance  = share of runs where the team has the highest final score
+top 3 chance = share of runs where it finishes in the top three</pre></div>
+
+  <div class="card step"><h3><i>8</i>From chance to price</h3>
+    <p>Chances are floored so nobody trades at 0%, renormalised to add up to 100%, then blended with the last tick's price so lines move like a market instead of jittering.</p>
+    <pre class="f">floored  = max(win_chance, <span class="v" data-p="price_floor" data-fmt="pct">…</span>), then scaled to sum to 100%
+price    = <span class="v" data-p="price_keep">…</span> × last_price + (1 − <span class="v" data-p="price_keep">…</span>) × floored
+Yes price = price in cents      No price = 100 − Yes price</pre></div>
+
+  <h2>Worked example, with live numbers</h2>
+  <div class="card step">
+    <div class="pick"><label for="team"><b>Team</b></label><select id="team"></select><span class="envname" id="roundline"></span></div>
+    <div class="tablecard"><table class="out" id="example"></table></div>
+  </div>
+
+  <h2>The weights</h2>
+  <div class="card tablecard"><table id="weights"></table></div>
+  <p class="src" id="excluded"></p>
+  <p class="src">The code is <code>market/pwnmarket/model.py</code> (the math) and <code>service.py</code> (the live state) on the <code>competition/prediction-market</code> branch. The numbers on this page come straight from the running service at <code>/api/model</code>.</p>
+</main>
+<script src="/site.js"></script>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const num = (v, d) => (d === undefined ? String(Math.round(v * 1000) / 1000) : Number(v).toFixed(d));
+const pc = (v, d = 1) => (v * 100).toFixed(d) + "%";
+let model = null, picked = null;
+
+const WEIGHTS = [
+  ["form_weight", "FORM_WEIGHT", "Form weight", "0 judges a team by its whole game, 1 only by recent rounds. Higher makes the odds twitchier.", num],
+  ["form_half_life", "FORM_HALF_LIFE", "Form half-life (rounds)", "How fast old rounds fade from recent form. Lower makes the odds twitchier.", num],
+  ["access_penalty", "ACCESS_PENALTY", "Penalty per host held", "Share of projected uptime lost for each host red team holds. Higher lets red team move prices more.", num],
+  ["unknown_points_sd", "UNKNOWN_POINTS_SD", "Unknown points (spread)", "Stand-in for injects and everything else we cannot see. Lower lets the leader run away, higher gives more upsets.", num],
+  ["unknown_ref_rounds", "UNKNOWN_REF_ROUNDS", "Unknown spread reference (rounds)", "With fewer rounds than this left, the unknown spread shrinks.", num],
+  ["tail_df", "TAIL_DF", "Tail weight (degrees of freedom)", "Lower means fatter tails and more upsets. Must be above 2.", num],
+  ["simulations", "SIMULATIONS", "Simulated finishes", "How many times the rest of the competition is played out each tick.", num],
+  ["price_floor", "PRICE_FLOOR", "Price floor", "The smallest chance any team can have.", (v) => pc(v)],
+  ["price_keep", "PRICE_KEEP", "Price smoothing", "Share of the previous price kept each tick. 0 means no smoothing.", num],
+  ["tick_seconds", "TICK_SECONDS", "Tick (seconds)", "How often prices are recomputed. A new round also triggers it straight away.", num],
+];
+
+function fillPlaceholders() {
+  const p = model.params, l = model.live || {};
+  document.querySelectorAll("[data-p]").forEach((el) => {
+    const v = p[el.dataset.p];
+    el.textContent = v === undefined ? "?" : el.dataset.fmt === "pct" ? pc(v, 1).replace(".0%", "%") : num(v, el.dataset.fmt === undefined ? undefined : Number(el.dataset.fmt));
+  });
+  document.querySelectorAll("[data-live]").forEach((el) => {
+    const v = l[el.dataset.live];
+    el.textContent = v === undefined ? "…" : num(v, el.dataset.fmt === undefined ? undefined : Number(el.dataset.fmt));
+  });
+}
+
+function renderWeights() {
+  $("weights").innerHTML = "<tr><th>Setting</th><th class='num'>Now</th><th>What it does</th></tr>" + WEIGHTS.map(([key, env, label, text, fmt]) =>
+    `<tr><td><b>${esc(label)}</b><br><code>${env}</code></td><td class="num"><b>${esc(fmt(model.params[key]))}</b></td><td>${esc(text)}</td></tr>`).join("");
+  const ex = model.params.excluded_teams || [];
+  $("excluded").textContent = ex.length ? `Teams ${ex.join(", ")} are left out of the market (absent or test teams).` : "";
+}
+
+function renderExample() {
+  const sel = $("team");
+  if (!model.ready) { $("example").innerHTML = ""; sel.innerHTML = ""; $("roundline").textContent = ""; return; }
+  const teams = model.teams;
+  if (picked === null || !teams.some((t) => t.team === picked)) picked = teams[0].team;
+  sel.innerHTML = teams.map((t) => `<option value="${t.team}" ${t.team === picked ? "selected" : ""}>Team ${t.team}</option>`).join("");
+  const t = teams.find((x) => x.team === picked), p = model.params, l = model.live;
+  $("roundline").textContent = `Round ${l.round} · ${l.rounds_left.toFixed(1)} rounds left`;
+  const rows = [
+    ["Whole-game rate", `${t.score} ÷ (${num(l.scored_rounds, 1)} × ${l.checks_per_round})`, pc(t.rate_long)],
+    ["Recent form", "weighted average of recent rounds", pc(t.rate_form)],
+    ["Blended rate", `(1 − ${p.form_weight}) × ${pc(t.rate_long)} + ${p.form_weight} × ${pc(t.rate_form)}`, pc(t.blended)],
+    ["Red team penalty", `min(${pc(p.max_access_penalty, 0)}, ${p.access_penalty} × ${t.hosts} hosts held)`, pc(t.penalty)],
+    ["Projected rate", `${pc(t.blended)} × (1 − ${pc(t.penalty)})`, pc(t.rate_proj)],
+    ["Expected final score", `${t.score} + ${num(l.points_left, 0)} × ${pc(t.rate_proj)}`, Math.round(t.mean_final)],
+    ["Spread: random checks", "√(points_left × rate × (1 − rate))", "± " + t.play_sd.toFixed(1)],
+    ["Spread: uncertain rate", "points_left × √(rate × (1 − rate) ÷ …)", "± " + t.rate_sd.toFixed(1)],
+    ["Spread: unseen points", "unknown spread, shrunk for rounds left", "± " + l.unknown_sd.toFixed(1)],
+    ["Total spread", "√(sum of the three squared)", "± " + t.sd.toFixed(1)],
+    ["Chance to win", `share of ${p.simulations.toLocaleString()} simulated finishes`, t.win_prob === null ? "–" : pc(t.win_prob)],
+    ["Top 3 chance", "share finishing in the top three", t.top3_prob === null ? "–" : pc(t.top3_prob)],
+    ["Price shown", "chance after floor and smoothing", t.price === null ? "–" : Math.max(1, Math.min(99, Math.round(t.price * 100))) + "¢ Yes"],
+  ];
+  const keyRows = new Set([4, 5, 10, 12]);
+  $("example").innerHTML = "<tr><th>Step</th><th>Calculation</th><th class='num'>Result</th></tr>" +
+    rows.map((r, i) => `<tr class="${keyRows.has(i) ? "key" : ""}"><td>${esc(r[0])}</td><td>${esc(r[1])}</td><td>${esc(r[2])}</td></tr>`).join("");
+}
+
+function render() {
+  $("notready").hidden = model.ready;
+  fillPlaceholders(); renderWeights(); renderExample();
+}
+$("team").addEventListener("change", (e) => { picked = Number(e.target.value); renderExample(); });
+
+async function refresh() {
+  try {
+    const r = await fetch("/api/model", { cache: "no-store" });
+    if (!r.ok) throw new Error(r.status);
+    model = await r.json(); render();
+  } catch (e) { /* keep what is on screen */ }
+}
+refresh();
+setInterval(refresh, 10000);
+</script>
+</body>
+</html>

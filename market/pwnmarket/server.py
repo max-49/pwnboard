@@ -8,23 +8,36 @@ from urllib.parse import parse_qs, urlparse
 
 logger = logging.getLogger("market.server")
 
-PAGE = os.path.join(os.path.dirname(__file__), "web", "index.html")
+WEB = os.path.join(os.path.dirname(__file__), "web")
+HTML = "text/html; charset=utf-8"
+# URL path -> (file in web/, content type)
+FILES = {
+    "/": ("index.html", HTML),
+    "/index.html": ("index.html", HTML),
+    "/how-it-works": ("how-it-works.html", HTML),
+    "/site.css": ("site.css", "text/css; charset=utf-8"),
+    "/site.js": ("site.js", "text/javascript; charset=utf-8"),
+}
 
 
 def make_server(market, port):
-    with open(PAGE, "rb") as f:
-        page = f.read()
+    pages = {}
+    for path, (name, content_type) in FILES.items():
+        with open(os.path.join(WEB, name), "rb") as f:
+            pages[path] = (f.read(), content_type)
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
             url = urlparse(self.path)
             try:
-                if url.path in ("/", "/index.html"):
-                    self._send(200, page, "text/html; charset=utf-8")
+                if url.path in pages:
+                    self._send(200, *pages[url.path])
                 elif url.path == "/healthz":
                     self._send(200, b"ok\n", "text/plain")
                 elif url.path in ("/api/odds", "/odds"):
                     self._json(market.snapshot())
+                elif url.path == "/api/model":
+                    self._json(market.explain())
                 elif url.path == "/api/history":
                     try:
                         minutes = int(parse_qs(url.query).get("minutes", ["60"])[0])

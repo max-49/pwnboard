@@ -6,7 +6,7 @@ from collections import deque
 from dataclasses import replace
 from datetime import datetime, timezone
 
-from .model import Noise, TeamInput, simulate, to_prices
+from .model import MAX_ACCESS_PENALTY, MIN_RATE, Noise, TeamInput, components, simulate, to_prices
 
 logger = logging.getLogger("market.service")
 
@@ -135,6 +135,18 @@ class Market:
 
     # --- output -------------------------------------------------------------------------
 
+    def _inputs(self, access):
+        return [
+            TeamInput(
+                team=team,
+                score=self.scores[team],
+                rate_long=self._rate_long(self.scores[team], self.scored_rounds, self.checks),
+                rate_form=self.form.get(team, 0.0),
+                access=access.get(team, 0),
+            )
+            for team in sorted(self.scores)
+        ]
+
     def tick(self):
         """Recompute and save everyone's odds. Returns the rows saved (None before any scores)."""
         with self.lock:
@@ -148,16 +160,7 @@ class Market:
         with self.lock:
             self.access = access
             stale = self.last_update is None or self._mono() - self.last_update > self.cfg.stale_seconds
-            teams = [
-                TeamInput(
-                    team=team,
-                    score=self.scores[team],
-                    rate_long=self._rate_long(self.scores[team], self.scored_rounds, self.checks),
-                    rate_form=self.form.get(team, 0.0),
-                    access=access.get(team, 0),
-                )
-                for team in sorted(self.scores)
-            ]
+            teams = self._inputs(access)
             odds = simulate(teams, self.rounds_left(), self.checks, self.cfg, self.noise)
             self.prices = to_prices({o.team: o.win_prob for o in odds}, self.prices, self.cfg)
             ts = self._now()
@@ -203,3 +206,48 @@ class Market:
             self._history_cache.clear()
         self._history_cache[minutes] = (self._mono(), data)
         return data
+
+    # The settings that shape the odds. Listed one by one so nothing secret (the database password)
+    # can leak into the public "How it works" page.
+    PUBLIC_PARAMS = (
+        "form_weight", "form_half_life", "access_penalty", "unknown_points_sd", "unknown_ref_rounds",
+        "tail_df", "simulations", "price_floor", "price_keep", "tick_seconds", "excluded_teams",
+    )
+
+    def explain(self):
+        """The model's settings, the live round state, and every step of the math for every team."""
+        with self.lock:
+            params = {name: getattr(self.cfg, name) for name in self.PUBLIC_PARAMS}
+            params["excluded_teams"] = list(params["excluded_teams"])
+            params["min_rate"] = MIN_RATE
+            params["max_access_penalty"] = MAX_ACCESS_PENALTY
+            params["form_alpha"] = 1 - 0.5 ** (1 / self.cfg.form_half_life)
+            if self.round is None:
+                return {"ready": False, "params": params}
+            teams = self._inputs(self.access)
+            rounds_left = self.rounds_left()
+            c = components(teams, rounds_left, self.checks, self.cfg)
+            latest = {row["team_number"]: row for row in self.latest}
+            out = []
+            for i, t in enumerate(teams):
+                row = latest.get(t.team, {})
+                out.append({
+                    "team": t.team, "score": int(t.score), "hosts": t.access,
+                    "rate_long": t.rate_long, "rate_form": t.rate_form,
+                    "blended": float(c["blended"][i]), "penalty": float(c["penalty"][i]),
+                    "rate_proj": float(c["rate"][i]), "mean_final": float(c["mean"][i]),
+                    "play_sd": float(c["play_sd"][i]), "rate_sd": float(c["rate_sd"][i]),
+                    "sd": float(c["sd"][i]),
+                    "win_prob": row.get("win_prob"), "top3_prob": row.get("top3_prob"), "price": row.get("price"),
+                })
+            out.sort(key=lambda r: -(r["price"] or 0))
+            return {
+                "ready": True,
+                "params": params,
+                "live": {
+                    "round": self.round, "rounds_left": rounds_left, "round_seconds": self.round_seconds(),
+                    "scored_rounds": self.scored_rounds, "checks_per_round": self.checks,
+                    "points_left": c["points_left"], "unknown_sd": float(c["unknown_sd"]),
+                },
+                "teams": out,
+            }
