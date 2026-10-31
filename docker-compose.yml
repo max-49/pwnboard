@@ -76,6 +76,34 @@ services:
       redis:
         condition: service_started
 
+  # Prediction market odds for the Grafana dashboard. Built on the host from ./market (it is
+  # not in the published images), so deploy it with:  docker compose up -d --build market
+  market:
+    build: ./market
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      - POSTGRES_PASSWORD=${PWNBOARD_PASSWORD}
+      - SCORING_URL=${SCORING_URL:-https://scoring.irsec.club/api}
+      # When the competition ends, e.g. 2026-10-31T18:00:00-04:00 (otherwise ROUNDS_REMAINING is used)
+      - COMPETITION_END=${COMPETITION_END:-}
+      - ROUNDS_REMAINING=${ROUNDS_REMAINING:-60}
+      # How wild the odds are; see market/README.md. Empty means the default.
+      - UNKNOWN_POINTS_SD=${UNKNOWN_POINTS_SD:-}
+      - ACCESS_PENALTY=${ACCESS_PENALTY:-}
+      - FORM_WEIGHT=${FORM_WEIGHT:-}
+      - FORM_HALF_LIFE=${FORM_HALF_LIFE:-}
+      - PRICE_KEEP=${PRICE_KEEP:-}
+      - TAIL_DF=${TAIL_DF:-}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8080/healthz', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      db:
+        condition: service_healthy
+
   data:
     image: grafana/grafana:latest
     restart: unless-stopped

@@ -1,0 +1,156 @@
+"""Ties the pieces together: score updates in, odds out."""
+import logging
+import threading
+import time
+from collections import deque
+from datetime import datetime, timezone
+
+from .model import Noise, TeamInput, simulate, to_prices
+
+logger = logging.getLogger("market.service")
+
+REPLAY_ROUNDS = 40  # recent rounds reloaded after a restart to rebuild "recent form"
+
+
+class Market:
+    def __init__(self, cfg, store, now=None, mono=time.monotonic):
+        self.cfg = cfg
+        self.store = store
+        self._now = now or (lambda: datetime.now(timezone.utc))
+        self._mono = mono
+        self.noise = Noise(cfg.simulations)
+        self.lock = threading.RLock()
+
+        self.round = None
+        self.first_round = None
+        self.checks = 11
+        self.scores = {}
+        self.form = {}
+        self.access = {}
+        self.prices = {}
+        self.arrivals = deque(maxlen=12)  # (round, monotonic time) of recent rounds
+        self.last_update = None
+        self.latest = []
+
+    # --- inputs -------------------------------------------------------------------------
+
+    def restore(self):
+        """Rebuild recent form from the rounds saved before a restart."""
+        from .scoring import RoundUpdate
+
+        for rnd, teams in self.store.load_recent_rounds(REPLAY_ROUNDS):
+            self.on_round(
+                RoundUpdate(
+                    round=rnd,
+                    uptime_score={t: v[0] for t, v in teams.items()},
+                    last_round_points={t: v[1] for t, v in teams.items()},
+                    checks_per_team=self.checks,
+                ),
+                replay=True,
+            )
+        if self.round is not None:
+            self.first_round = self.round  # ROUNDS_REMAINING counts from now, not from the replay
+            logger.info("restored recent rounds up to round %d", self.round)
+
+    def on_round(self, update, replay=False):
+        """Take in one round of scores. Returns False for a round already seen."""
+        with self.lock:
+            if self.round is not None and update.round <= self.round:
+                return False
+            alpha = 1 - 0.5 ** (1 / self.cfg.form_half_life)
+            checks = update.checks_per_team
+            for team, points in update.last_round_points.items():
+                long_rate = self._rate_long(update.uptime_score[team], update.round, checks)
+                previous = self.form.get(team, long_rate)
+                self.form[team] = previous + alpha * (points / checks - previous)
+            self.round, self.checks = update.round, checks
+            self.scores = dict(update.uptime_score)
+            if self.first_round is None:
+                self.first_round = update.round
+            if not replay:
+                self.arrivals.append((update.round, self._mono()))
+                self.last_update = self._mono()
+        if not replay:
+            try:
+                self.store.save_round(update)
+            except Exception:
+                logger.exception("could not save round %d", update.round)
+        return True
+
+    @staticmethod
+    def _rate_long(score, rnd, checks):
+        return max(0.0, min(1.0, score / max(1, rnd * checks)))
+
+    # --- time left ----------------------------------------------------------------------
+
+    def round_seconds(self):
+        """Seconds per round, measured from the rounds seen so far."""
+        if len(self.arrivals) >= 2:
+            (r0, t0), (r1, t1) = self.arrivals[0], self.arrivals[-1]
+            if r1 > r0 and t1 > t0:
+                return max(5.0, min(3600.0, (t1 - t0) / (r1 - r0)))
+        return self.cfg.round_seconds
+
+    def rounds_left(self):
+        if self.cfg.competition_end:
+            seconds = (self.cfg.competition_end - self._now()).total_seconds()
+            return max(0.0, seconds / self.round_seconds())
+        return max(0.0, self.cfg.rounds_remaining - (self.round - self.first_round))
+
+    # --- output -------------------------------------------------------------------------
+
+    def tick(self):
+        """Recompute and save everyone's odds. Returns the rows saved (None before any scores)."""
+        with self.lock:
+            if self.round is None:
+                return None
+        try:
+            access = self.store.team_access()
+        except Exception:
+            logger.exception("could not read red team access; using the last known values")
+            access = self.access
+        with self.lock:
+            self.access = access
+            stale = self.last_update is None or self._mono() - self.last_update > self.cfg.stale_seconds
+            teams = [
+                TeamInput(
+                    team=team,
+                    score=self.scores[team],
+                    rate_long=self._rate_long(self.scores[team], self.round, self.checks),
+                    rate_form=self.form.get(team, 0.0),
+                    access=access.get(team, 0),
+                )
+                for team in sorted(self.scores)
+            ]
+            odds = simulate(teams, self.rounds_left(), self.checks, self.cfg, self.noise)
+            self.prices = to_prices({o.team: o.win_prob for o in odds}, self.prices, self.cfg)
+            ts = self._now()
+            rows = [
+                {
+                    "ts": ts, "round": self.round, "team": f"Team {o.team}", "team_number": o.team,
+                    "price": self.prices[o.team], "win_prob": o.win_prob, "top3_prob": o.top3_prob,
+                    "score": int(self.scores[o.team]), "exp_final": o.exp_final,
+                    "rate_long": t.rate_long, "rate_form": t.rate_form, "rate_proj": o.rate_proj,
+                    "access_hosts": t.access, "stale": stale,
+                }
+                for o, t in zip(odds, teams)
+            ]
+            self.latest = rows
+        try:
+            self.store.save_odds(rows)
+        except Exception:
+            logger.exception("could not save odds")
+        return rows
+
+    def snapshot(self):
+        """The latest odds as JSON-ready data, best price first."""
+        with self.lock:
+            rows = sorted(self.latest, key=lambda r: -r["price"])
+            return {
+                "round": self.round,
+                "rounds_left": None if self.round is None else round(self.rounds_left(), 1),
+                "stale": bool(rows and rows[0]["stale"]),
+                "teams": [
+                    {k: (v.isoformat() if k == "ts" else v) for k, v in row.items()} for row in rows
+                ],
+            }

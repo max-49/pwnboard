@@ -239,9 +239,9 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "format": "time_series",
+                        "format": "table",
                         "rawQuery": true,
-                        "rawSql": "WITH buckets AS (\n  SELECT generate_series(\n    $__timeFrom()::timestamptz,\n    $__timeTo()::timestamptz,\n    make_interval(secs => GREATEST($__interval_ms / 1000.0, 60))\n  ) AS t\n),\nteams AS (\n  SELECT DISTINCT team FROM callback_events WHERE team IS NOT NULL\n),\npresence AS (\n  -- which hosts called back in which minute (5 minutes of lookback before the range)\n  SELECT DISTINCT team, ip, date_trunc('minute', received_at) AS m\n  FROM callback_events\n  WHERE team IS NOT NULL\n    AND received_at >= $__timeFrom()::timestamptz - INTERVAL '5 minutes'\n    AND received_at <= $__timeTo()::timestamptz\n),\nonline AS (\n  -- hosts of each team that called back during the 5 minutes up to each bucket\n  SELECT b.t, tm.team, COUNT(DISTINCT p.ip) AS hosts\n  FROM buckets b\n  CROSS JOIN teams tm\n  LEFT JOIN presence p\n    ON p.team = tm.team\n   AND p.m > b.t - INTERVAL '5 minutes'\n   AND p.m <= b.t\n  GROUP BY b.t, tm.team\n),\nweights AS (\n  -- fewer compromised hosts means a bigger weight\n  SELECT t, team, EXP(-${odds_sharpness} * hosts) AS w FROM online\n),\nodds AS (\n  -- each team's share of the total weight in each bucket, as a percentage\n  SELECT t, team, 100.0 * w / SUM(w) OVER (PARTITION BY t) AS pct FROM weights\n),\nleaders AS (\n  -- the teams with the best odds now; only these are drawn\n  SELECT team FROM odds WHERE t = (SELECT MAX(t) FROM odds) ORDER BY pct DESC LIMIT ${odds_top}\n)\nSELECT\n  t AS \"time\",\n  team AS metric,\n  pct::float8 AS \"Odds\"\nFROM odds\nWHERE team IN (SELECT team FROM leaders)\nORDER BY t, team"
+                        "rawSql": "WITH leaders AS (\n  -- the teams with the best odds right now; only these are drawn\n  SELECT team FROM market.odds\n  WHERE ts = (SELECT MAX(ts) FROM market.odds)\n  ORDER BY price DESC LIMIT ${odds_top}\n)\nSELECT\n  $__timeGroupAlias(ts, $__interval),\n  team AS metric,\n  100.0 * AVG(price) AS \"Odds\"\nFROM market.odds\nWHERE $__timeFilter(ts) AND team IN (SELECT team FROM leaders)\nGROUP BY 1, 2\nORDER BY 1, 2"
                       },
                       "version": "v0"
                     },
@@ -253,7 +253,7 @@
               "transformations": []
             }
           },
-          "description": "Each team's chance of winning, drawn like a prediction market: the chances of all teams add up to 100%. A team's chance falls as red team holds more of its hosts (hosts that called back in the last 5 minutes) and rises as it gets them back. Only the teams with the best chances now are drawn (Teams shown). Market sharpness sets how strongly one compromised host moves the odds. It is a joke model: lost callbacks can also mean a team's own scorechecks are down.",
+          "description": "Each team's chance of winning, in percent, from the market service: its score, how well it has been doing lately and how many hosts red team holds, simulated to the end of the competition. All teams add up to 100%.",
           "id": 10,
           "links": [],
           "title": "Odds of Winning",
@@ -356,7 +356,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "WITH buckets AS (\n  SELECT generate_series(\n    $__timeFrom()::timestamptz,\n    $__timeTo()::timestamptz,\n    make_interval(secs => GREATEST($__interval_ms / 1000.0, 60))\n  ) AS t\n),\nteams AS (\n  SELECT DISTINCT team FROM callback_events WHERE team IS NOT NULL\n),\npresence AS (\n  -- which hosts called back in which minute (5 minutes of lookback before the range)\n  SELECT DISTINCT team, ip, date_trunc('minute', received_at) AS m\n  FROM callback_events\n  WHERE team IS NOT NULL\n    AND received_at >= $__timeFrom()::timestamptz - INTERVAL '5 minutes'\n    AND received_at <= $__timeTo()::timestamptz\n),\nonline AS (\n  -- hosts of each team that called back during the 5 minutes up to each bucket\n  SELECT b.t, tm.team, COUNT(DISTINCT p.ip) AS hosts\n  FROM buckets b\n  CROSS JOIN teams tm\n  LEFT JOIN presence p\n    ON p.team = tm.team\n   AND p.m > b.t - INTERVAL '5 minutes'\n   AND p.m <= b.t\n  GROUP BY b.t, tm.team\n),\nweights AS (\n  -- fewer compromised hosts means a bigger weight\n  SELECT t, team, EXP(-${odds_sharpness} * hosts) AS w FROM online\n),\nodds AS (\n  -- each team's share of the total weight in each bucket, as a percentage\n  SELECT t, team, 100.0 * w / SUM(w) OVER (PARTITION BY t) AS pct FROM weights\n)\nSELECT\n  team AS metric,\n  pct::float8 AS \"Odds\"\nFROM odds\nWHERE t = (SELECT MAX(t) FROM odds)\nORDER BY pct DESC\nLIMIT ${odds_top}"
+                        "rawSql": "SELECT\n  team AS metric,\n  100.0 * price AS \"Odds\"\nFROM market.odds\nWHERE ts = (SELECT MAX(ts) FROM market.odds)\nORDER BY price DESC\nLIMIT ${odds_top}"
                       },
                       "version": "v0"
                     },
@@ -1363,6 +1363,88 @@
             "version": "13.3.0"
           }
         }
+      },
+      "panel-12": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "PF37523F25C86FB03"
+                      },
+                      "group": "grafana-postgresql-datasource",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawQuery": true,
+                        "rawSql": "SELECT\n  team AS \"Team\",\n  ROUND((100.0 * price)::numeric, 1) AS \"Odds %\",\n  ROUND((100.0 * top3_prob)::numeric, 1) AS \"Top 3 %\",\n  score AS \"Score\",\n  access_hosts AS \"Hosts held\",\n  ROUND((100.0 * rate_long)::numeric, 1) AS \"Uptime all game %\",\n  ROUND((100.0 * rate_form)::numeric, 1) AS \"Uptime recent %\",\n  ROUND((100.0 * rate_proj)::numeric, 1) AS \"Projected %\",\n  ROUND(exp_final::numeric) AS \"Projected final\",\n  stale AS \"Stale\"\nFROM market.odds\nWHERE ts = (SELECT MAX(ts) FROM market.odds)\nORDER BY price DESC"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Why the odds are what they are: score, projected uptime rate (after red team access) and projected final uptime score.",
+          "id": 12,
+          "links": [],
+          "title": "Market Details",
+          "vizConfig": {
+            "group": "table",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "custom": {
+                    "align": "auto",
+                    "cellOptions": {
+                      "type": "auto"
+                    },
+                    "footer": {
+                      "reducers": []
+                    },
+                    "inspect": false
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "red",
+                        "value": 80
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "cellHeight": "sm",
+                "showHeader": true,
+                "zebraStriping": false
+              }
+            },
+            "version": "13.3.0"
+          }
+        }
       }
     },
     "layout": {
@@ -1511,6 +1593,19 @@
               "x": 16,
               "y": 31
             }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-12"
+              },
+              "height": 10,
+              "width": 24,
+              "x": 0,
+              "y": 43
+            }
           }
         ]
       }
@@ -1549,62 +1644,6 @@
     },
     "title": "PWNBoard Dashboard",
     "variables": [
-      {
-        "kind": "CustomVariable",
-        "spec": {
-          "allowCustomValue": true,
-          "current": {
-            "text": "0.5",
-            "value": "0.5"
-          },
-          "description": "How strongly one compromised host moves a team's odds. Turn it up when the teams are all close.",
-          "hide": "dontHide",
-          "includeAll": false,
-          "label": "Market sharpness",
-          "multi": false,
-          "name": "odds_sharpness",
-          "options": [
-            {
-              "selected": false,
-              "text": "0.2",
-              "value": "0.2"
-            },
-            {
-              "selected": false,
-              "text": "0.35",
-              "value": "0.35"
-            },
-            {
-              "selected": true,
-              "text": "0.5",
-              "value": "0.5"
-            },
-            {
-              "selected": false,
-              "text": "0.75",
-              "value": "0.75"
-            },
-            {
-              "selected": false,
-              "text": "1",
-              "value": "1"
-            },
-            {
-              "selected": false,
-              "text": "1.5",
-              "value": "1.5"
-            },
-            {
-              "selected": false,
-              "text": "2",
-              "value": "2"
-            }
-          ],
-          "query": "0.2,0.35,0.5,0.75,1,1.5,2",
-          "skipUrlSync": false,
-          "valuesFormat": "csv"
-        }
-      },
       {
         "kind": "CustomVariable",
         "spec": {
