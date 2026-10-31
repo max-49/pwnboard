@@ -88,9 +88,14 @@ The `market` schema in Postgres is left behind and harmless (`DROP SCHEMA market
   scores, marking rows `stale` after 3 minutes without a round.
 - If the database hiccups, a tick is skipped and the connection is reopened; the last known red team
   access is used if only that read fails.
+- Scoring pauses (lunch) are ignored: a round where nobody scored does not count against anyone's recent
+  form. The whole-game rate counts only rounds that scored, worked out from the best score divided by the
+  checks per round, which relies on one team having perfect uptime (the test team, 21). If it ever stops
+  being perfect, whole-game rates read slightly high.
 - After a restart the last 40 rounds are reloaded so "recent form" does not reset.
   `ROUNDS_REMAINING` counts from each start, so prefer `COMPETITION_END`.
-- Only teams in the scoring engine's feed get odds, which leaves the test team out.
+- Teams 19 (did not show up), 20 (red team test team) and 21 (blue team test team) get no odds. This is
+  hardcoded in `excluded_teams` in `pwnmarket/config.py` for this competition.
 
 ## Development
 

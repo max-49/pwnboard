@@ -33,6 +33,10 @@ class Config:
     rounds_remaining: float = 60
     round_seconds: float = 60  # used until the real round length has been measured
 
+    # Teams that get no odds: 19 did not show up, 20 and 21 are the red team and blue team test teams.
+    # Hardcoded for this competition.
+    excluded_teams: tuple = (19, 20, 21)
+
     tick_seconds: float = 15
     stale_seconds: float = 180
     access_window_minutes: int = 5

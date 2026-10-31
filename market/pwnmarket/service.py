@@ -3,6 +3,7 @@ import logging
 import threading
 import time
 from collections import deque
+from dataclasses import replace
 from datetime import datetime, timezone
 
 from .model import Noise, TeamInput, simulate, to_prices
@@ -23,6 +24,7 @@ class Market:
 
         self.round = None
         self.first_round = None
+        self.scored_rounds = 0.0  # rounds that actually awarded points (not paused, not before scoring began)
         self.checks = 11
         self.scores = {}
         self.form = {}
@@ -54,15 +56,28 @@ class Market:
 
     def on_round(self, update, replay=False):
         """Take in one round of scores. Returns False for a round already seen."""
+        saved = update  # saved whole: the excluded teams' scores are how rounds are counted
+        update = replace(
+            update,
+            uptime_score=self._without_excluded(update.uptime_score),
+            last_round_points=self._without_excluded(update.last_round_points),
+        )
         with self.lock:
             if self.round is not None and update.round <= self.round:
                 return False
             alpha = 1 - 0.5 ** (1 / self.cfg.form_half_life)
             checks = update.checks_per_team
+            # A team that never fails (the test team) has earned `checks` points in every round that
+            # scored, so the best score tells us how many rounds that was, whatever the round number says.
+            self.scored_rounds = max(self.scored_rounds, max(saved.uptime_score.values(), default=0) / checks)
+            idle = not any(update.last_round_points.values())  # scoring paused: says nothing about form
             for team, points in update.last_round_points.items():
-                long_rate = self._rate_long(update.uptime_score[team], update.round, checks)
-                previous = self.form.get(team, long_rate)
-                self.form[team] = previous + alpha * (points / checks - previous)
+                long_rate = self._rate_long(update.uptime_score[team], self.scored_rounds, checks)
+                if idle:
+                    self.form.setdefault(team, long_rate)
+                else:
+                    previous = self.form.get(team, long_rate)
+                    self.form[team] = previous + alpha * (points / checks - previous)
             self.round, self.checks = update.round, checks
             self.scores = dict(update.uptime_score)
             if self.first_round is None:
@@ -72,14 +87,17 @@ class Market:
                 self.last_update = self._mono()
         if not replay:
             try:
-                self.store.save_round(update)
+                self.store.save_round(saved)
             except Exception:
                 logger.exception("could not save round %d", update.round)
         return True
 
+    def _without_excluded(self, by_team):
+        return {team: v for team, v in by_team.items() if team not in self.cfg.excluded_teams}
+
     @staticmethod
-    def _rate_long(score, rnd, checks):
-        return max(0.0, min(1.0, score / max(1, rnd * checks)))
+    def _rate_long(score, scored_rounds, checks):
+        return max(0.0, min(1.0, score / max(1.0, scored_rounds * checks)))
 
     # --- time left ----------------------------------------------------------------------
 
@@ -116,7 +134,7 @@ class Market:
                 TeamInput(
                     team=team,
                     score=self.scores[team],
-                    rate_long=self._rate_long(self.scores[team], self.round, self.checks),
+                    rate_long=self._rate_long(self.scores[team], self.scored_rounds, self.checks),
                     rate_form=self.form.get(team, 0.0),
                     access=access.get(team, 0),
                 )

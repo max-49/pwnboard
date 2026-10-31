@@ -41,7 +41,7 @@ class Clock:
 
 
 def update(rnd, scores=None, points=None):
-    scores = scores or {1: 100 * rnd, 2: 90 * rnd, 3: 80 * rnd}
+    scores = scores or {1: 10 * rnd, 2: 9 * rnd, 3: 8 * rnd}
     points = points or {1: 10, 2: 9, 3: 8}
     return RoundUpdate(rnd, scores, points, 10)
 
@@ -119,9 +119,38 @@ def test_database_trouble_does_not_stop_pricing():
 
 
 def test_restore_rebuilds_form_and_counts_rounds_left_from_now():
-    history = [(r, {1: (100 * r, 10), 2: (90 * r, 9), 3: (80 * r, 8)}) for r in range(1, 31)]
+    history = [(r, {1: (10 * r, 10), 2: (9 * r, 9), 3: (8 * r, 8)}) for r in range(1, 31)]
     m = market(store=FakeStore(history=history), rounds_remaining=50)
     m.restore()
     assert m.round == 30 and m.form[1] > 0.5
     assert m.rounds_left() == 50
     assert m.store.rounds == []  # replayed rounds are not saved again
+
+
+def test_excluded_teams_get_no_odds():
+    scores = {1: 100, 2: 90, 19: 0, 20: 50, 21: 110}
+    m = market()
+    m.on_round(RoundUpdate(5, scores, {t: 9 for t in scores}, 10))
+    assert {r["team_number"] for r in m.tick()} == {1, 2}
+    assert sum(r["price"] for r in m.tick()) == pytest.approx(1)
+
+
+def test_paused_scoring_does_not_drag_down_form_or_whole_game_rate():
+    m = market(form_half_life=1)
+    frozen = {1: 100, 2: 90, 3: 80}
+    m.on_round(update(10, scores=frozen))
+    form, row = dict(m.form), m.tick()[1]
+    for rnd in range(11, 16):  # scores frozen, nobody earning anything
+        m.on_round(update(rnd, scores=frozen, points={1: 0, 2: 0, 3: 0}))
+    assert m.form == form
+    assert m.tick()[1]["rate_long"] == pytest.approx(row["rate_long"]) == pytest.approx(0.9)
+
+
+def test_whole_game_rate_counts_only_rounds_that_scored_using_the_test_team():
+    # round 100, but the test team (21, perfect: 10 points a round) only has 40 rounds of points,
+    # as when scoring started late or was paused before the market started watching
+    m = market()
+    scores = {1: 360, 2: 320, 21: 400}
+    m.on_round(RoundUpdate(100, scores, {1: 9, 2: 8, 21: 10}, 10))
+    rates = {r["team_number"]: r["rate_long"] for r in m.tick()}
+    assert rates == {1: pytest.approx(0.9), 2: pytest.approx(0.8)}
